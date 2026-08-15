@@ -1,0 +1,27 @@
+{
+  "revision": "6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a",
+  "source": "src/utils/rng.rs:57-105; tools/parity/shim.py:57-83",
+  "seed": 42,
+  "choice": 20,
+  "closedRange": 2,
+  "halfOpenRange": 5,
+  "shuffledValues": [4, 2, 1, 3],
+  "requestTrace": [
+    "choice", "choice",
+    "closed", "closed", "closed", "closed",
+    "halfOpen",
+    "shuffle", "shuffle", "shuffle"
+  ],
+  "valueTrace": [
+    15021278609987233951,
+    5881210131331364753,
+    18149643915985481100,
+    12933668939759105464,
+    14637574242682825331,
+    10848501901068131965,
+    2312344417745909078,
+    11162538943635311430,
+    3831705504650218695,
+    17217215411128672468
+  ]
+}

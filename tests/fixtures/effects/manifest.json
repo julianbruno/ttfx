@@ -1,0 +1,15 @@
+{
+  "format": "ttfx-effect-oracle-v1",
+  "revision": "6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a",
+  "frameEncoding": "length-prefixed-utf8-terminal-frame-v1",
+  "fixtures": [
+    { "effect": "print", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "print.frames" },
+    { "effect": "slide", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "slide.frames" },
+    { "effect": "wipe", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "wipe.frames" },
+    { "effect": "expand", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "expand.frames" },
+    { "effect": "rain", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "rain.frames" },
+    { "effect": "bubbles", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "bubbles.frames" },
+    { "effect": "fireworks", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "fireworks.frames" },
+    { "effect": "swarm", "input": "Swift\nTTE", "seed": 42, "canvas": { "columns": 12, "rows": 6 }, "frameFile": "swarm.frames" }
+  ]
+}

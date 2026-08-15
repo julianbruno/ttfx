@@ -1,2 +1,3 @@
 tools/parity/cases.txt merge=union
 docs/ordering-inventory.md merge=union
+tests/fixtures/effects/*.frames -whitespace
