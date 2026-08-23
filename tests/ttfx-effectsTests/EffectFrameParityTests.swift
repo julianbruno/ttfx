@@ -1661,4 +1661,176 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func matrixEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "matrix", "--rain-time", "1",
+            "--rain-fall-delay-range", "1-1", "--rain-column-delay-range", "1-1",
+            "--rain-symbols", "x", "--rain-color-gradient", "112233",
+            "--highlight-color", "ffffff", "--symbol-swap-chance", "0.000001",
+            "--color-swap-chance", "0.000001", "--resolve-delay", "1",
+            "--final-gradient-stops", "445566", "--final-gradient-steps", "1",
+            "--final-gradient-frames", "1", "--final-gradient-direction", "vertical"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        MatrixEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            matrixConfiguration: .init(
+                highlightColor: Color(hex: "ffffff"),
+                rainColorGradient: [Color(hex: "112233")],
+                rainSymbols: ["x"],
+                rainFallDelayRange: 1...1,
+                rainColumnDelayRange: 1...1,
+                rainTime: 1,
+                symbolSwapChance: 0.000001,
+                colorSwapChance: 0.000001,
+                resolveDelay: 1,
+                finalGradientStops: [Color(hex: "445566")],
+                finalGradientSteps: [1],
+                finalGradientFrames: 1,
+                finalGradientDirection: .vertical
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "matrix one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell matrix frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func burnEffectMatchesACompleteOneCellNoSmokeIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "220",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "burn", "--smoke-chance", "0",
+            "--final-gradient-stops", "112233", "445566", "--final-gradient-steps", "2",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 200)
+    let status = try assertFrameParity(
+        BurnEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            burnConfiguration: .init(
+                smokeChance: 0,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "burn one-cell no-smoke independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell no-smoke burn frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func crumbleEffectMatchesABoundedOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "64",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "crumble", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        CrumbleEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            crumbleConfiguration: .init(
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "crumble bounded one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .running, "The bounded one-cell Rust run continues beyond this crumble prefix")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func decryptEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "220",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "decrypt", "--typing-speed", "1",
+            "--ciphertext-colors", "00ff00", "--final-gradient-stops", "112233",
+            "--final-gradient-steps", "1", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        DecryptEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            decryptConfiguration: .init(
+                typingSpeed: 1,
+                ciphertextColors: [Color(hex: "00ff00")],
+                finalGradientStops: [Color(hex: "112233")],
+                finalGradientSteps: [1],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "decrypt one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell decrypt frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }

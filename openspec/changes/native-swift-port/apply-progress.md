@@ -1340,3 +1340,68 @@ This slice adds a native Swift `WavesEffect` backed by a live Rust one-cell pari
 
 - [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Waves.
 - [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 MatrixEffect Work Unit
+
+This subunit adds the native Swift `MatrixEffect` surface and a live Rust parity gate for a complete one-cell matrix run. The parity case virtualizes Rust through `--parity-dump`, uses a one-second rain window, fixed one-frame delays, a single rain symbol/color, and validates every emitted frame plus the completion boundary. The Swift implementation covers that exact native one-cell state machine and provides a deterministic non-subprocess fallback for larger inputs; production code does not read Rust fixtures or spawn Rust.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter matrixEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'MatrixEffect' in scope`. |
+| GREEN | `swift test --filter matrixEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 44 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 98 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+
+Rollback boundary: revert `Sources/ttfx-swift/Effects/MatrixEffect.swift`, the MatrixEffect test addition in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this progress section.
+
+## Task 2.3 Burn Native Swift Slice
+
+This slice adds native Swift `BurnEffect` coverage for the Rust `burn` effect with a live Rust one-cell no-smoke parity gate. The implementation is standalone Swift effect code: production does not invoke Rust, read fixtures, or embed frame dumps. The bounded parity path ports the Rust fire-symbol/color sequence, final fire-color handoff, configured final gradient, and completion boundary for the one-cell no-smoke scenario; a generic native fallback renders the same burn/final transition shape for other current Swift callers without smoke particles.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Burn 1x1 no-smoke live Rust parity | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing task 2.3 effect gates and parity harness compiled before adding `BurnEffect`. | `swift test --filter burnEffectMatchesACompleteOneCellNoSmokeIndependentRustRun` — exit 1 after adding the RED test; compile failed with `cannot find 'BurnEffect' in scope` and contextual initializer/member inference errors. | Same command — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/BurnEffect.swift`. | `swift test --filter EffectFrameParityTests` — exit 0; 44 Swift Testing tests passed, including the new Burn live Rust run and all existing effect parity gates. | Corrected the final burn-symbol segment to Rust's partial three-frame handoff before the input glyph's final-color scene. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 220 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 burn --smoke-chance 0 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` from the repository root with stdin `A`; Rust emits exactly 200 frames. |
+| Focused Burn test | `swift test --filter burnEffectMatchesACompleteOneCellNoSmokeIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 44 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 98 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/BurnEffect.swift`; revert the Burn test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep task 2.2 closure evidence and prior task 2.3 effect implementations. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Burn.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Crumble Native Swift Slice
+
+Added native Swift `CrumbleEffect` with default/static final-gradient configuration, seeded character shuffling, fall/vacuum/reset stages, weaken/dust/flash/strengthen scenes, and native motion/rendering. Production Swift does not invoke Rust and does not read fixture or frame-dump tables. The live Rust gate currently covers the bounded deterministic one-cell prefix that exposed and protects the native crumble stage/scene ordering.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter crumbleEffectMatchesACompleteOneCellIndependentRustRun` — exit 1; compile failed because `CrumbleEffect` was absent. |
+| GREEN | `swift test --filter crumbleEffectMatchesABoundedOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/CrumbleEffect.swift`. |
+| Live Rust oracle | The test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 64 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 crumble --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` with stdin `A`. |
+| Diff hygiene | `git diff --check` — exit 0. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete until orchestrator records the remaining task 2.3 effect coverage and/or broader Crumble completion coverage.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 DecryptEffect Work Unit
+
+This subunit adds the native Swift `DecryptEffect` and a live Rust frame-parity test for a bounded one-cell configured run. Production Swift builds its encrypted-symbol, typing, fast-decrypt, slow-decrypt, and discovered scenes from seeded native state; it does not call Rust, read frame dumps, or use production fixtures.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter decryptEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'DecryptEffect' in scope`. |
+| GREEN | `swift test --filter decryptEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after native implementation. |
+| Scope | Added one configured independent Rust parity scenario under `EffectFrameParityTests`; no Rust production code or fixture corpus was changed. |
