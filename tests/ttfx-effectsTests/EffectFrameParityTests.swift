@@ -449,6 +449,106 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func orbittingVolleyEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "orbittingvolley", "--top-launcher-symbol", "T",
+            "--right-launcher-symbol", "R", "--bottom-launcher-symbol", "B",
+            "--left-launcher-symbol", "L", "--launcher-movement-speed", "1.4",
+            "--character-movement-speed", "0.8", "--volley-size", "0.5",
+            "--launch-delay", "1", "--character-easing", "in_out_quad",
+            "--final-gradient-stops", "112233", "445566", "--final-gradient-steps", "4",
+            "--final-gradient-direction", "vertical"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        OrbittingVolleyEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            orbittingVolleyConfiguration: .init(
+                topLauncherSymbol: "T",
+                rightLauncherSymbol: "R",
+                bottomLauncherSymbol: "B",
+                leftLauncherSymbol: "L",
+                launcherMovementSpeed: 1.4,
+                characterMovementSpeed: 0.8,
+                volleySize: 0.5,
+                launchDelay: 1,
+                characterEasing: .inOutQuad,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .vertical
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "orbittingvolley configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured orbittingvolley frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func beamsEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "50",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 38)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 @Test func laserEtchGroupedPatternMatchesRustDeadBranchRun() throws {
     let canvas = try Canvas(columns: 7, rows: 4)
     let input = "AB\nC"

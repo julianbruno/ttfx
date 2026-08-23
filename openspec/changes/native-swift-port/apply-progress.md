@@ -732,3 +732,49 @@ This is a narrow task 2.2 slice only. It implements the Rust-documented grouped 
 
 - [ ] 2.2 remains incomplete: only grouped-pattern dead-branch parity exists for LaserEtch; the default algorithm, RecursiveBacktracker, ParticlePool, and other 2.2 effects remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 OrbittingVolley Geometry Slice
+
+OrbittingVolley was selected as the next geometry-heavy slice after LaserEtch because the Rust implementation consumes no RNG and its observable contract is deterministic under live `--parity-dump`. The Swift port covers the bounded parity case: center-to-outside magazine grouping, four perimeter launchers, parent-derived launcher coordinates, launched character paths, painter ordering, and final launcher-hide completion. Task 2.2 remains incomplete because beams, rings, blackhole, the LaserEtch default algorithm, and synthgrid are still pending.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `orbittingvolley` configured run | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust-frame integration | Existing LaserEtch grouped slice preserved. | `swift test --filter orbittingVolleyEffectMatchesAConfiguredIndependentRustRun` — exit 1; compile failed because `OrbittingVolleyEffect` did not exist. | `swift test --filter orbittingVolleyEffectMatchesAConfiguredIndependentRustRun` — exit 0; Rust emitted 9 frames and Swift matched bytes with `.complete` on tick 9. | The test uses a 7x4 canvas, stdin `AB\nC`, `--max-frames 80`, four distinct launcher symbols, vertical final gradient, volley size 0.5, launch delay 1, and `in_out_quad` character easing. | Completion was tightened to Rust's magazine/input-active gate so a still-orbiting launcher alone does not keep the effect running. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused OrbittingVolley test | `swift test --filter orbittingVolleyEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Runtime/oracle harness | The independent test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 80 --seed 7 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 orbittingvolley --top-launcher-symbol T --right-launcher-symbol R --bottom-launcher-symbol B --left-launcher-symbol L --launcher-movement-speed 1.4 --character-movement-speed 0.8 --volley-size 0.5 --launch-delay 1 --character-easing in_out_quad --final-gradient-stops 112233 445566 --final-gradient-steps 4 --final-gradient-direction vertical` from the repository root with stdin `AB\nC`; Rust emits 9 frames. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/OrbittingVolleyEffect.swift`; revert the OrbittingVolley test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep the committed LaserEtch grouped slice and all task 2.1 effect evidence. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: OrbittingVolley and LaserEtch grouped-branch parity are present, but beams, rings, blackhole, LaserEtch default, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Beams One-Cell Geometry Slice
+
+Beams was selected as the next smallest safe slice after OrbittingVolley because a one-cell live Rust run exercises the row/column overlap, beam scene reset, fade-to-dim input scene, final diagonal wipe, and brighten scene without requiring broader shared runtime changes for multi-cell group scheduling. The Swift port covers this bounded parity case only; larger beam grids still require the full row/column group scheduler and fill-character behavior. Task 2.2 remains incomplete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `beams` one-cell configured run | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust-frame integration | Existing OrbittingVolley and LaserEtch slices preserved. | `swift test --filter EffectFrameParityTests/beamsEffectMatchesACompleteOneCellIndependentRustRun` — exit 1; compile failed because `BeamsEffect` did not exist. | `swift test --filter EffectFrameParityTests/beamsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; Rust emitted 38 frames and Swift matched bytes with `.complete` on tick 38. | The test uses a 1x1 canvas, stdin `A`, fixed row/column speed ranges `20-20`, one-frame/two-stop beam gradient, one-frame/two-stop final gradient, beam delay 1, and final wipe speed 1. | Localized Rust quirks for the one-cell overlap: the column beam color holds white for the first two glyphs and the second beam scene reset holds the fully faded input for two extra frames before brighten advances. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused Beams test | `swift test --filter EffectFrameParityTests/beamsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Runtime/oracle harness | The independent test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 50 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 beams --beam-delay 1 --beam-row-speed-range 20-20 --beam-column-speed-range 20-20 --beam-gradient-stops ffffff 00D1FF --beam-gradient-steps 2 --beam-gradient-frames 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-frames 1 --final-wipe-speed 1` from the repository root with stdin `A`; Rust emits 38 frames. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/BeamsEffect.swift`; revert the Beams test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep OrbittingVolley, LaserEtch grouped slice, and all task 2.1 effect evidence. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Beams one-cell, OrbittingVolley, and LaserEtch grouped-branch parity are present, but multi-cell beams, rings, blackhole, LaserEtch default, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
