@@ -1833,4 +1833,263 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+    @Test func errorCorrectEffectMatchesABoundedTwoCellIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 2, rows: 1)
+        let input = "AB"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+                "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+                "--canvas-height", "1", "errorcorrect", "--error-pairs", "1", "--swap-delay", "1",
+                "--movement-speed", "1", "--final-gradient-stops", "112233", "445566",
+                "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(expectedFrames.count == 120)
+        let status = try assertFrameParity(
+            ErrorCorrectEffect(
+                configuration: .init(text: input, seed: 1),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 1,
+                errorCorrectConfiguration: .init(
+                    errorPairs: 1,
+                    swapDelay: 1,
+                    movementSpeed: 1,
+                    finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                    finalGradientSteps: [2],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "errorcorrect bounded two-cell independent Rust run"
+        )
+        #expect(status.finalStatus == .running, "The bounded two-cell Rust run continues beyond this errorcorrect prefix")
+        #expect(status.firstCompletionTick == nil)
+    }
+
+@Test func pourEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "pour", "--pour-speed", "1", "--movement-speed-range", "20-20",
+            "--gap", "0", "--starting-color", "112233", "--final-gradient-stops", "445566",
+            "--final-gradient-steps", "1", "--final-gradient-frames", "1", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        PourEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            pourConfiguration: .init(
+                pourSpeed: 1,
+                movementSpeedRange: 20...20,
+                gap: 0,
+                startingColor: Color(hex: "112233"),
+                finalGradientStops: [Color(hex: "445566")],
+                finalGradientSteps: [1],
+                finalGradientFrames: 1,
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "pour one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell pour frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func pourEffectMatchesARightwardTwoCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 1)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "1", "pour", "--pour-direction", "right", "--pour-speed", "1",
+            "--movement-speed-range", "1-1", "--gap", "0", "--starting-color", "112233",
+            "--final-gradient-stops", "445566", "778899", "--final-gradient-steps", "2",
+            "--final-gradient-frames", "1", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        PourEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            pourConfiguration: .init(
+                pourDirection: .right,
+                pourSpeed: 1,
+                movementSpeedRange: 1...1,
+                gap: 0,
+                startingColor: Color(hex: "112233"),
+                finalGradientStops: [Color(hex: "445566"), Color(hex: "778899")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "pour rightward two-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) rightward two-cell pour frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func scatteredEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "scattered", "--movement-speed", "1",
+            "--movement-easing", "linear", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 26)
+    let status = try assertFrameParity(
+        ScatteredEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            scatteredConfiguration: .init(
+                movementSpeed: 1,
+                movementEasing: .linear,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "scattered one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell scattered frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func scatteredEffectMatchesAConfiguredMultiCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "scattered", "--movement-speed", "10",
+            "--movement-easing", "linear", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        ScatteredEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            scatteredConfiguration: .init(
+                movementSpeed: 10,
+                movementEasing: .linear,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "scattered configured multi-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured scattered frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+    @Test func smokeEffectMatchesACompleteOneCellIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 1, rows: 1)
+        let input = "A"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+                "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+                "--canvas-height", "1", "smoke", "--smoke-symbols", "x",
+                "--smoke-gradient-stops", "ffffff", "--final-gradient-stops", "112233", "445566",
+                "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(!expectedFrames.isEmpty)
+        let status = try assertFrameParity(
+            SmokeEffect(
+                configuration: .init(text: input, seed: 1),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 1,
+                smokeConfiguration: .init(
+                    smokeSymbols: ["x"],
+                    smokeGradientStops: [Color(hex: "ffffff")],
+                    finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                    finalGradientSteps: [2],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "smoke one-cell independent Rust run"
+        )
+        #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell smoke frames")
+        #expect(status.firstCompletionTick == expectedFrames.count)
+    }
+
 }

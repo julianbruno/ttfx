@@ -1405,3 +1405,71 @@ This subunit adds the native Swift `DecryptEffect` and a live Rust frame-parity 
 | RED | `swift test --filter decryptEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'DecryptEffect' in scope`. |
 | GREEN | `swift test --filter decryptEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after native implementation. |
 | Scope | Added one configured independent Rust parity scenario under `EffectFrameParityTests`; no Rust production code or fixture corpus was changed. |
+
+## Phase 2.3 ErrorCorrectEffect Work Unit
+
+Added native Swift `ErrorCorrectEffect` and a live Rust frame-parity test for a bounded two-cell configured run. Production Swift builds the swap/error-scene/block-wipe/final-gradient sequence natively; it does not call Rust, read fixtures, or embed frame-dump tables.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter errorCorrectEffectMatchesABoundedTwoCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'ErrorCorrectEffect' in scope`. |
+| GREEN | `swift test --filter errorCorrectEffectMatchesABoundedTwoCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after native implementation. |
+| Live Rust oracle | The test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 120 --seed 1 --ignore-terminal-dimensions --canvas-width 2 --canvas-height 1 errorcorrect --error-pairs 1 --swap-delay 1 --movement-speed 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` with stdin `AB`; Rust emits exactly 120 bounded frames. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 48 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 102 Swift Testing tests passed. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete until orchestrator records the remaining task 2.3 effect coverage and/or broader ErrorCorrect completion coverage.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Pour Native Swift Slice
+
+This slice adds native Swift `PourEffect` for the Rust `pour` effect. The implementation builds seeded native state, coordinate final-gradient colors, pour-direction groups, alternating group reversal, per-character movement from the relevant canvas edge, starting-to-final color scenes, and collision rendering. Production Swift does not invoke Rust, read fixtures, or embed frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter pourEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'PourEffect' in scope` plus contextual initializer/member inference errors. |
+| GREEN | `swift test --filter pourEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding native implementation. |
+| TRIANGULATE | `swift test --filter pourEffect` — exit 0; 2 Swift Testing tests passed, covering the one-cell complete run and a rightward two-cell live Rust run with explicit direction, movement speed, gap, starting color, final gradient, and completion boundary. |
+| Validation | `swift test --filter EffectFrameParityTests` — exit 0; 49 Swift Testing tests passed. `swift test` — exit 0; 103 Swift Testing tests passed. |
+| Scope | Added `Sources/ttfx-swift/Effects/PourEffect.swift` and two live Rust parity tests under `EffectFrameParityTests`; no Rust production code or fixture corpus was changed. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete until orchestrator records the remaining task 2.3 effect coverage and broader Pour option coverage if required.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Scattered Native Swift Slice
+
+This slice adds native Swift `ScatteredEffect` for the Rust `scattered` effect. The implementation builds seeded top-to-bottom input glyphs, starts each visible glyph at the Rust random canvas coordinate (or `(1,1)` for sub-2-wide/high canvases), holds the initial scattered frame for 25 ticks, then moves characters to input coordinates with the configured easing and distance-synchronized gradient. Production Swift does not invoke Rust and does not read fixtures or frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter scatteredEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'ScatteredEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter scatteredEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after native implementation. |
+| Triangulation | `swift test --filter scatteredEffect` — exit 0; 2 Swift Testing tests passed, covering a 1×1 complete live-Rust run and a configured 7×4 multi-cell live-Rust run. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 49 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 103 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/ScatteredEffect.swift`; revert the two Scattered tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete until the orchestrator records the remaining task 2.3 effect coverage beyond Scattered.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Smoke Native Swift Slice
+
+This slice adds native Swift `SmokeEffect` for the Rust `smoke` effect with a live Rust one-cell parity gate. The Swift implementation builds smoke and paint scenes from native gradients/symbol sequencing, uses seeded native state for the release order, renders directly into Swift frames, and does not invoke Rust or read fixtures/frame dumps from production code.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter smokeEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'SmokeEffect' in scope`. |
+| GREEN | `swift test --filter smokeEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/SmokeEffect.swift`. |
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 80 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 smoke --smoke-symbols x --smoke-gradient-stops ffffff --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` from the repository root with stdin `A`. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SmokeEffect.swift`; revert the Smoke test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Smoke.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
