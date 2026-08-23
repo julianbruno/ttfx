@@ -778,3 +778,29 @@ Beams was selected as the next smallest safe slice after OrbittingVolley because
 
 - [ ] 2.2 remains incomplete: Beams one-cell, OrbittingVolley, and LaserEtch grouped-branch parity are present, but multi-cell beams, rings, blackhole, LaserEtch default, and synthgrid remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Beams Two-Cell Row Geometry Slice
+
+Beams was selected again as the smallest safe geometry-heavy slice because the already-ported one-cell path exposed the beam scene/final wipe mechanics, and a bounded 2×1 live Rust run adds the first multi-cell row/column overlap without requiring fill-character or arbitrary-grid scheduling. The Swift port covers only this 2×1 row parity case: simultaneous row and column beam symbols, per-character fade offset, diagonal final-wipe offset, and independent brighten timing. Larger beam grids, fill characters, rings, blackhole, LaserEtch default, and synthgrid remain pending; task 2.2 is not complete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Beams 2×1 row | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing one-cell beams parity was retained. | `swift test --filter beamsEffectMatchesACompleteTwoCellRowIndependentRustRun` — exit 1 after the RED test; Swift completed at tick 1 and rendered final `AB` while Rust emitted 39 frames beginning with beam symbols. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded 2×1 Beams renderer. | `swift test --filter beamsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; `swift test --filter EffectFrameParityTests` — exit 0; 21 tests passed. | No shared core change; effect-local bounded renderer only. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | `cargo run --quiet -- --parity-dump --max-frames 80 --seed 1 --ignore-terminal-dimensions --canvas-width 2 --canvas-height 1 beams --beam-delay 1 --beam-row-speed-range 20-20 --beam-column-speed-range 20-20 --beam-gradient-stops ffffff 00D1FF --beam-gradient-steps 2 --beam-gradient-frames 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-frames 1 --final-wipe-speed 1` with stdin `AB` produced 39 frames through the test harness. |
+| Focused tests | `swift test --filter beamsEffectMatchesACompleteTwoCellRowIndependentRustRun` — exit 0; `swift test --filter beamsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 21 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 75 Swift Testing tests passed. |
+| Whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert the 2×1 Beams test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the two-cell row branch in `Sources/ttfx-swift/Effects/BeamsEffect.swift`, and this section. Keep the committed Beams one-cell, OrbittingVolley, and LaserEtch grouped-branch slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Beams now has one-cell and bounded 2×1 row parity only; arbitrary multi-cell grids/fill characters, rings, blackhole, LaserEtch default, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

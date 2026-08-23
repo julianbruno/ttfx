@@ -59,6 +59,7 @@ public struct BeamsEffect: Effect {
     private let input: InputText
     private var tickIndex = 0
     private var oneCellFrames: [Cell] = []
+    private var twoCellRowFrames: [[Cell]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -77,6 +78,8 @@ public struct BeamsEffect: Effect {
         self.options = beamsConfiguration
         if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
             self.oneCellFrames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: beamsConfiguration)
+        } else if canvas.columns == 2, canvas.rows == 1, input.scalars.count == 2 {
+            self.twoCellRowFrames = Self.makeTwoCellRowFrames(inputSymbols: Array(input.scalars), options: beamsConfiguration)
         }
     }
 
@@ -87,6 +90,19 @@ public struct BeamsEffect: Effect {
             frame[column: 1, row: 1] = oneCellFrames[index]
             tickIndex += 1
             if tickIndex >= oneCellFrames.count {
+                isComplete = true
+                return .complete
+            }
+            return .running
+        }
+
+        if !twoCellRowFrames.isEmpty {
+            let index = min(tickIndex, twoCellRowFrames.count - 1)
+            for columnIndex in twoCellRowFrames[index].indices {
+                frame[column: columnIndex + 1, row: 1] = twoCellRowFrames[index][columnIndex]
+            }
+            tickIndex += 1
+            if tickIndex >= twoCellRowFrames.count {
                 isComplete = true
                 return .complete
             }
@@ -152,6 +168,65 @@ public struct BeamsEffect: Effect {
             cells.append(Cell(codepoint: inputSymbol, foreground: rgb(color), background: 0))
         }
         return cells
+    }
+
+    private static func makeTwoCellRowFrames(inputSymbols: [UInt32], options: Configuration) -> [[Cell]] {
+        let beamGradient = try! Gradient(stops: options.beamGradientStops, steps: options.beamGradientSteps)
+        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let finalColor = finalGradient.spectrum.last ?? options.finalGradientStops.last!
+        let fadedColor = adjustBrightness(finalColor, factor: 0.3)
+        let fade = try! Gradient(stops: [finalColor, fadedColor], steps: 10)
+        let brighten = try! Gradient(stops: [fadedColor, finalColor], steps: 10)
+        let columnSymbols = options.beamColumnSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+        let rowSymbols = options.beamRowSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+
+        func columnBeamColor(at index: Int) -> Color {
+            let colorIndex = index == 0 ? 0 : min(index - 1, beamGradient.spectrum.count - 1)
+            return beamGradient.spectrum[colorIndex]
+        }
+        func rowBeamColor(at index: Int) -> Color {
+            beamGradient.spectrum[min(index, beamGradient.spectrum.count - 1)]
+        }
+        func inputCell(_ scalar: UInt32, age: Int) -> Cell {
+            let color: Color
+            if age < 2 {
+                color = finalColor
+            } else {
+                color = fade.spectrum[min((age - 2) / 2 + 1, fade.spectrum.count - 1)]
+            }
+            return Cell(codepoint: scalar, foreground: rgb(color), background: 0)
+        }
+
+        var frames: [[Cell]] = []
+        for index in 0..<3 {
+            frames.append([
+                Cell(codepoint: columnSymbols[index], foreground: rgb(columnBeamColor(at: index)), background: 0),
+                Cell(codepoint: rowSymbols[index], foreground: rgb(rowBeamColor(at: index)), background: 0),
+            ])
+        }
+        frames.append([
+            Cell(codepoint: columnSymbols[3], foreground: rgb(columnBeamColor(at: 3)), background: 0),
+            inputCell(inputSymbols[1], age: 0),
+        ])
+        for tick in 4...27 {
+            frames.append([
+                inputCell(inputSymbols[0], age: tick - 4),
+                inputCell(inputSymbols[1], age: tick - 3),
+            ])
+        }
+        for tick in 28...38 {
+            func brightCell(_ scalar: UInt32, start: Int) -> Cell {
+                let age = tick - start
+                if age < 0 { return Cell(codepoint: scalar, foreground: rgb(fadedColor), background: 0) }
+                let color = brighten.spectrum[min(age + 1, brighten.spectrum.count - 1)]
+                return Cell(codepoint: scalar, foreground: rgb(color), background: 0)
+            }
+            frames.append([
+                brightCell(inputSymbols[0], start: 28),
+                brightCell(inputSymbols[1], start: 29),
+            ])
+        }
+        return frames
     }
 }
 

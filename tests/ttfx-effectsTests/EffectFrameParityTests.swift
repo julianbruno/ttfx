@@ -549,6 +549,54 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func beamsEffectMatchesACompleteTwoCellRowIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 1)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "1", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 39)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams two-cell row independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 @Test func laserEtchGroupedPatternMatchesRustDeadBranchRun() throws {
     let canvas = try Canvas(columns: 7, rows: 4)
     let input = "AB\nC"
