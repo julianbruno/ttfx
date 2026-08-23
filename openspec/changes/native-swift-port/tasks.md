@@ -1,6 +1,6 @@
 # Tasks: Native Swift Port of ttfx
 
-**Total:** 27 — 12 complete, 15 pending.
+**Total:** 27 — 15 complete, 12 pending.
 
 ## Review Workload Forecast
 
@@ -42,9 +42,9 @@ Chain strategy: size-exception
 - [x] 2.0a Strict RED→GREEN: `tests/ttfx-swiftTests/Core/AnimationCompositionTests.swift`: multi-segment/waypoint path chains; synchronized/resettable scenes; ordered groups/release-schedules/per-character-paths; gradients; typed chained actions without persistent closures; input-to-arena initialization/runtime-spawning; RuntimeEffect integration; deterministic RNG request-order. GREEN: `Sources/ttfx-swift/Core/MotionComposition.swift,Sources/ttfx-swift/Core/SceneComposition.swift,Sources/ttfx-swift/Core/CharacterScheduling.swift,Sources/ttfx-swift/Core/RuntimeActions.swift,Sources/ttfx-swift/Core/EffectRuntime.swift`; integrate existing substrate/engine only as required. Gates: focused `swift test --filter AnimationCompositionTests`, full `swift test`, seeded Rust trace fixture gate.
 - [x] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
 - [x] 2.2 Implement geometry-heavy effects: beams, rings, blackhole, laseretch, orbittingvolley, synthgrid; preserve bezier/order quirks
-- [ ] 2.3 Implement remaining effects: burn, crumble, decrypt, errorcorrect, highlight, matrix, middleout, pour, scattered, smoke, thunderstorm, unstable, vhstape, waves, etc.
-- [ ] 2.4 Add a RED parity test before each effect's GREEN implementation
-- [ ] 2.5 Run the 37-effect parity matrix gate
+- [x] 2.3 Implement remaining effects: burn, crumble, decrypt, errorcorrect, highlight, matrix, middleout, pour, scattered, smoke, thunderstorm, unstable, vhstape, waves, etc.
+- [x] 2.4 Add a RED parity test before each effect's GREEN implementation
+- [x] 2.5 Run the 37-effect parity matrix gate
 
 ## Phase 3
 

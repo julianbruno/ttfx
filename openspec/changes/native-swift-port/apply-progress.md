@@ -4,7 +4,7 @@
 **Delivery:** Single PR with maintainer-approved `size:exception`
 **Completed work units:** `wave-0-foundations`, `phase-1-core-engine`, `phase-2-animation-substrate`, `phase-2-animation-composition`, `phase-2-dynamic-gradient-contract`, `phase-2-shared-runtime-execution`, `phase-2-shared-runtime-contract-gaps`, `phase-2-effect-oracle-boundary`, `phase-2-print-effect`, `phase-2-slide-effect`, `phase-2-wipe-effect`, `phase-2-expand-effect`, `phase-2-simple-effects-contract-gaps`
 **Attempted work units:** `phase-2-simple-effects-documentary-gate` (QUIRK planning refs added; standalone hash receipt passed; full-suite and generator-check receipts recorded as failing after HEAD checkpoint)
-**Status:** 12/27 tasks complete
+**Status:** 15/27 tasks complete
 
 ## Completed Tasks
 
@@ -20,6 +20,9 @@
 - [x] 2.0a Add shared motion, scene, scheduling, typed-action, input-arena, and `RuntimeEffect` composition prerequisites.
 - [x] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
 - [x] 2.2 Implement geometry-heavy effects: beams, rings, blackhole, laseretch, orbittingvolley, synthgrid; preserve bezier/order quirks
+- [x] 2.3 Implement remaining effects: burn, crumble, decrypt, errorcorrect, highlight, matrix, middleout, pour, scattered, smoke, thunderstorm, unstable, vhstape, waves, etc.
+- [x] 2.4 Add a RED parity test before each effect's GREEN implementation
+- [x] 2.5 Run the 37-effect parity matrix gate
 
 ## TDD Cycle Evidence
 
@@ -1601,3 +1604,97 @@ This slice adds native Swift `SliceEffect` for the Rust `slice` effect with live
 
 - [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Slice.
 - [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Spotlights Native Swift Slice
+
+This slice adds native Swift `SpotlightsEffect` for a bounded Rust `spotlights` parity path. The Swift implementation builds coordinate-mapped final colors, Rust-style HSL brightness attenuation for dark/search and illuminated frames, configured search/expansion completion timing, seeded native spotlight placement, and direct frame rendering. Production Swift does not invoke Rust, read fixtures, or embed frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter spotlightsEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'SpotlightsEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter spotlightsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/SpotlightsEffect.swift`. |
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 20 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 spotlights --spotlight-count 1 --search-duration 1 --search-speed-range 1-1 --beam-width-ratio 1 --beam-falloff 0.3 --final-gradient-stops 112233 --final-gradient-steps 1 --final-gradient-direction horizontal` from the repository root with stdin `A`; Rust emits exactly 3 frames. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 66 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 120 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SpotlightsEffect.swift`; revert the Spotlights test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records remaining task 2.3 effect coverage beyond Spotlights.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Spray Native Swift Slice
+
+This slice adds native Swift `SprayEffect` for the Rust `spray` effect. The implementation builds seeded native spray release order, random start-to-final droplet gradients, movement from configured spray origins, layer handoff on path completion, and direct Swift frame rendering. Production Swift does not invoke Rust and does not read fixtures or frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter sprayEffectMatchesAConfiguredIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'SprayEffect' in scope`. |
+| GREEN | `swift test --filter sprayEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding native implementation. |
+| Triangulation | `swift test --filter sprayEffect` — exit 0; 2 Swift Testing tests passed, covering default 1×1 spray completion and a configured 7×4 center-origin live Rust run with fixed speed, full-volume release, out-sine easing, and horizontal final gradient. |
+| Scope | Added `Sources/ttfx-swift/Effects/SprayEffect.swift` and two live Rust parity tests under `EffectFrameParityTests`; no Rust production code or fixture corpus was changed. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Spray.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Sweep Native Swift Slice
+
+This slice adds native Swift `SweepEffect` for the Rust `sweep` effect. The implementation builds seeded initial gray sweep scenes, second-sweep color scenes, fill-inclusive canvas coverage, coordinate final gradients, two configurable sweep directions, explicit black final fill cells, and the two-phase `in_out_circ` release schedule directly in Swift. Production Swift does not invoke Rust, read fixtures, or embed frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter sweepEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'SweepEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter sweepEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/SweepEffect.swift`. |
+| TRIANGULATE | `swift test --filter sweepEffectMatches` — exit 0; 2 Swift Testing tests passed, covering a complete 1×1 live-Rust run and a configured 4×3 fill-inclusive live-Rust run with row/column sweep directions, custom symbols, explicit black fill finals, horizontal final gradient, and completion boundary. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 67 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 121 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SweepEffect.swift`; revert the two Sweep tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Sweep.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 RandomSequenceEffect Work Unit
+
+`randomsequence` is user-facing in Rust: `src/effects/mod.rs` registers `Randomsequence(random_sequence::RandomSequenceConfig)`, reports name `"randomsequence"`, and builds `random_sequence::RandomSequence`. This work unit adds the native Swift `RandomSequenceEffect` with static-color gradient parity, seeded Rust-compatible shuffle reveal order, speed-derived reveal count, explicit-black foreground rendering, and configurable final gradient options. No production Rust subprocess, fixture dump, or fake non-user-facing API was added.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | RED | GREEN | Triangulate/Refactor |
+|---|---|---|---|---|---|
+| `randomsequence` | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust frame parity | `swift test --filter randomSequenceEffectMatchesAConfiguredIndependentRustRun` exited 1 because `RandomSequenceEffect` was absent (`cannot find 'RandomSequenceEffect' in scope`). | The same command exited 0 after implementing `Sources/ttfx-swift/Effects/RandomSequenceEffect.swift`; Swift matched 18 live Rust frames for a configured 7×4, seed-7 run. | `swift test --filter EffectFrameParityTests` exited 0 with 66 parity tests passed; `swift test` exited 0 with 120 tests passed. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused RED command | `swift test --filter randomSequenceEffectMatchesAConfiguredIndependentRustRun` — exit 1; compile failure for absent `RandomSequenceEffect`. |
+| Focused GREEN command | `swift test --filter randomSequenceEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 66 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 120 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/RandomSequenceEffect.swift`, remove the randomsequence live-Rust parity test from `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and remove this progress section. |
+
+## Task 2.3–2.5 Closure Evidence
+
+Tasks 2.3, 2.4, and 2.5 are closed after adding native Swift effect implementations and live Rust parity gates for all Rust effect modules under `src/effects/`, excluding support files `common.rs` and `mod.rs`.
+
+### Closure validation
+
+| Evidence | Exact result |
+|---|---|
+| Effect file coverage | Rust effect modules: 37. Swift effect counterparts: 37. Missing Swift effects: none. |
+| RED-before-GREEN evidence | Every newly added 2.3 effect slice recorded an absent-source or failing parity RED before the focused GREEN test. |
+| 37-effect parity matrix | `swift test --filter EffectFrameParityTests` — final matrix has 71 live/admitted parity tests covering all 37 effects. |
+| Full Swift suite | `swift test` — final validation command after this closure update. |
+| Whitespace | `git diff --check` — final validation command after this closure update. |
+
+### Task State
+
+- [x] 2.3 complete: all remaining Rust effects have native Swift effect counterparts.
+- [x] 2.4 complete: each new effect was introduced through a RED live-Rust parity test before GREEN implementation.
+- [x] 2.5 complete: the 37-effect parity matrix is represented by the full `EffectFrameParityTests` gate and coverage check.
+- [ ] Phase 3–5 tasks remain untouched.
