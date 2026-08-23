@@ -1065,3 +1065,29 @@ This slice advances SynthGrid beyond the prior 1×1 bound with a complete 4×3 l
 
 - [ ] 2.2 remains incomplete: SynthGrid now has bounded 1×1 and configured 4×3 small-grid parity only; arbitrary SynthGrid grid partitioning/shuffled blocks/default generated text, arbitrary Beams grids/fill characters, arbitrary Rings/Blackhole, and LaserEtch default grids remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+## Task 2.2 SynthGrid Generic Runtime First Step
+
+This slice replaces the prior bounded-only SynthGrid path with an effect-local generic runtime sufficient for a complete 7×4 live Rust parity run using single-color grid/text gradients, `--text-generation-symbols x`, and `--max-active-blocks 1`. It now builds generated scenes for every canvas cell (including final blank cells), consumes Rust-shaped random durations/choices in canvas order, activates a shuffled block group, keeps the outer grid layered above generated text, and collapses the grid with Rust frame timing. The existing bounded 1×1 and configured 4×3 SynthGrid parity tests remain preserved. Task 2.2 is still incomplete; this does not claim the full default multi-symbol/multi-color SynthGrid contract or arbitrary multi-block partition breadth.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| SynthGrid 7×4 generic first step | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing SynthGrid 1×1 and configured 4×3 tests were retained. | `swift test --filter EffectFrameParityTests/synthGridEffectMatchesANonBoundedIndependentRustRun` — exit 1 after adding the RED test; Swift mismatched Rust at tick 41 and completed early while Rust emitted 70 frames. | Same command — exit 0; 1 Swift Testing test passed after adding the generic generated-cell runtime path. | `swift test --filter EffectFrameParityTests/synthGrid` — exit 0; SynthGrid 1×1, 7×4, and 4×3 parity tests passed. `swift test --filter EffectFrameParityTests` — exit 0; 32 tests passed. | Removed no shared core; kept the generic runtime effect-local and preserved existing bounded special cases. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 300 --seed 7 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 synthgrid --grid-gradient-stops ffffff ffffff --grid-gradient-steps 1 --text-gradient-stops 112233 112233 --text-gradient-steps 1 --text-generation-symbols x --max-active-blocks 1` with stdin `AB\nCDE`; Rust emits exactly 70 frames. |
+| Focused RED | `swift test --filter EffectFrameParityTests/synthGridEffectMatchesANonBoundedIndependentRustRun` — exit 1; mismatches began at tick 41 and Swift completed before Rust's 70-frame run. |
+| Focused GREEN | `swift test --filter EffectFrameParityTests/synthGridEffectMatchesANonBoundedIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| SynthGrid triangulation | `swift test --filter EffectFrameParityTests/synthGrid` — exit 0; 3 Swift Testing tests passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 32 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 86 Swift Testing tests passed. |
+| Rollback boundary | Revert the 7×4 SynthGrid test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the generic generated-cell runtime changes in `Sources/ttfx-swift/Effects/SynthGridEffect.swift`, and this section. Keep the prior SynthGrid 1×1/4×3 and other task 2.2 slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: SynthGrid now has bounded 1×1, configured 4×3, and a first generic 7×4 runtime step only; default multi-symbol/multi-color generated text breadth, full arbitrary partition/multi-block coverage, and the remaining wider task 2.2 effect breadth remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

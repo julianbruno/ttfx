@@ -67,10 +67,11 @@ public struct SynthGridEffect: Effect {
     }
 
     private struct CharacterScene {
-        let inputIndex: Int
+        let coordinate: Coordinate
         let generationFrames: Int
         let generationSymbol: UInt32
         let generationColor: UInt32
+        let finalCodepoint: UInt32
         let finalColor: UInt32
         var age: Int = 0
         var active: Bool = false
@@ -230,24 +231,36 @@ public struct SynthGridEffect: Effect {
             GridLine(direction: .vertical, coordinates: (1..<canvas.rows).map { Coordinate(column: canvas.columns, row: $0) }, collapsed: (1..<canvas.rows).map { Coordinate(column: canvas.columns, row: $0) })
         ]
 
-        pendingGroups = makeGroups()
         let finalColors = textColorMapping()
-        characterScenes = input.scalars.indices.map { index in
-            let frameCount = rng.integer(in: 15...30)
-            var symbolScalar = options.textGenerationSymbols.first?.unicodeScalars.first?.value ?? 32
-            var color = finalColors[index]
-            for _ in 0..<frameCount {
-                symbolScalar = options.textGenerationSymbols[rng.integer(in: 0..<options.textGenerationSymbols.count)].unicodeScalars.first?.value ?? symbolScalar
-                color = synthGridRGB((try! Gradient(stops: options.textGradientStops, steps: options.textGradientSteps)).spectrum[rng.integer(in: 0..<(try! Gradient(stops: options.textGradientStops, steps: options.textGradientSteps)).spectrum.count)])
-            }
-            return CharacterScene(
-                inputIndex: index,
-                generationFrames: frameCount,
-                generationSymbol: symbolScalar,
-                generationColor: color,
-                finalColor: finalColors[index]
-            )
+        var inputByCoordinate: [Coordinate: (codepoint: UInt32, color: UInt32)] = [:]
+        for index in input.scalars.indices {
+            let position = input.positions[index]
+            inputByCoordinate[Coordinate(column: position.column, row: position.row)] = (input.scalars[index], finalColors[index])
         }
+        let textGradient = try! Gradient(stops: options.textGradientStops, steps: options.textGradientSteps)
+        characterScenes = []
+        for row in 1...canvas.rows {
+            for column in 1...canvas.columns {
+                let coordinate = Coordinate(column: column, row: row)
+                let frameCount = rng.integer(in: 15...30)
+                var symbolScalar = options.textGenerationSymbols.first?.unicodeScalars.first?.value ?? 32
+                var color = inputByCoordinate[coordinate]?.color ?? 0
+                for _ in 0..<frameCount {
+                    symbolScalar = options.textGenerationSymbols[rng.integer(in: 0..<options.textGenerationSymbols.count)].unicodeScalars.first?.value ?? symbolScalar
+                    color = synthGridRGB(textGradient.spectrum[rng.integer(in: 0..<textGradient.spectrum.count)])
+                }
+                let final = inputByCoordinate[coordinate]
+                characterScenes.append(CharacterScene(
+                    coordinate: coordinate,
+                    generationFrames: frameCount,
+                    generationSymbol: symbolScalar,
+                    generationColor: color,
+                    finalCodepoint: final?.codepoint ?? Cell.blank.codepoint,
+                    finalColor: final?.color ?? 0
+                ))
+            }
+        }
+        pendingGroups = makeGroups()
         rng.shuffle(&pendingGroups)
         if pendingGroups.isEmpty {
             for index in characterScenes.indices { characterScenes[index].active = true }
@@ -285,7 +298,7 @@ public struct SynthGridEffect: Effect {
     private mutating func advanceActiveScenes() {
         for index in characterScenes.indices where characterScenes[index].active && !characterScenes[index].complete {
             characterScenes[index].age += 1
-            if characterScenes[index].age > characterScenes[index].generationFrames * 2 + 1 {
+            if characterScenes[index].age >= characterScenes[index].generationFrames * 2 + 1 {
                 characterScenes[index].complete = true
             }
         }
@@ -293,10 +306,9 @@ public struct SynthGridEffect: Effect {
 
     private func renderSynthGrid(into frame: inout Frame) {
         for scene in characterScenes where scene.active {
-            let position = input.positions[scene.inputIndex]
-            let codepoint = scene.complete ? input.scalars[scene.inputIndex] : (scene.currentCellCodepoint == 0 ? input.scalars[scene.inputIndex] : scene.currentCellCodepoint)
+            let codepoint = scene.complete ? scene.finalCodepoint : (scene.currentCellCodepoint == 0 ? scene.finalCodepoint : scene.currentCellCodepoint)
             let color = scene.complete || scene.currentCellCodepoint == 0 ? scene.finalColor : scene.generationColor
-            frame[column: position.column, row: position.row] = Cell(codepoint: codepoint, foreground: color, background: 0)
+            frame[column: scene.coordinate.column, row: scene.coordinate.row] = Cell(codepoint: codepoint, foreground: color, background: 0)
         }
 
         for line in gridLines {
@@ -309,11 +321,11 @@ public struct SynthGridEffect: Effect {
     }
 
     private func makeGroups() -> [[Int]] {
-        guard !input.scalars.isEmpty else { return [] }
+        guard !characterScenes.isEmpty else { return [] }
         var indices: [Int] = []
-        for row in stride(from: canvas.rows, through: 1, by: -1) {
+        for row in 1...canvas.rows {
             for column in 1...canvas.columns {
-                if let index = input.positions.firstIndex(where: { $0.column == column && $0.row == row }) {
+                if let index = characterScenes.firstIndex(where: { $0.coordinate == Coordinate(column: column, row: row) }) {
                     indices.append(index)
                 }
             }

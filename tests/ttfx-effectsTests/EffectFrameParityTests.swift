@@ -1106,6 +1106,48 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func synthGridEffectMatchesANonBoundedIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nCDE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "300",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "synthgrid", "--grid-gradient-stops", "ffffff", "ffffff",
+            "--grid-gradient-steps", "1", "--text-gradient-stops", "112233", "112233",
+            "--text-gradient-steps", "1", "--text-generation-symbols", "x", "--max-active-blocks", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 70)
+    let status = try assertFrameParity(
+        SynthGridEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            synthGridConfiguration: .init(
+                gridGradientStops: [Color(hex: "ffffff"), Color(hex: "ffffff")],
+                gridGradientSteps: [1],
+                textGradientStops: [Color(hex: "112233"), Color(hex: "112233")],
+                textGradientSteps: [1],
+                textGenerationSymbols: ["x"],
+                maxActiveBlocks: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "synthgrid non-bounded independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) non-bounded synthgrid frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 @Test func synthGridEffectMatchesACompleteSmallGridIndependentRustRun() throws {
     let canvas = try Canvas(columns: 4, rows: 3)
     let input = "AB\nCD"
