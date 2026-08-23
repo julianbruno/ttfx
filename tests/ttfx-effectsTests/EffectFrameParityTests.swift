@@ -333,4 +333,180 @@ struct EffectFrameParityTests {
     #expect(status.finalStatus == .complete)
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
+
+@Test func rainEffectMatchesItsAdmittedRustFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let status = try assertFixtureParity(
+        RainEffect(configuration: .init(text: "Swift\nTTE", seed: 42), canvas: canvas, input: canvas.ingest("Swift\nTTE"), seed: 42),
+        named: "rain"
+    )
+    #expect(status.finalStatus == .running, "The admitted fixture is intentionally capped at 32 Rust frames; the independent Rust run proves completion.")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func rainEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 8, rows: 5)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "200",
+            "--seed", "11", "--ignore-terminal-dimensions", "--canvas-width", "8",
+            "--canvas-height", "5", "rain", "--rain-colors", "112233", "445566",
+            "--movement-speed", "2.0-2.5", "--rain-symbols", "x", "+",
+            "--final-gradient-stops", "88aaff", "00ffcc", "--final-gradient-steps", "4",
+            "--final-gradient-direction", "horizontal", "--movement-easing", "out_sine"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        RainEffect(
+            configuration: .init(text: input, seed: 11),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 11,
+            rainConfiguration: .init(
+                rainColors: [Color(hex: "112233"), Color(hex: "445566")],
+                movementSpeed: (2.0, 2.5),
+                rainSymbols: ["x", "+"],
+                finalGradientStops: [Color(hex: "88aaff"), Color(hex: "00ffcc")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .horizontal,
+                movementEasing: .outSine
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "rain configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured rain frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func bubblesEffectMatchesItsAdmittedRustFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let status = try assertFixtureParity(
+        BubblesEffect(
+            configuration: .init(text: "Swift\nTTE", seed: 42),
+            canvas: canvas,
+            input: canvas.ingest("Swift\nTTE"),
+            seed: 42,
+            bubblesConfiguration: .init(bubbleSpeed: 3, bubbleDelay: 1)
+        ),
+        named: "bubbles"
+    )
+    #expect(status.finalStatus == .running, "The admitted fixture is intentionally capped at 32 Rust frames; the independent Rust run proves completion.")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func bubblesEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 8, rows: 5)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "200",
+            "--seed", "11", "--ignore-terminal-dimensions", "--canvas-width", "8",
+            "--canvas-height", "5", "bubbles", "--bubble-speed", "3", "--bubble-delay", "1",
+            "--bubble-colors", "112233", "445566", "--pop-color", "ffff00",
+            "--movement-easing", "out_sine", "--final-gradient-stops", "88aaff", "00ffcc",
+            "--final-gradient-steps", "4", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        BubblesEffect(
+            configuration: .init(text: input, seed: 11),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 11,
+            bubblesConfiguration: .init(
+                bubbleColors: [Color(hex: "112233"), Color(hex: "445566")],
+                popColor: Color(hex: "ffff00"),
+                bubbleSpeed: 3,
+                bubbleDelay: 1,
+                movementEasing: .outSine,
+                finalGradientStops: [Color(hex: "88aaff"), Color(hex: "00ffcc")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "bubbles configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured bubbles frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func fireworksEffectMatchesItsAdmittedRustFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let status = try assertFixtureParity(
+        FireworksEffect(
+            configuration: .init(text: "Swift\nTTE", seed: 42),
+            canvas: canvas,
+            input: canvas.ingest("Swift\nTTE"),
+            seed: 42
+        ),
+        named: "fireworks"
+    )
+    #expect(status.finalStatus == .running, "The admitted fixture is intentionally capped at 32 Rust frames; the independent Rust run proves completion.")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func fireworksEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 8, rows: 5)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "250",
+            "--seed", "11", "--ignore-terminal-dimensions", "--canvas-width", "8",
+            "--canvas-height", "5", "fireworks", "--launch-delay", "1",
+            "--firework-colors", "112233", "445566", "--firework-symbol", "*",
+            "--firework-volume", "0.5", "--explode-distance", "0.3",
+            "--final-gradient-stops", "88aaff", "00ffcc", "--final-gradient-steps", "4",
+            "--final-gradient-direction", "vertical"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        FireworksEffect(
+            configuration: .init(text: input, seed: 11),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 11,
+            fireworksConfiguration: .init(
+                fireworkColors: [Color(hex: "112233"), Color(hex: "445566")],
+                fireworkSymbol: "*",
+                fireworkVolume: 0.5,
+                launchDelay: 1,
+                explodeDistance: 0.3,
+                finalGradientStops: [Color(hex: "88aaff"), Color(hex: "00ffcc")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .vertical
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "fireworks configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured fireworks frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
 }

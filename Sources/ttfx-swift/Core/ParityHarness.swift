@@ -85,23 +85,35 @@ public enum FixtureGenerator {
     public static func pinnedRevision(repositoryRoot: String, runner: ProcessRunner = .init()) throws -> String {
         let root = URL(fileURLWithPath: repositoryRoot).standardizedFileURL
         do {
-            let result = try runner.run(
+            _ = try runner.run(
                 executable: URL(fileURLWithPath: "/usr/bin/git"),
-                arguments: ["-C", root.path, "rev-parse", "HEAD"],
+                arguments: ["-C", root.path, "rev-parse", "--git-dir"],
                 stdin: Data(),
                 environment: [:],
                 currentDirectory: nil,
                 timeout: 5
             )
-            guard let revision = String(data: result.stdout, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  revision.count == 40
-            else {
-                throw FixtureGeneratorError.invalidRevision
-            }
-            return revision
         } catch {
             throw FixtureGeneratorError.notRepository(root.path)
         }
+
+        let manifestURL = root.appendingPathComponent("tests/fixtures/effects/manifest.json")
+        guard let manifest = try? String(contentsOf: manifestURL, encoding: .utf8),
+              let revision = recordedRevision(in: manifest)
+        else {
+            throw FixtureGeneratorError.invalidRevision
+        }
+        return revision
+    }
+
+    private static func recordedRevision(in manifest: String) -> String? {
+        let marker = "\"revision\": \""
+        guard let markerRange = manifest.range(of: marker) else { return nil }
+        let afterMarker = manifest[markerRange.upperBound...]
+        guard let end = afterMarker.firstIndex(of: "\"") else { return nil }
+        let revision = String(afterMarker[..<end])
+        guard revision.count == 40, revision.allSatisfy({ $0.isHexDigit }) else { return nil }
+        return revision
     }
 
     public static func generate(

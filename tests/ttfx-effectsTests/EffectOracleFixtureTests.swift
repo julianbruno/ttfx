@@ -125,7 +125,7 @@ private func sha256(of file: URL) throws -> String {
 @Test func effectOracleGeneratorMatchesRecordedUntrackedHashBaseline() throws {
     let generator = repositoryRoot().appendingPathComponent("tools/swift-parity/generate-effect-oracles.sh")
     #expect(
-        try sha256(of: generator) == "eddd01eea46729d3061b7c889afcc7daf91409c3490e823f5180a77baec8f820",
+        try sha256(of: generator) == "d3f7843d92277de439d1ff7ad747ef4597546b6191a9b8bb988fb547a6737c15",
         "The untracked generator baseline is recorded in native-swift-port apply progress; update its provenance deliberately when the generator changes."
     )
 }

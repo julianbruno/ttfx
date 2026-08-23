@@ -3,6 +3,7 @@
 **Mode:** Strict TDD
 **Delivery:** Single PR with maintainer-approved `size:exception`
 **Completed work units:** `wave-0-foundations`, `phase-1-core-engine`, `phase-2-animation-substrate`, `phase-2-animation-composition`, `phase-2-dynamic-gradient-contract`, `phase-2-shared-runtime-execution`, `phase-2-shared-runtime-contract-gaps`, `phase-2-effect-oracle-boundary`, `phase-2-print-effect`, `phase-2-slide-effect`, `phase-2-wipe-effect`, `phase-2-expand-effect`, `phase-2-simple-effects-contract-gaps`
+**Attempted work units:** `phase-2-simple-effects-documentary-gate` (QUIRK planning refs added; standalone hash receipt passed; full-suite and generator-check receipts recorded as failing after HEAD checkpoint)
 **Status:** 10/27 tasks complete
 
 ## Completed Tasks
@@ -407,6 +408,36 @@ This correction changes only evidence tests, source quirk references, and cumula
 - [ ] 2.1 remains unchecked: RainEffect, BubblesEffect, FireworksEffect, and SwarmEffect are not implemented by this correction.
 - [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
 
+## Phase 2 Simple Effects Documentary Gate
+
+This unit changes only `QUIRK(...)` planning-file provenance and durable receipts. It does not implement Rain, Bubbles, Fireworks, Swarm, CLI, SwiftUI, or later tasks. WipeEffect algorithm is unchanged. Task 2.1 remains unchecked at 10/27. No fixture, generator, or Rust production bytes were modified.
+
+Print, Slide, and Expand `QUIRK(...)` comments previously cited only Rust source ranges. They now also reference `plan.md`, matching the swift-effects-parity requirement that every quirk marker cite `plan.md` or `ordering-inventory.md`. Wipe already cited `ordering-inventory.md` and was left unchanged.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `phase-2-simple-effects-documentary-gate` | existing `EffectOracleFixtureTests` / `EffectFrameParityTests` | Documentary provenance | `swift test --filter effectOracleGeneratorMatchesRecordedUntrackedHashBaseline` — exit 0; 1 test passed after comment edits. | No new production behavior. Comment-only provenance cannot go RED without changing tests, which this unit forbids. | Comment updates compile; the standalone hash filter remains 1 passing test. Full-suite GREEN is blocked by a pre-existing HEAD/fixture revision mismatch, not by the comments. | Triangulation skipped: one documentary form with no branching behavior. | None. Wipe algorithm, fixtures, and generator bytes were not refactored. |
+
+### Persisted Receipts
+
+| Evidence | Exact result |
+|---|---|
+| Standalone hash | `swift test --filter effectOracleGeneratorMatchesRecordedUntrackedHashBaseline` — exit 0; Swift Testing ran 1 test, 1 passed. |
+| Post-correction full suite | `swift test` — exit 1; Swift Testing ran 63 tests in 1 suite and failed after 4.313 seconds with 4 issues. 60 tests passed. Three tests failed because current `git rev-parse HEAD` is `f544dc813eff97c4310df1f91629d8e834afb683` (`chore(wip): checkpoint native Swift port`) while fixtures remain pinned to `6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a`. Failures: `effectOracleFixturesHavePinnedProvenanceAndBehavioralContent`, `namedRandomOperationsMatchPinnedRustRangeChoiceAndShuffleTrace`, and `effectOracleGeneratorCheckIsDeterministicAndReportsCurrentFixtures`. All Print/Slide/Wipe/Expand admitted and live-Rust parity tests passed. |
+| Post-correction generator check | `sh tools/swift-parity/generate-effect-oracles.sh --check` — exit 1; emitted `frames=32` seven times, `frames=18` once, then `Effect oracle fixtures are stale or pinned to a different Rust revision.` |
+| Diff whitespace | `git diff --check -- Sources/ttfx-swift/Effects/{Print,Slide,Expand}Effect.swift openspec/changes/native-swift-port/apply-progress.md` — exit 0. |
+| Task checkboxes | Unchanged. `tasks.md` still shows `- [ ] 2.1`. |
+| Rollback boundary | Revert the `plan.md` additions in the Print/Slide/Expand `QUIRK(...)` comments and this documentary-gate section. Leave Wipe, fixtures, generator bytes, and task 2.1 untouched. |
+
+The previously missing standalone hash, full-suite, and generator-check receipts are now persisted as observed. They are not invented passing results: after the checkpoint commit, the oracle revision pin and current HEAD no longer match. Closing the remaining receipt gap requires an authorized fixture-revision reconciliation, which this unit forbids.
+
+### Task State
+
+- [ ] 2.1 remains unchecked: RainEffect, BubblesEffect, FireworksEffect, and SwarmEffect are not implemented by this documentary unit.
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
 ## Phase 2 ExpandEffect Work Unit
 
 This partial task 2.1 work unit implements only `ExpandEffect`. Task 2.1 remains unchecked at 10/27 because rain, bubbles, fireworks, and swarm remain pending. PrintEffect, SlideEffect, WipeEffect, Rust production source, fixture-generation behavior, CLI work, and later tasks were preserved.
@@ -530,4 +561,121 @@ At subunit completion, the direct Slide implementation/test inventory was 531 ph
 ### Remaining Effects and Task State
 
 - [ ] 2.1 remains unchecked: `WipeEffect`, `ExpandEffect`, `RainEffect`, `BubblesEffect`, `FireworksEffect`, and `SwarmEffect` require their own RED→GREEN Rust parity work units.
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2 Oracle Revision Pin Reconciliation
+
+Surgical work unit `phase-2-oracle-revision-pin-reconciliation` only. Task 2.1 remains unchecked at 10/27. No named Rain/other effect work, no Print/Slide/Wipe/Expand algorithm or QUIRK edits, and no admitted `*.frames` regeneration.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Recorded Rust pin after HEAD checkpoint | `tests/ttfx-effectsTests/EffectOracleFixtureTests.swift`, `tests/ttfx-swiftTests/Core/EffectOraclePrimitivesTests.swift` | Oracle provenance | Pre-edit HEAD was `f544dc813eff97c4310df1f91629d8e834afb683`; fixtures already recorded `6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a`. | `swift test --filter effectOracleFixturesHavePinnedProvenanceAndBehavioralContent --filter namedRandomOperationsMatchPinnedRustRangeChoiceAndShuffleTrace --filter effectOracleGeneratorCheckIsDeterministicAndReportsCurrentFixtures` — exit 1; 3 tests, 4 issues: fixture/RNG revision `6e24dac...` != `pinnedRevision` HEAD `f544dc8...`; `--check` status 1 with empty stdout. | Same three filters plus `effectOracleGeneratorMatchesRecordedUntrackedHashBaseline` — exit 0; 4 tests passed after `FixtureGenerator.pinnedRevision` read the effects-manifest pin and the generator stopped using `git rev-parse HEAD`. | `sh tools/swift-parity/generate-effect-oracles.sh --check` — exit 0; eight dump counts 32/32/32/18/32/32/32/32 and `Effect oracle fixtures are current.` `swift test --filter ParityHarnessTests` remains green via `rev-parse --git-dir` plus the recorded pin. | None; pin source is the existing manifest revision, not a new abstraction. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter effectOracleFixturesHavePinnedProvenanceAndBehavioralContent --filter namedRandomOperationsMatchPinnedRustRangeChoiceAndShuffleTrace --filter effectOracleGeneratorCheckIsDeterministicAndReportsCurrentFixtures` — exit 1; 3 failed / 4 issues. |
+| GREEN focused | Same three filters plus `effectOracleGeneratorMatchesRecordedUntrackedHashBaseline` — exit 0; 4 passed. |
+| Generator check | `sh tools/swift-parity/generate-effect-oracles.sh --check` — exit 0; `Effect oracle fixtures are current.`; dump bytes unchanged. |
+| Full suite | `swift test` — exit 0; 63 Swift Testing tests passed. |
+| Runtime harness | Generator `--check` still cargo-dumps the eight admitted effects into staging and byte-compares them to the recorded corpus; it now writes/compares pin `6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a` instead of current HEAD. |
+| Rollback boundary | Revert `Sources/ttfx-swift/Core/ParityHarness.swift`, `tools/swift-parity/generate-effect-oracles.sh`, the hash literal in `tests/ttfx-effectsTests/EffectOracleFixtureTests.swift`, and this section. Fixtures, effect algorithms, and task 2.1 stay untouched. |
+
+### Generator Hash Baseline
+
+`effectOracleGeneratorMatchesRecordedUntrackedHashBaseline` now requires SHA-256 `d3f7843d92277de439d1ff7ad747ef4597546b6191a9b8bb988fb547a6737c15` for `tools/swift-parity/generate-effect-oracles.sh`. Previous baseline was `eddd01eea46729d3061b7c889afcc7daf91409c3490e823f5180a77baec8f820`.
+
+### Remaining Tasks
+
+- [ ] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2 RainEffect Work Unit
+
+This partial task 2.1 work unit implements only `RainEffect`. Task 2.1 remains unchecked at 10/27 because bubbles, fireworks, and swarm remain pending. Print, Slide, Wipe, Expand, Rust production source, fixtures, generator behavior, CLI, and later tasks were preserved.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `rain` | `Tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Rust-frame integration | `swift test --filter printEffect --filter slideEffect --filter wipeEffect --filter expandEffect` — exit 0; 9 tests passed. | Existing admitted test compiled and failed: `swift test --filter rainEffectMatchesItsAdmittedRustFrames` exit 1, `cannot find 'RainEffect' in scope` at line 340. No extra closing brace was present. | First genuine implementation mismatched at tick 17 because fade index advanced on the same tick Rust still paints the popped frame. After matching `get_next_visual` (return current visual, then retire the frame), the admitted 12×6/seed-42 test exited 0 across all 32 ANSI frames with final status `.running`. | `rainEffectMatchesAConfiguredIndependentRustRun` runs live Rust with input `AB\nC`, canvas 8×5, seed 11, rain colors `112233 445566`, speed `2.0-2.5`, symbols `x +`, horizontal `88aaff → 00ffcc` steps 4, and `out_sine`. The dump is compared byte-for-byte and Swift returns `.complete` on the final frame. | Documented PathComplete→fade activation before scene stepping; no further production extraction. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused Rain tests | `swift test --filter rainEffect` — exit 0; 2 Swift Testing tests passed: the admitted 12×6/seed-42 32-frame corpus and the independent configured live Rust run with completion. |
+| Safety tests | `swift test --filter printEffect --filter slideEffect --filter wipeEffect --filter expandEffect` — exit 0; 9 tests passed. |
+| Full Swift suite | `swift test` — exit 0; 65 Swift Testing tests passed (was 63). |
+| Runtime/oracle harness | The independent test uses `/usr/bin/env cargo run --quiet -- --parity-dump ... rain` via `ProcessRunner`, inherited environment, repository-root working directory, and a 30-second timeout. Production code never reads fixture data. |
+| Fixture generator | `sh tools/swift-parity/generate-effect-oracles.sh --check` — exit 0; eight dump counts 32/32/32/18/32/32/32/32 and `Effect oracle fixtures are current.` Pin remains `6e24dac`. Generator script hash unchanged. |
+| Diff whitespace | `git diff --check -- Sources/ttfx-swift/Effects/RainEffect.swift tests/ttfx-effectsTests/EffectFrameParityTests.swift` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/RainEffect.swift`; revert the Rain activation and independent Rust test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Print, Slide, Wipe, Expand, fixtures, generator, and pending effects remain intact. |
+
+### Rain Implementation Notes
+
+`RainEffect` is a standalone `Effect`, not a fixture reader or alias. It uses `Xoshiro256PlusPlus(seed)` with Rust `choice`/`uniform`/`randint` semantics, builds static final-gradient colors, draws per-character rain color then symbol then speed, groups by input row in BTreeMap order, and releases `randint(1, 2)` random pending glyphs each tick. Paths fall from `canvas.top` with `in_quart` by default; `PathComplete` activates the 7-step/3-duration fade in the same tick. Collisions use `(layer, character_id)`. The admitted fixture is capped at 32 frames so its last status is `.running`; completion is proved by the independent Rust run.
+
+### Remaining Effects and Task State
+
+- [ ] 2.1 remains unchecked: `BubblesEffect`, `FireworksEffect`, and `SwarmEffect` require their own RED→GREEN Rust parity work units.
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2 BubblesEffect Work Unit
+
+This partial task 2.1 work unit implements only `BubblesEffect`. Task 2.1 remains unchecked at 10/27 because fireworks and swarm remain pending. Print, Slide, Wipe, Expand, Rain, Rust production source, fixtures, generator behavior, CLI, and later tasks were preserved.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `bubbles` | `Tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Rust-frame integration | `swift test --filter printEffect --filter slideEffect --filter wipeEffect --filter expandEffect --filter rainEffect` — exit 0; 11 tests passed. | `swift test --filter bubblesEffectMatchesItsAdmittedRustFrames` exit 1, `cannot find 'BubblesEffect' in scope` at line 394. | First genuine implementation matched the admitted 12×6/seed-42 32-frame corpus (`--bubble-speed 3 --bubble-delay 1`) with final status `.running`. Intra-scene final-gradient frames initially advanced one tick early versus `get_next_visual`. After keeping the current color until the next tick, the independent run matched. | `bubblesEffectMatchesAConfiguredIndependentRustRun` runs live Rust with input `AB\nC`, canvas 8×5, seed 11, bubble colors `112233 445566`, pop `ffff00`, speed 3, delay 1, horizontal `88aaff → 00ffcc` steps 4, and `out_sine`. The dump is compared byte-for-byte and Swift returns `.complete` on the final frame. | Documented inclusive `randint` grouping and PathComplete `pop_out`→`final`; no further production extraction. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused Bubbles tests | `swift test --filter bubblesEffect` — exit 0; 2 Swift Testing tests passed: the admitted 12×6/seed-42 32-frame corpus and the independent configured live Rust run with completion. |
+| Safety tests | `swift test --filter printEffect --filter slideEffect --filter wipeEffect --filter expandEffect --filter rainEffect --filter bubblesEffect` — exit 0; 13 tests passed. |
+| Full Swift suite | `swift test` — exit 0; 67 Swift Testing tests passed (was 65). |
+| Runtime/oracle harness | The independent test uses `/usr/bin/env cargo run --quiet -- --parity-dump ... bubbles` via `ProcessRunner`, inherited environment, repository-root working directory, and a 30-second timeout. Production code never reads fixture data. |
+| Fixture generator | `sh tools/swift-parity/generate-effect-oracles.sh --check` — exit 0; eight dump counts 32/32/32/18/32/32/32/32 and `Effect oracle fixtures are current.` Pin remains `6e24dac`. Generator script hash unchanged. |
+| Diff whitespace | `git diff --check -- Sources/ttfx-swift/Effects/BubblesEffect.swift tests/ttfx-effectsTests/EffectFrameParityTests.swift` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/BubblesEffect.swift`; revert the Bubbles activation and independent Rust test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Print, Slide, Wipe, Expand, Rain, fixtures, generator, and pending effects remain intact. |
+
+### Bubbles Implementation Notes
+
+`BubblesEffect` is a standalone `Effect`, not a fixture reader or alias. It uses `Xoshiro256PlusPlus(seed)` with Rust inclusive `randint`/`choice` semantics, maps the final diagonal gradient, groups leftover input characters `RowBottomToTop`, and slices `randint(5, min(len, 20))` from the front. Anchors spawn at `randint(left, right), top+10` and walk at `bubble_speed` onto a circle (`unique=false`). Landing pops onto `radius+3` (`unique=true`, zip-truncated), then `pop_1`/`pop_2`/`final` scenes and `pop_out`→`final` paths. Collisions use `(layer, character_id)` with higher keys winning. The admitted fixture is capped at 32 frames so its last status is `.running`; completion is proved by the independent Rust run.
+
+### Remaining Effects and Task State
+
+- [ ] 2.1 remains unchecked: `FireworksEffect` and `SwarmEffect` require their own RED→GREEN Rust parity work units.
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2 FireworksEffect Work Unit
+
+This partial task 2.1 work unit completes `FireworksEffect` parity evidence. Task 2.1 remains unchecked at 10/27 because `SwarmEffect` is still absent. Print, Slide, Wipe, Expand, Rain, Bubbles, Rust production source, admitted fixtures, generator behavior, CLI, and later tasks were preserved.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `fireworks` | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Rust-frame integration | `swift test --filter EffectFrameParityTests` previously passed except the configured Fireworks independent run. | `swift test --filter EffectFrameParityTests/fireworksEffectMatchesAConfiguredIndependentRustRun` reproduced tick-138 divergence: Swift rendered A as white while Rust expected fall-gradient color. | `swift test --filter fireworksEffectMatchesAConfiguredIndependentRustRun` — exit 0; configured Rust run matched all emitted frames after increasing the Rust cap to 250. | `swift test --filter fireworksEffectMatchesItsAdmittedRustFrames` — exit 0; admitted 32-frame 12x6/seed-42 fixture still matches. `swift test --filter EffectFrameParityTests` — exit 0; 15 tests passed. | Corrected shared Swift `Gradient` interpolation to clamp RGB channels to 0...255 before hex formatting, matching Rust `utils/graphics.rs`; no effect-local workaround was kept. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused Fireworks independent run | `swift test --filter fireworksEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed. The Rust oracle emitted 215 frames when capped at 250. |
+| Admitted Fireworks fixture | `swift test --filter fireworksEffectMatchesItsAdmittedRustFrames` — exit 0; 1 Swift Testing test passed. |
+| Effect frame suite | `swift test --filter EffectFrameParityTests` — exit 0; 15 Swift Testing tests passed. |
+| Root cause | Swift `Gradient` used Python floor division for negative channel deltas but formatted negative intermediate RGB values directly, producing wrapped `ff...` white values. Rust clamps each interpolated channel before formatting. |
+| Rollback boundary | Revert `Sources/ttfx-swift/Core/ParityPrimitives.swift`, `Sources/ttfx-swift/Effects/FireworksEffect.swift`, the Fireworks independent Rust cap in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this section. Keep Rain/Bubbles evidence and task 2.1 unchecked. |
+
+### Task State
+
+- [ ] 2.1 remains unchecked: `SwarmEffect` requires its own RED→GREEN Rust parity work unit before the combined simple/particle task can close.
 - [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.

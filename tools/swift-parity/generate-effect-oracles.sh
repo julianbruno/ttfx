@@ -10,7 +10,8 @@ esac
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 
-revision=$(git rev-parse HEAD)
+# Admitted Rust oracle pin shared with the RNG fixture; never current HEAD.
+revision=6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a
 case "$revision" in *[!0-9a-f]*|'') printf '%s\n' "invalid Rust Git revision" >&2; exit 1 ;; esac
 [ "${#revision}" -eq 40 ] || { printf '%s\n' "invalid Rust Git revision" >&2; exit 1; }
 

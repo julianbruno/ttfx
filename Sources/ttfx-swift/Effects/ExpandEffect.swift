@@ -35,7 +35,7 @@ public struct ExpandEffect: Effect {
         var lastDistance = 0.0
         var pathActive = true
 
-        // QUIRK(src/effects/expand.rs:124-142): path activation raises the layer to 1,
+        // QUIRK(src/effects/expand.rs:124-142; plan.md): path activation raises the layer to 1,
         // then path completion restores layer 0 while the distance-synced scene remains active.
         var layer: Int { pathActive ? 1 : 0 }
 

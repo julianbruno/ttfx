@@ -154,7 +154,7 @@ public struct SlideEffect: Effect {
 
         var groups = groupedGlyphIndices()
         for index in groups.indices {
-            // QUIRK(src/effects/slide.rs:162-179): choose the start from the original
+            // QUIRK(src/effects/slide.rs:162-179; plan.md): choose the start from the original
             // group, then reverse the live group so release order remains upstream-compatible.
             let original = groups[index]
             let groupStart = initialCoordinate(for: &groups[index], original: original, index: index)
@@ -214,7 +214,7 @@ public struct SlideEffect: Effect {
                 row: startsFromBottom ? 0 : canvas.rows + 1
             )
         case .diagonal:
-            // QUIRK(src/effects/slide.rs:208-236): diagonal groups share one off-canvas
+            // QUIRK(src/effects/slide.rs:208-236; plan.md): diagonal groups share one off-canvas
             // origin; they do not start from each glyph's target row or column.
             let last = glyphs[original.last!].inputCoordinate
             let bottomDistance = last.row

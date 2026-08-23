@@ -177,6 +177,18 @@ public enum Geometry {
         return Coordinate(column: PyCompat.roundHalfEven(points[0].0), row: PyCompat.roundHalfEven(points[0].1))
     }
 
+    // QUIRK(src/utils/geometry.rs:130-140; plan.md): non-doubled length, then lerp past the target.
+    public static func extrapolateAlongRay(origin: Coordinate, target: Coordinate, offsetFromTarget: Double) -> Coordinate {
+        let base = lineLength(from: origin, to: target, doubleRowDifference: false)
+        let total = base + offsetFromTarget
+        if total == 0 || origin == target { return target }
+        let t = total / base
+        return Coordinate(
+            column: PyCompat.roundHalfEven((1 - t) * Double(origin.column) + t * Double(target.column)),
+            row: PyCompat.roundHalfEven((1 - t) * Double(origin.row) + t * Double(target.row))
+        )
+    }
+
     public static func lineLength(from start: Coordinate, to end: Coordinate, doubleRowDifference: Bool = true) -> Double {
         hypot(Double(end.column - start.column), Double(end.row - start.row) * (doubleRowDifference ? 2 : 1))
     }
@@ -285,7 +297,10 @@ public struct Gradient: Sendable {
             let greenDelta = PyCompat.floorDivide(Int(end.green) - Int(start.green), count)
             let blueDelta = PyCompat.floorDivide(Int(end.blue) - Int(start.blue), count)
             for step in (generated.isEmpty ? 0 : 1)..<count {
-                generated.append(Color(hex: String(format: "%02x%02x%02x", Int(start.red) + redDelta * step, Int(start.green) + greenDelta * step, Int(start.blue) + blueDelta * step)))
+                let red = min(max(Int(start.red) + redDelta * step, 0), 255)
+                let green = min(max(Int(start.green) + greenDelta * step, 0), 255)
+                let blue = min(max(Int(start.blue) + blueDelta * step, 0), 255)
+                generated.append(Color(hex: String(format: "%02x%02x%02x", red, green, blue)))
             }
             generated.append(end)
         }

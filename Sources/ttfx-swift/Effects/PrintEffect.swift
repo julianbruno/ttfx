@@ -77,7 +77,7 @@ public struct PrintEffect: Effect {
             right: textRight
         )
 
-        // QUIRK(src/effects/print_effect.rs:112-125): all-fill rows retain one cell,
+        // QUIRK(src/effects/print_effect.rs:112-125; plan.md): all-fill rows retain one cell,
         // while other rows stop at the last non-fill column before printing.
         for row in stride(from: canvas.rows, through: 1, by: -1) {
             let lastColumn = (1...canvas.columns)
