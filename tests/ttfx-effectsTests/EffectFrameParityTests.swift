@@ -464,6 +464,56 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == nil)
 }
 
+@Test func swarmEffectMatchesItsAdmittedRustFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let status = try assertFixtureParity(
+        SwarmEffect(
+            configuration: .init(text: "Swift\nTTE", seed: 42),
+            canvas: canvas,
+            input: canvas.ingest("Swift\nTTE"),
+            seed: 42,
+            swarmConfiguration: .init(swarmSize: 1, swarmCoordination: 1, swarmAreaCountRange: 1...1)
+        ),
+        named: "swarm"
+    )
+    #expect(status.finalStatus == .running, "The admitted fixture is intentionally capped at 32 Rust frames; the independent Rust run proves completion.")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func swarmEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let input = "Swift\nTTE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "150",
+            "--seed", "42", "--ignore-terminal-dimensions", "--canvas-width", "12",
+            "--canvas-height", "6", "swarm", "--swarm-size", "1", "--swarm-coordination", "1",
+            "--swarm-area-count-range", "1-1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 103)
+    let status = try assertFrameParity(
+        SwarmEffect(
+            configuration: .init(text: input, seed: 42),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 42,
+            swarmConfiguration: .init(swarmSize: 1, swarmCoordination: 1, swarmAreaCountRange: 1...1)
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "swarm configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured swarm frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 @Test func fireworksEffectMatchesAConfiguredIndependentRustRun() throws {
     let canvas = try Canvas(columns: 8, rows: 5)
     let input = "AB\nC"

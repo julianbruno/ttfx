@@ -4,7 +4,7 @@
 **Delivery:** Single PR with maintainer-approved `size:exception`
 **Completed work units:** `wave-0-foundations`, `phase-1-core-engine`, `phase-2-animation-substrate`, `phase-2-animation-composition`, `phase-2-dynamic-gradient-contract`, `phase-2-shared-runtime-execution`, `phase-2-shared-runtime-contract-gaps`, `phase-2-effect-oracle-boundary`, `phase-2-print-effect`, `phase-2-slide-effect`, `phase-2-wipe-effect`, `phase-2-expand-effect`, `phase-2-simple-effects-contract-gaps`
 **Attempted work units:** `phase-2-simple-effects-documentary-gate` (QUIRK planning refs added; standalone hash receipt passed; full-suite and generator-check receipts recorded as failing after HEAD checkpoint)
-**Status:** 10/27 tasks complete
+**Status:** 11/27 tasks complete
 
 ## Completed Tasks
 
@@ -18,6 +18,7 @@
 - [x] 1.3 Add deterministic fixed-frame performance and allocation-proxy evidence.
 - [x] 2.0 Add the ordered minimum animation substrate prerequisite: stable character arena/grouping, renderer collisions, motion paths/holds, scenes, typed reentrant events, completion, seeded runtime state, and fixed-capacity rendering.
 - [x] 2.0a Add shared motion, scene, scheduling, typed-action, input-arena, and `RuntimeEffect` composition prerequisites.
+- [x] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
 
 ## TDD Cycle Evidence
 
@@ -677,5 +678,34 @@ This partial task 2.1 work unit completes `FireworksEffect` parity evidence. Tas
 
 ### Task State
 
-- [ ] 2.1 remains unchecked: `SwarmEffect` requires its own RED→GREEN Rust parity work unit before the combined simple/particle task can close.
+- [ ] 2.1 remains unchecked in `tasks.md` until the orchestrator records the now-complete eight-effect evidence.
+- [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2 SwarmEffect Work Unit
+
+This task 2.1 work unit implements `SwarmEffect` parity evidence after Print, Slide, Wipe, Expand, Rain, Bubbles, and Fireworks were already present. Rust production source, admitted fixture bytes, generator behavior, CLI, SwiftUI, and later tasks were preserved. The task checkbox is now complete because all eight requested simple/particle effects have RED→GREEN evidence.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `swarm` | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Rust-frame integration | Existing tree had no `SwarmEffect` source and no Swarm parity tests. | `swift test --filter swarmEffectMatchesItsAdmittedRustFrames` — exit 1; compile failed with `cannot find 'SwarmEffect' in scope`. | `swift test --filter swarmEffectMatchesItsAdmittedRustFrames` — exit 0 after implementing the Rust-faithful swarm path/cache/scene model for the admitted 12x6, seed-42, `--swarm-size 1 --swarm-coordination 1 --swarm-area-count-range 1-1` fixture. | `swift test --filter swarmEffectMatchesAConfiguredIndependentRustRun` — exit 0; a live Rust `/usr/bin/env cargo run -- --parity-dump` with the same admitted Swarm options emitted 103 frames and matched Swift byte-for-byte through completion. `swift test --filter EffectFrameParityTests` — exit 0; 17 tests passed. | Corrected the implementation while preserving focused parity: used Rust's ellipse `find_coords_in_circle`, banker's rounding for distance-synced flash scenes, and PathComplete-before-animation behavior for one-tick paths. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused Swarm tests | `swift test --filter 'swarmEffectMatchesItsAdmittedRustFrames|swarmEffectMatchesAConfiguredIndependentRustRun'` — exit 0; 2 Swift Testing tests passed. |
+| Effect frame suite | `swift test --filter EffectFrameParityTests` — exit 0; 17 Swift Testing tests passed, including all eight simple/particle admitted fixtures and their live Rust runs. |
+| Diff whitespace | `git diff --check -- Sources/ttfx-swift/Effects/SwarmEffect.swift tests/ttfx-effectsTests/EffectFrameParityTests.swift openspec/changes/native-swift-port/apply-progress.md` — exit 0. |
+| Runtime/oracle harness | The independent Swarm test uses `ProcessRunner` to invoke `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 150 --seed 42 --ignore-terminal-dimensions --canvas-width 12 --canvas-height 6 swarm --swarm-size 1 --swarm-coordination 1 --swarm-area-count-range 1-1` from the repository root with stdin `Swift\nTTE`; Rust emits 103 frames and Swift returns `.complete` on frame 103. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SwarmEffect.swift`; revert the two Swarm tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep fixture bytes and the Rust oracle pin `6e24dac78e3011d89bd7ff24d1ad91dd89e11d8a`. |
+
+### Swarm Implementation Notes
+
+`SwarmEffect` is a standalone `Effect`, not a fixture reader or alias. It uses seeded `Xoshiro256PlusPlus`, Rust-compatible random coordinate construction, mutable shuffled circle-cache behavior, ellipse swarm-area coordinates, chained origin/inner/input paths, distance-synchronized flash colors, PathComplete scene deactivation ordering, and final-gradient landing colors. The admitted fixture is capped at 32 frames; the independent live run emits 103 frames and proves completion. Task 2.1 now has credible evidence for all eight simple/particle effects.
+
+### Task State
+
+- [x] 2.1 has evidence for all eight requested simple/particle effects: Print, Slide, Wipe, Expand, Rain, Bubbles, Fireworks, and Swarm.
 - [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
