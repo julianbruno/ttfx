@@ -112,6 +112,7 @@ public struct OrbittingVolleyEffect: Effect {
     private var launchers: [Launcher] = []
     private var launcherColorByCoordinate: [Coordinate: UInt32] = [:]
     private var delay = 0
+    private var emittedSettledFrame = false
     private var emittedFinalFrame = false
     private var isComplete = false
 
@@ -138,6 +139,17 @@ public struct OrbittingVolleyEffect: Effect {
             updateLauncherAppearances()
             launchVolleyIfDue()
             stepActivePaths()
+            render(into: &frame)
+            return .running
+        }
+        if !emittedSettledFrame && delay > 0 {
+            emittedSettledFrame = true
+            restartMainLauncherIfNeeded()
+            updateLauncherAppearances()
+            if launchers[0].path?.active == true {
+                let (coordinate, _) = launchers[0].path!.step()
+                launchers[0].coordinate = coordinate
+            }
             render(into: &frame)
             return .running
         }

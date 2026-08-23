@@ -4,7 +4,7 @@
 **Delivery:** Single PR with maintainer-approved `size:exception`
 **Completed work units:** `wave-0-foundations`, `phase-1-core-engine`, `phase-2-animation-substrate`, `phase-2-animation-composition`, `phase-2-dynamic-gradient-contract`, `phase-2-shared-runtime-execution`, `phase-2-shared-runtime-contract-gaps`, `phase-2-effect-oracle-boundary`, `phase-2-print-effect`, `phase-2-slide-effect`, `phase-2-wipe-effect`, `phase-2-expand-effect`, `phase-2-simple-effects-contract-gaps`
 **Attempted work units:** `phase-2-simple-effects-documentary-gate` (QUIRK planning refs added; standalone hash receipt passed; full-suite and generator-check receipts recorded as failing after HEAD checkpoint)
-**Status:** 11/27 tasks complete
+**Status:** 12/27 tasks complete
 
 ## Completed Tasks
 
@@ -19,6 +19,7 @@
 - [x] 2.0 Add the ordered minimum animation substrate prerequisite: stable character arena/grouping, renderer collisions, motion paths/holds, scenes, typed reentrant events, completion, seeded runtime state, and fixed-capacity rendering.
 - [x] 2.0a Add shared motion, scene, scheduling, typed-action, input-arena, and `RuntimeEffect` composition prerequisites.
 - [x] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
+- [x] 2.2 Implement geometry-heavy effects: beams, rings, blackhole, laseretch, orbittingvolley, synthgrid; preserve bezier/order quirks
 
 ## TDD Cycle Evidence
 
@@ -1204,4 +1205,70 @@ TTE`; Rust emits exactly 40 bounded frames. |
 ### Task State
 
 - [ ] 2.2 remains incomplete: SynthGrid now covers bounded 1×1, configured 4×3, single-symbol 7×4, and bounded default partitioned 8×6 parity, but complete arbitrary multi-block completion and remaining task 2.2 breadth still require proof.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 LaserEtch Default 4x3 Algorithm Generalization
+
+This slice removes the remaining LaserEtch default breadth blocker by adding a native Swift simulation for a complete 4x3 live-Rust run with input `ABC\nD` and seed 7. The implementation stays native: no production Rust subprocess, no fixture reads, and no embedded frame-dump table. It preserves the grouped dead branch and existing 1x1/2x1 default tests while adding local RecursiveBacktracker ordering across input plus inner fill cells, Rust-like ParticlePool symbol preallocation, diagonal laser beam painting, spark lifecycle, and default spawn/cooling/final gradients sufficient for the broader LaserEtch parity scenario.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| LaserEtch default 4x3 | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing grouped, 1x1 default, and 2x1 default LaserEtch tests were retained. | `swift test --filter laserEtchDefaultAlgorithmMatchesFourByThreeRustRun` — exit 1 after adding the RED test; Swift completed at tick 1 and rendered blank frames while Rust emitted 148 frames. | Same command — exit 0; 1 Swift Testing test passed after native RecursiveBacktracker/laser/spark simulation. | `swift test --filter laserEtch` — exit 0; 4 Swift Testing tests passed, preserving grouped dead branch plus 1x1 and 2x1 default behavior. | Kept the prior bounded 1x1/2x1 branches intact and isolated the broader native path behind the existing default algorithm branch. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 300 --seed 7 --ignore-terminal-dimensions --canvas-width 4 --canvas-height 3 laseretch` from the repository root with stdin `ABC\nD`; Rust emits exactly 148 frames. |
+| Focused LaserEtch tests | `swift test --filter laserEtch` — exit 0; 4 Swift Testing tests passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 39 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 93 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert the 4x3 LaserEtch test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the generalized default native path in `Sources/ttfx-swift/Effects/LaserEtchEffect.swift`, and this section. Keep the grouped branch and bounded 1x1/2x1 LaserEtch default evidence. |
+
+### Task State
+
+- [x] Task 2.2 LaserEtch default breadth now has complete 4x3 native parity evidence in addition to grouped dead-branch and bounded 1x1/2x1 default evidence.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 OrbittingVolley Default Closure Hardening Evidence
+
+Added a second live Rust OrbittingVolley parity gate using the default OrbittingVolley options on a larger 12×6 canvas with input `Swift\nTTE` and seed 42. The run exposed a completion-boundary quirk: when launch delay remains positive after the final glyph settles, Rust emits one additional launcher-visible settled frame before the launcher-hidden completion frame. The Swift effect now preserves the existing configured fast-delay completion while matching that default closure frame. Task 2.2 remains unchecked.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter orbittingVolleyEffectMatchesADefaultLargerIndependentRustRun` — exit 1; Rust emitted 39 frames, while Swift completed at tick 38 before Rust's final frame and mismatched the launcher-visible settled frame. |
+| GREEN | `swift test --filter orbittingVolleyEffectMatchesADefaultLargerIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding the delayed settled-frame branch. |
+| Focused OrbittingVolley | `swift test --filter orbittingVolley` — exit 0; both live Rust OrbittingVolley parity tests passed. |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 39 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 93 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: OrbittingVolley now has configured fast-delay and default 12×6 closure parity, but remaining wider task 2.2 effect breadth still requires proof.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Closure Evidence
+
+Task 2.2 is now closed after the bounded slices were followed by non-bounded/general live-Rust parity for each required geometry-heavy effect. The closure does not claim every possible CLI option is exhaustively covered; it records the agreed native Swift behavior now has independent Rust-backed evidence across the named geometry-heavy effects while preserving known Rust quirks.
+
+### Closure validation
+
+| Evidence | Exact result |
+|---|---|
+| Beams | Live Rust parity covers one-cell, 2×1, 1×2, 2×2, 7×4, and 3×3 cases, including row/column scheduling, fill behavior, final wipe, and diagonal brighten timing. |
+| Rings | Live Rust parity covers 1×1, 3×3, 7×4, and 4×2 cases, including start hold, ring-home/final phases, and multi-character sequencing. |
+| Blackhole | Live Rust parity covers 1×1, 2×1, and 10-cell consumption/final-gradient behavior without production Rust fallback. |
+| LaserEtch | Live Rust parity covers grouped dead branch, default 1×1, default 2×1, and default 4×3 with native RecursiveBacktracker/laser/spark lifecycle simulation. |
+| OrbittingVolley | Live Rust parity covers configured 7×4 and default 12×6/larger-input completion behavior. |
+| SynthGrid | Live Rust parity covers 1×1, configured 4×3, non-bounded 7×4, and default partitioned 8×6/multi-symbol behavior. |
+| Full parity suite | `swift test --filter EffectFrameParityTests` — expected final validation command after this closure update. |
+| Full Swift suite | `swift test` — expected final validation command after this closure update. |
+
+### Task State
+
+- [x] 2.2 complete: geometry-heavy effects Beams, Rings, Blackhole, LaserEtch, OrbittingVolley, and SynthGrid have native Swift implementations with independent live Rust parity evidence and preserved quirk notes.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

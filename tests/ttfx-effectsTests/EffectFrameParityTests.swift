@@ -1462,4 +1462,68 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == nil)
 }
 
+@Test func laserEtchDefaultAlgorithmMatchesFourByThreeRustRun() throws {
+    let canvas = try Canvas(columns: 4, rows: 3)
+    let input = "ABC\nD"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "300",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "4",
+            "--canvas-height", "3", "laseretch"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 148)
+    let status = try assertFrameParity(
+        LaserEtchEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "laseretch default 4x3 Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) 4x3 default laseretch frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func orbittingVolleyEffectMatchesADefaultLargerIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let input = "Swift\nTTE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "300",
+            "--seed", "42", "--ignore-terminal-dimensions", "--canvas-width", "12",
+            "--canvas-height", "6", "orbittingvolley"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 39)
+    let status = try assertFrameParity(
+        OrbittingVolleyEffect(
+            configuration: .init(text: input, seed: 42),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 42
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "orbittingvolley default larger independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) default larger orbittingvolley frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }

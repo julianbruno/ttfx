@@ -1,6 +1,6 @@
 # Tasks: Native Swift Port of ttfx
 
-**Total:** 27 — 11 complete, 16 pending.
+**Total:** 27 — 12 complete, 15 pending.
 
 ## Review Workload Forecast
 
@@ -41,7 +41,7 @@ Chain strategy: size-exception
 - [x] 2.0 RED: add `tests/ttfx-swiftTests/Core/AnimationSubstrateTests.swift` for stable character identity/grouping, visibility/layers, terminal collision resolution, path interpolation/holds, scene timing/loops, typed inline reentrant event order, completion, and fixed-capacity runtime orchestration. GREEN: implement ordered runtime in `Sources/ttfx-swift/Core/{Character,Motion,Animation,Events,TerminalModel,AnimationRuntime}.swift`; focused `swift test --filter AnimationSubstrateTests` fails then passes, followed by `swift test`.
 - [x] 2.0a Strict RED→GREEN: `tests/ttfx-swiftTests/Core/AnimationCompositionTests.swift`: multi-segment/waypoint path chains; synchronized/resettable scenes; ordered groups/release-schedules/per-character-paths; gradients; typed chained actions without persistent closures; input-to-arena initialization/runtime-spawning; RuntimeEffect integration; deterministic RNG request-order. GREEN: `Sources/ttfx-swift/Core/MotionComposition.swift,Sources/ttfx-swift/Core/SceneComposition.swift,Sources/ttfx-swift/Core/CharacterScheduling.swift,Sources/ttfx-swift/Core/RuntimeActions.swift,Sources/ttfx-swift/Core/EffectRuntime.swift`; integrate existing substrate/engine only as required. Gates: focused `swift test --filter AnimationCompositionTests`, full `swift test`, seeded Rust trace fixture gate.
 - [x] 2.1 Implement simple/particle: print_effect, slide, wipe, expand, rain, bubbles, fireworks, swarm in `Sources/ttfx-swift/Effects/`; dedicated tests: `tests/ttfx-swiftTests/Effects/`
-- [ ] 2.2 Implement geometry-heavy effects: beams, rings, blackhole, laseretch, orbittingvolley, synthgrid; preserve bezier/order quirks
+- [x] 2.2 Implement geometry-heavy effects: beams, rings, blackhole, laseretch, orbittingvolley, synthgrid; preserve bezier/order quirks
 - [ ] 2.3 Implement remaining effects: burn, crumble, decrypt, errorcorrect, highlight, matrix, middleout, pour, scattered, smoke, thunderstorm, unstable, vhstape, waves, etc.
 - [ ] 2.4 Add a RED parity test before each effect's GREEN implementation
 - [ ] 2.5 Run the 37-effect parity matrix gate
