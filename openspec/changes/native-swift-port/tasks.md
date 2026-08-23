@@ -1,6 +1,6 @@
 # Tasks: Native Swift Port of ttfx
 
-**Total:** 27 — 22 complete, 5 pending.
+**Total:** 27 — 27 complete, 0 pending.
 
 ## Review Workload Forecast
 
@@ -61,11 +61,11 @@ Chain strategy: size-exception
 
 ## Phase 5
 
-- [ ] 5.1 Finalize `Package.swift`, dependencies, SPM docs
-- [ ] 5.2 Add Swift CI workflow in `.github/workflows/`
-- [ ] 5.3 Update `docs/swift-port/` fixtures/docs and extend `./bin/test`
-- [ ] 5.4 Verify proposal criteria and update `README.md`
-- [ ] 5.5 Run final full-matrix parity check
+- [x] 5.1 Finalize `Package.swift`, dependencies, SPM docs
+- [x] 5.2 Add Swift CI workflow in `.github/workflows/`
+- [x] 5.3 Update `docs/swift-port/` fixtures/docs and extend `./bin/test`
+- [x] 5.4 Verify proposal criteria and update `README.md`
+- [x] 5.5 Run final full-matrix parity check
 
 ## Implementation Order
 

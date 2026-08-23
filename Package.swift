@@ -11,7 +11,7 @@ let package = Package(
     products: [
         .library(
             name: "ttfx-swift",
-            targets: ["TTFXCore"]
+            targets: ["TTFXCore", "TTFXEffects"]
         ),
         .library(
             name: "TTFXSwiftUI",

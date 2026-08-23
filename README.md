@@ -141,6 +141,39 @@ upstream, which it clones at the pinned commit on first run:
 
 Upstream is not vendored here — the harness fetches it, because it's their code.
 
+## Native Swift port
+
+A macOS-first native Swift port is being developed alongside the Rust binary. It lives in the
+root Swift package and does **not** replace the Rust `ttfx` product or change the Rust parity
+claims above.
+
+```sh
+swift package resolve
+swift build --product ttfx
+printf 'Swift\nTTE' | swift run ttfx --canvas-width 12 --canvas-height 6 print
+swift run ttfx --help
+swift run ttfx --print-completion bash
+swift run ttfx --print-completion zsh
+```
+
+The Swift package currently exposes:
+
+| Area | Current status |
+|---|---|
+| Core/effects | Native Swift core plus all 37 effect counterparts. Effect parity is covered by the Swift test suite's Rust-backed effect matrix. |
+| CLI | Native `ttfx` executable with Rust-style terminal options, random-effect filtering, completions, and hidden parity-dump support. Focused byte parity is documented for `print`, `wipe`, and `expand`; all 37 effects have CLI parity-dump smoke coverage. |
+| SwiftUI/Metal | Optional `TTFXSwiftUI` library with deterministic gallery, snapshots, scheduling, and Metal upload/command-plan tests. Headless CI proves command planning only; visual drawable-backed Metal presentation still needs an interactive app/device check. |
+| Product scope | The Rust binary remains the production authority in this README. The Swift port is for SwiftPM/macOS ecosystem integration and is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
+
+Swift validation entry points:
+
+```sh
+swift test --filter EffectFrameParityTests
+swift test --filter CLIParityDumpTests
+swift test --filter TTFXSwiftUITests
+swift test
+```
+
 ## Scope
 
 Linux and macOS. Built for [Omarchy](https://omarchy.org) originally; nothing targets a

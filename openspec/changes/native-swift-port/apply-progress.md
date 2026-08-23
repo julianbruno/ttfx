@@ -1828,3 +1828,102 @@ The Swift executable now executes native effect implementations for hidden `--pa
 | `Sources/ttfx-swift/CLI/main.swift` | Modified | Native Swift `--parity-dump` runtime path, stdin/input-file ingestion, effect factory for all registry names, and Rust-compatible length-prefixed terminal-frame output. |
 | `openspec/changes/native-swift-port/tasks.md` | Modified | Marked task 3.3 complete after focused parity and smoke tests passed. |
 | `openspec/changes/native-swift-port/apply-progress.md` | Modified | Recorded Phase 3.3 strict-TDD evidence, limitations, and rollback boundary. |
+
+## Phase 5.4 README and Proposal Criteria Verification
+
+This work unit verifies the native Swift port criteria against the current implementation and updates documentation without changing Swift, Rust, CI, package, fixture, or test behavior. The Rust README claims remain scoped to the Rust production binary; the added Swift section explicitly describes the Swift port as a parallel SwiftPM/macOS product.
+
+### Criteria verification
+
+| Proposal criterion | Current verified state |
+|---|---|
+| Parity harness passes for all 37 effects | Phase 2.5 records the 37-effect `EffectFrameParityTests` gate. `tests/ttfx-effectsTests/EffectFrameParityTests.swift` contains Rust-backed admitted/live parity coverage for all effect implementations, and `Sources/ttfx-swift/Effects/TTFXEffects.swift` maps all 37 registry names. |
+| `ttfx-swift` CLI behavior/output matches Rust `ttfx` | Phase 3 verifies parser/options/completions and native runtime. Exact CLI byte parity is intentionally documented as focused: `tests/ttfx-cliTests/CLIParityDumpTests.swift` compares live Rust bytes for `print`, `wipe`, and `expand`; all 37 effects have one-frame parity-dump smoke decoding. This is not claimed as exhaustive full-stream byte parity for every effect/option. |
+| Core/effects tests and benchmark/performance budget | Core/effect/CLI/SwiftUI suites are recorded as passing in prior work units. The documented performance evidence is a sub-millisecond/fixed-capacity proxy, not a measured zero-allocation counter. |
+| SwiftUI gallery | Phase 4 records optional SwiftUI/gallery/Metal shell coverage. The documentation now states the headless limitation: CI proves deterministic snapshots, upload plans, command plans, and availability handling, but not drawable-backed visual GPU presentation. |
+| Review budget / delivery shape | The approved single logical PR with `size:exception` remains the recorded delivery shape. |
+| Documentation and build instructions | Root `README.md` and `docs/swift-port/README.md` now include SwiftPM build, run, completion, validation, status, and limitations. `./bin/test` extension remains separate Phase 5.3 unless its checkbox is completed by that work unit. |
+
+### Documentation updates
+
+- Root `README.md` gained a dedicated **Native Swift port** section after Rust build/test instructions, preserving the existing Rust usage, fidelity, benchmark, and scope claims.
+- `docs/swift-port/README.md` was refreshed from stale minimal-launch-seam text to the current 37-effect, CLI, SwiftUI/Metal, evidence, and limitation state.
+- `tasks.md` now marks only task 5.4 complete and updates the cumulative count to 23/27. Phase 5.1, 5.2, 5.3, and 5.5 remain pending.
+
+### Validation
+
+| Command | Result |
+|---|---|
+| `git diff --check` | Exit 0 after the README/proposal documentation update. |
+
+### Scope limitations documented
+
+- Headless Metal tests do not prove visual drawable-backed presentation.
+- CLI byte parity is focused for `print`, `wipe`, and `expand`; the 37-effect CLI check is smoke coverage.
+- Swift port product scope is SwiftPM/macOS ecosystem integration and does not replace the Rust production binary or Rust README claims.
+
+## Phase 5.5 Final Full-Matrix Closure Evidence
+
+Final validation confirmed the native Swift port package, CLI, SwiftUI renderer, and Rust-side sanity checks after Phase 5 documentation/CI updates.
+
+| Evidence | Result |
+|---|---|
+| Swift effect parity matrix | `swift test --filter EffectFrameParityTests` — 71 tests passed. |
+| CLI parity dump | `swift test --filter CLIParityDumpTests` — 2 tests passed. |
+| SwiftUI renderer | `swift test --filter TTFXSwiftUITests` — 6 tests passed. |
+| Full Swift suite | `swift test` — 146 tests in 4 suites passed. |
+| Swift CLI help | `swift run ttfx --help` — built product and printed all effects/options. |
+| Swift completions | `swift run ttfx --print-completion bash` — built product and printed bash completion with all effects. |
+| Rust sanity | `cargo test --release` — passed. |
+| Effect count | Rust effect modules: 37; Swift registry/effect files: 37; missing: none. |
+| Whitespace | `git diff --check` — no output. |
+
+### Task State
+
+- [x] 5.5 complete: final full-matrix parity and release-readiness validation passed.
+- [x] Native Swift port OpenSpec change complete: 27/27 tasks checked.
+
+## Phase 5.1 Package and SPM Documentation Work Unit
+
+The Swift package release surface now documents all public SwiftPM products and exposes the effects module through the main `ttfx-swift` library product. This closes the package/documentation slice only; CI, fixture/bin-test docs, README release criteria, and the final parity matrix remain Phase 5 follow-up tasks.
+
+| Evidence | Exact result |
+|---|---|
+| Package description | `swift package describe` — exit 0; described Swift tools 6.2, macOS 14, iOS 17, products `ttfx-swift`, `TTFXSwiftUI`, and `ttfx`; `ttfx-swift` product members are `TTFXCore` and `TTFXEffects`. |
+| Full suite | `swift test` — exit 0; Swift Testing reported `Test run with 146 tests in 4 suites passed after 37.138 seconds.` |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Scope limitation | This task does not add CI, extend `./bin/test`, update the root `README.md`, or run the final 37-effect matrix gate. |
+| Rollback boundary | Revert the `ttfx-swift` product target-list addition in `Package.swift`, remove `docs/swift-port/spm.md`, revert the package-guide rewrite in `docs/swift-port/README.md`, revert task checkbox 5.1, and remove this section. |
+
+### Exact Work Unit Inventory
+
+| File | Action | Responsibility |
+|---|---|---|
+| `Package.swift` | Modified | Added `TTFXEffects` to the `ttfx-swift` library product so consumers can import both core primitives and the public effect registry from one library product. |
+| `docs/swift-port/README.md` | Modified | Replaced stale launch-seam-only guidance with current package products, supported platforms, validation commands, Rust/Cargo test boundary, and links. |
+| `docs/swift-port/spm.md` | Created | Added focused SwiftPM integration documentation for library, executable, and SwiftUI products, platform/tool support, dependency snippet, and maintainer validation checklist. |
+| `openspec/changes/native-swift-port/tasks.md` | Modified | Marked task 5.1 complete after package description, full test, and whitespace validation passed. |
+| `openspec/changes/native-swift-port/apply-progress.md` | Modified | Recorded Phase 5.1 evidence, scope limitation, rollback boundary, and inventory. |
+
+### Task State
+
+- [x] 5.1 complete: `Package.swift` is finalized for the exported SwiftPM library/effects surface and SPM docs cover library, executable, SwiftUI, platforms, dependency, and validation.
+- [ ] 5.2–5.5 remain pending.
+
+## Phase 5.2/5.3 CI and bin-test Swift Validation Slice
+
+This slice wires the native Swift package into CI/bin validation without changing Rust source, package metadata, fixtures, or effect behavior. Existing Linux Rust parity remains pinned to the original `./bin/test` Linux/glibc branch; Swift package tests run on macOS where the SwiftUI/Metal target has Apple frameworks available, while Linux CI validates the portable Swift CLI product build/help path after installing Swift 6.2.
+
+| Evidence | Exact result |
+|---|---|
+| CI wiring | `.github/workflows/ci.yml` installs Swift 6.2 before `./bin/test` and adds a `swift-package` matrix over Ubuntu/macOS. The matrix runs split Swift tests on macOS and Swift CLI build/help validation on Ubuntu. |
+| `bin/test` | `bin/test` now requires `swift`; on macOS it runs `swift test --filter EffectFrameParityTests` followed by `swift test --skip EffectFrameParityTests`, then `swift build --product ttfx` and `swift run --skip-build ttfx --help >/dev/null`. On Linux it preserves the Rust parity branch and validates the portable Swift CLI build/help path. |
+| Docs | `docs/swift-port/README.md` documents the CI-equivalent split Swift test commands, Linux Swift CLI build/help validation, required tools, and the Linux-only Rust parity/resize behavior. |
+| Validation | `sh -n bin/test` — exit 0. `swift test --filter EffectFrameParityTests` — exit 0; 71 Swift Testing tests passed. `swift test --skip EffectFrameParityTests` — exit 0; 75 Swift Testing tests passed. `swift build --product ttfx && swift run --skip-build ttfx --help >/dev/null` — exit 0. `git diff --check -- .github/workflows/ci.yml bin/test docs/swift-port/README.md openspec/changes/native-swift-port/tasks.md openspec/changes/native-swift-port/apply-progress.md` — exit 0. |
+| Non-adopted command | `swift test --target TTFXCoreTests --target TTFXEffectsTests --target TTFXCLITests` exited 64 because this toolchain does not support `swift test --target`; the CI/bin implementation uses supported `--filter`/`--skip` split testing instead. A plain concurrent `swift test` was not adopted after one observed failure in `printEffectMatchesAnIndependentRustRun` with live Rust oracle `.nonzeroExit(9)`, while the same test and the split suites passed afterward. |
+
+### Task State
+
+- [x] 5.2 complete: Swift CI coverage is present in `.github/workflows/` and the existing CI entrypoint installs Swift before invoking `./bin/test`.
+- [x] 5.3 complete: `./bin/test` runs Swift package validation/build-help checks and `docs/swift-port/README.md` documents the test/fixture workflow and Linux/macOS split.
+- [ ] 5.1, 5.4, and 5.5 remain outside this slice.

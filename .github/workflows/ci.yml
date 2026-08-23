@@ -17,13 +17,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
       - run: ./bin/test
 
   test-macos:
     name: Tests (macOS)
     # bin/test skips the parity suites off Linux, so what's left here proves the
     # port builds, tests green (with the boundary-tolerant easing assertion for
-    # Apple's libm), and honors the CLI and signal contracts on macOS.
+    # Apple's libm), honors the CLI and signal contracts on macOS, and runs the
+    # Swift package including SwiftUI/Metal-facing tests.
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +35,42 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
       - run: ./bin/test
       - uses: actions/upload-artifact@v4
         with:
           name: ttfx-aarch64-apple-darwin
           path: target/release/ttfx
+
+  swift-package:
+    name: Swift package (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            swift-tests: false
+          - os: macos-latest
+            swift-tests: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Swift package tests
+        run: |
+          if [ "${{ matrix.swift-tests }}" = "true" ]; then
+            swift test --filter EffectFrameParityTests
+            swift test --skip EffectFrameParityTests
+          else
+            echo "SwiftUI/Metal tests require Apple frameworks; validating Linux CLI build/help only."
+          fi
+      - run: swift build --product ttfx
+      - run: swift run --skip-build ttfx --help >/dev/null
 
   release-binary:
     name: Static musl binary

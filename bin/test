@@ -5,7 +5,7 @@ set -eu
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 
-for tool in cargo python3; do
+for tool in cargo python3 swift; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "$tool is required to run the ttfx tests." >&2
     exit 1
@@ -18,6 +18,17 @@ cargo test --release
 "$ROOT/bin/build"
 ./tools/tests/cli_corpus.sh
 python3 tools/tests/sigterm_behavior.py
+
+# The Swift package is part of CI now. Linux runners keep Rust bit-parity as the
+# platform authority and validate the portable CLI build; macOS also runs the
+# Swift package tests, including SwiftUI/Metal-facing tests that depend on Apple
+# frameworks.
+if [ "$(uname -s)" != "Linux" ]; then
+  swift test --filter EffectFrameParityTests
+  swift test --skip EffectFrameParityTests
+fi
+swift build --product ttfx
+swift run --skip-build ttfx --help >/dev/null
 
 # Bit-exact parity is pinned to Linux/glibc (plan.md §5.20) — elsewhere the
 # reference was never promised to match. The resize suite goes with it: its

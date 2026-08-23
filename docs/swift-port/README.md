@@ -1,176 +1,85 @@
-# Run the Native Swift Test App
+# Native Swift port status
 
-The current native Swift "test app" is the `ttfx` executable product in the
-root Swift package. It is a minimal ArgumentParser launch seam used to prove
-that `TTFXCLI` links and starts. It currently prints help and exits successfully.
+The native Swift port is a macOS-first SwiftPM implementation that runs in parallel with the Rust `ttfx` binary. It is not a replacement for the Rust product described in the root README; the Rust implementation remains the production authority and the reference oracle for Swift parity checks.
 
-It is **not** a GUI, SwiftUI gallery, effects demo, or functional replacement
-for the production Rust `ttfx` CLI. The Swift effects are exercised through
-tests while the full Swift CLI and optional UI remain future port work.
+## Quick path
 
-## Quick Start
-
-Run every command in this section from the repository root:
+Run these commands from the repository root:
 
 ```sh
-git clone git@github.com:omacom-io/ttfx.git
-cd ttfx
 swift package resolve
 swift build --product ttfx
-swift run --skip-build ttfx
+printf 'Swift\nTTE' | swift run ttfx --canvas-width 12 --canvas-height 6 print
+swift run ttfx --help
+swift run ttfx --print-completion bash
+swift run ttfx --print-completion zsh
 ```
 
-The working directory must contain `Package.swift`; this directory is `<repo>`.
+The Swift executable is named `ttfx` because the port is exercising command compatibility. Use the repository context, `swift build --product ttfx`, or the package name `ttfx-swift` when you need to distinguish it from the Rust binary.
 
-A successful launch exits with status `0` after printing:
+## What is implemented
 
-```text
-USAGE: ttfx
-
-OPTIONS:
-  -h, --help              Show help information.
-```
-
-No environment variables, credentials, configuration files, services, or RDD
-setup are required to resolve, build, or run this executable.
-
-## Prerequisites
-
-| Requirement | Supported or verified value |
+| Proposal area | Verified implementation state |
 |---|---|
-| macOS | macOS 14 or later, as declared by `Package.swift` |
-| Swift | Swift 6.2 or later; the package uses `swift-tools-version: 6.2` |
-| Xcode | Optional; use a release that includes a Swift 6.2-or-later toolchain |
-| iOS | iOS 17 or later is declared for package libraries; this guide launches the CLI on macOS |
-| Git/network | Required for cloning and the first dependency resolution |
-| Rust/Cargo | Required only for live parity tests and oracle checks, not for building or launching the Swift CLI |
+| Core engine | `TTFXCore` provides frames/canvas/input, deterministic effect initialization, Xoshiro-compatible primitives, motion/scene/runtime composition, ANSI frame rendering helpers, and parity diagnostics. |
+| Effects | `TTFXEffects` registers all 37 Rust effect names, each mapped to a native Swift `Effect` implementation. |
+| CLI | `TTFXCLI` parses Rust-style terminal options, seed, input file, random-effect filters, hidden `--parity-dump`/`--max-frames`, and bash/zsh completions. The normal terminal path renders the final Swift frame; hidden parity-dump emits length-prefixed frames for oracle comparison. |
+| SwiftUI/Metal | Optional `TTFXSwiftUI` exposes frame snapshots, a deterministic 37-effect gallery model/view, scheduler, Metal availability, upload plans, command plans, and an `MTKView` bridge. |
+| Rust scope | The Rust code and README claims remain unchanged. Swift uses Rust as an oracle in tests; production Swift effect execution does not shell out to Rust. |
 
-The verified environment was macOS 26.6.1, Xcode 26.6, Apple Swift 6.3.3,
-Rust 1.96.0, and Cargo 1.96.0. SwiftPM resolved `swift-argument-parser`
-1.8.2 from `Package.resolved`.
+## Evidence map
 
-Confirm the installed tools when diagnosing a local mismatch:
+| Criterion | Evidence recorded or inspectable |
+|---|---|
+| 37 Swift effects | `Sources/ttfx-swift/Effects/TTFXEffects.swift` lists all 37 names and factory mappings. `openspec/changes/native-swift-port/apply-progress.md` records the 37-effect `EffectFrameParityTests` gate. |
+| Focused CLI byte parity | `tests/ttfx-cliTests/CLIParityDumpTests.swift` compares Swift CLI `--parity-dump` stdout byte-for-byte with live Rust for `print`, `wipe`, and `expand`. |
+| 37-effect CLI smoke | The same CLI parity test decodes one nonempty length-prefixed parity frame for every Rust effect name. This is smoke coverage, not full-stream byte parity for all effects. |
+| Completions/help | `tests/ttfx-cliTests/CLIParsingTests.swift` covers public global options, all 37 effect names, bash/zsh completion shape, hidden parity flags, and help visibility. |
+| SwiftUI/gallery | `tests/ttfx-swiftUITests/RendererTests.swift` covers snapshot ordering, 37-effect gallery contents, scheduler cadence/capacity, Metal availability, upload packing, and command planning. |
+| Proposal/task state | `openspec/changes/native-swift-port/tasks.md` is the task ledger. Phase 5.4 records README/proposal verification only; final matrix and package/CI/bin-test docs remain separate Phase 5 tasks unless their boxes are explicitly checked. |
 
-```sh
-swift --version
-xcodebuild -version
-cargo --version
-```
+## Current limitations
 
-There is no `.xcodeproj` or `.xcworkspace`. Open the repository directory as a
-Swift package if using an editor or Xcode; command-line configuration is
-complete after `swift package resolve`.
+- Full CLI byte parity is focused, not exhaustive: live Rust byte equality is asserted for `print`, `wipe`, and `expand`, while all 37 effects have CLI parity-dump smoke coverage.
+- Effect-specific option parity is not documented as exhaustive in the current CLI slice.
+- The SwiftUI/Metal work is testable headlessly through deterministic upload and command plans, but it does not prove visual GPU presentation in a drawable-backed app window.
+- The Swift core keeps a fixed-capacity/performance proxy; it does not claim measured zero heap allocations from an allocation counter.
+- Linux/Windows support remains out of initial Swift scope.
+- Python-style plugins and behavioral improvements over Rust/upstream quirks remain out of scope.
 
-## Launch Commands
+## Validation commands
 
-Build and run in the foreground:
-
-```sh
-swift build --product ttfx
-swift run --skip-build ttfx
-```
-
-Show the same currently supported help explicitly:
+Use focused checks first:
 
 ```sh
-swift run --skip-build ttfx --help
-```
-
-Run the built debug executable directly:
-
-```sh
-.build/debug/ttfx
-```
-
-The process is not long-running: it prints help and exits. There is nothing to
-stop, and restarting means running the foreground command again. Options such
-as `--version`, effect names, piped input, and Rust CLI flags are not yet
-implemented by the Swift executable.
-
-## Tests and Oracle Checks
-
-Run the focused package launch-seam test:
-
-```sh
-swift test --filter PackageBaselineTests
-```
-
-Expected result: `coreModuleIsLinkable()` passes, with one Swift Testing test
-reported.
-
-Run the focused admitted-fixture checks for the implemented Swift effects:
-
-```sh
-swift test --filter 'MatchesItsAdmittedRustFrames'
-```
-
-Expected result: four tests pass for Print, Slide, Wipe, and Expand.
-
-Run the complete Swift test suite:
-
-```sh
+swift test --filter EffectFrameParityTests
+swift test --filter CLIParityDumpTests
+swift test --filter TTFXSwiftUITests
 swift test
 ```
 
-Some tests launch the Rust oracle through Cargo. Do not run multiple full or
-live parity suites concurrently.
-
-Check that all recorded effect fixtures still match the current Rust revision:
+Documentation-only checks can use:
 
 ```sh
-sh tools/swift-parity/generate-effect-oracles.sh --check
+git diff --check
 ```
 
-Successful output ends with:
+Do not run the live Rust-backed parity tests concurrently; several suites intentionally serialize oracle subprocess work.
 
-```text
-Effect oracle fixtures are current.
-```
+## CI and top-level validation
 
-The check uses Git `HEAD`, Cargo, and the Rust binary to regenerate a temporary
-eight-effect corpus before comparing every file. It removes its staging
-directory on normal completion.
+The top-level `./bin/test` entrypoint now includes Swift validation alongside the existing Rust checks. It requires `cargo`, `python3`, and `swift`; it preserves Linux/glibc-only Rust parity and resize behavior while running Swift package validation in a split that avoids concurrent live-Rust oracle pressure.
 
-## Troubleshooting
-
-### `Unknown option '--version'`
-
-The Swift launch seam does not define a version option yet. Use `--help`, or
-inspect the package and Git revision directly.
-
-### Full suite does not finish promptly
-
-In the verified environment, a plain `swift test` exceeded a bounded
-240-second check while an oracle subprocess was running, although the focused
-tests and standalone oracle check above passed. Treat this as an unresolved
-full-suite limitation, not a successful full-suite result. Interrupt the test,
-then confirm that no test/oracle process remains before retrying:
+Useful local commands:
 
 ```sh
-ps -axo pid,ppid,state,etime,command | grep -E '[s]wiftpm-testing-helper|[g]enerate-effect-oracles|target/debug/[t]tfx'
+sh -n bin/test
+swift test --filter EffectFrameParityTests
+swift test --skip EffectFrameParityTests
+swift build --product ttfx
+swift run --skip-build ttfx --help
 ```
 
-If that command lists a process from the interrupted run, terminate that exact
-process before retrying. Do not run the standalone oracle check concurrently
-with `swift test`.
+On Linux CI the Swift path builds the CLI and checks help output; SwiftUI/Metal tests are macOS-oriented because they depend on Apple frameworks.
 
-### Oracle fixtures are stale
-
-The check intentionally fails with
-`Effect oracle fixtures are stale or pinned to a different Rust revision.` when
-the generated bytes or manifest revision differ from the recorded corpus.
-Fixture regeneration changes test artifacts and requires deliberate port-work
-authority; do not regenerate fixtures merely to make a local check pass.
-
-## Current Limitations
-
-- `TTFXCLI` only provides the generated help path and exits; it does not render effects.
-- There is no dedicated demo app, Xcode project, SwiftUI interface, or Metal renderer.
-- Only Print, Slide, Wipe, and Expand currently have Swift implementations; the fixture corpus also contains future particle-effect oracles.
-- The Rust implementation remains the production authority.
-- Full CLI parity, terminal behavior, completion generation, and optional UI work remain incomplete.
-- The bounded full-suite run described above did not complete, while focused tests and the standalone oracle check passed.
-
-For the detailed implementation state, authority boundaries, blockers, and
-resume order, read the [native Swift port handoff](handoff-2026-08-15.md). RDD
-is not required to configure, build, launch, or test this app.
+See [Swift Package Integration](spm.md) for product-level integration details.
