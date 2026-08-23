@@ -804,3 +804,131 @@ Beams was selected again as the smallest safe geometry-heavy slice because the a
 
 - [ ] 2.2 remains incomplete: Beams now has one-cell and bounded 2×1 row parity only; arbitrary multi-cell grids/fill characters, rings, blackhole, LaserEtch default, and synthgrid remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Rings One-Cell Geometry Slice
+
+Rings was selected as the next smallest safe task 2.2 slice because a 1×1 live Rust run avoids full ring assignment and rotation while still exercising the documented start hold, non-ring external path, final home return, and completion timing. The Swift port covers only this bounded one-cell parity case; arbitrary ring construction, dispersed/ring characters, random ring motion, blackhole, LaserEtch default, and synthgrid remain pending. Task 2.2 is not complete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Rings 1×1 one-cell run | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing Beams 1×1/2×1, OrbittingVolley, and LaserEtch slices were retained. | `swift test --filter ringsEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 after the RED test; compile failed because `RingsEffect` did not exist. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded 1×1 Rings renderer. | `swift test --filter EffectFrameParityTests` — exit 0; 22 tests passed. `swift test` — exit 0; 76 tests passed. | No shared core change; effect-local bounded renderer only. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | `cargo run --quiet -- --parity-dump --max-frames 120 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 rings --ring-gap 1 --spin-duration 1 --spin-speed 1-1 --disperse-duration 1 --spin-disperse-cycles 1 --ring-colors ab48ff --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction vertical` with stdin `A` produced 107 frames through the test harness. |
+| Focused test | `swift test --filter ringsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 76 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/RingsEffect.swift`; revert the Rings test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep the committed Beams, OrbittingVolley, and LaserEtch grouped slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Rings now has only bounded 1×1 one-cell parity; arbitrary ring geometry/disperse/spin behavior, blackhole, LaserEtch default, synthgrid, arbitrary Beams grids, and fill characters remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 SynthGrid One-Cell Live-Rust Slice
+
+SynthGrid was selected as the next smallest safe geometry-heavy slice because a 1×1 live Rust run exercises the outer grid expansion/collapse timing and final text reveal without requiring arbitrary block grouping, shuffled pending groups, or generated text animation. The Swift port covers only this bounded one-cell parity case: 58 white grid-row-symbol frames followed by two white input-symbol frames, with completion on the 60th tick. Larger SynthGrid canvases, configured grid/text gradients beyond the fallback final render, generated-symbol dissolve, block grouping, and max-active-block scheduling remain pending; task 2.2 is not complete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| SynthGrid 1×1 | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing Beams, OrbittingVolley, and LaserEtch slices were retained. | `swift test --filter synthGridEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 after the RED test; compile failed because `SynthGridEffect` did not exist. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded 1×1 SynthGrid renderer. | `swift test --filter EffectFrameParityTests` — exit 0; 22 tests passed, including the prior task 2.2 slices. | No shared core change; effect-local bounded renderer only. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | `cargo run --quiet -- --parity-dump --max-frames 100 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 synthgrid` with stdin `A` produced 60 frames through the test harness. |
+| Focused test | `swift test --filter synthGridEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 76 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SynthGridEffect.swift`; revert the SynthGrid test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep the committed Beams, OrbittingVolley, and LaserEtch grouped-branch slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: SynthGrid now has only bounded 1×1 parity; larger SynthGrid grids/block groups, arbitrary beams, rings, blackhole, and LaserEtch default remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Blackhole One-Cell Geometry Slice
+
+Blackhole was selected as a bounded live-Rust parity slice only for the complete one-cell path. This exercises the seeded initial starfield/formation delay, blackhole marker, collapse-to-singularity symbol loop, explosion cooldown to final color, and terminal completion without taking on the broader multi-character consumption, shuffled starfield paths, or arbitrary canvas circle scheduling. Task 2.2 remains incomplete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Blackhole 1×1 | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing Beams 2×1 and previous 2.2 parity slices were retained. | `swift test --filter blackholeEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 after the RED test; compile failed because `BlackholeEffect` did not exist. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded one-cell Blackhole renderer. | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed, including the prior Beams, OrbittingVolley, and LaserEtch slices. | No shared core change; effect-local bounded renderer only. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | `cargo run --quiet -- --parity-dump --max-frames 600 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 blackhole --blackhole-color ffffff --star-colors ffcc0d --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` with stdin `A` produced 483 frames through the test harness. |
+| Focused test | `swift test --filter blackholeEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 76 Swift Testing tests passed. |
+| Whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/BlackholeEffect.swift`; revert the Blackhole test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep the committed Beams, OrbittingVolley, and LaserEtch slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Blackhole now has bounded one-cell parity only; arbitrary blackhole canvases/multi-character consumption, rings, arbitrary multi-cell Beams/fill characters, LaserEtch default, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 LaserEtch Default One-Cell Algorithm Slice
+
+This narrow task 2.2 slice adds bounded live-Rust parity for the default `laseretch` algorithm on a 1×1 canvas with input `A`. It intentionally avoids the broad `RecursiveBacktracker`/`ParticlePool` generalization: the Swift path covers only the one-cell observable sequence where the diagonal laser, spawn marker, cooldown gradient, and final white tail are visible while sparks remain off-canvas. The grouped dead-branch behavior remains preserved. Task 2.2 is not complete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| LaserEtch default 1×1 | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing grouped LaserEtch and Beams slices were retained. | `swift test --filter laserEtchDefaultAlgorithmMatchesBoundedOneCellRustRun` — exit 1 after the RED test; Swift completed at tick 1 and rendered a blank frame while Rust emitted 55 colored one-cell frames. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded one-cell default renderer. | `swift test --filter 'laserEtchDefaultAlgorithmMatchesBoundedOneCellRustRun|laserEtchGroupedPatternMatchesRustDeadBranchRun'` — exit 0; 2 tests passed, preserving the grouped dead branch. `swift test --filter EffectFrameParityTests` — exit 0; 22 tests passed. | No shared core change; the implementation stayed effect-local and bounded to 1×1 default parity. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 55 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 laseretch` from the repository root with stdin `A`; Rust emits exactly 55 bounded frames. |
+| Focused tests | `swift test --filter laserEtchDefaultAlgorithmMatchesBoundedOneCellRustRun` — exit 0; `swift test --filter 'laserEtchDefaultAlgorithmMatchesBoundedOneCellRustRun|laserEtchGroupedPatternMatchesRustDeadBranchRun'` — exit 0. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 76 Swift Testing tests passed. |
+| Rollback boundary | Revert the default LaserEtch test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the one-cell default branch in `Sources/ttfx-swift/Effects/LaserEtchEffect.swift`, and this section. Keep the committed grouped LaserEtch, OrbittingVolley, and Beams slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: LaserEtch now has grouped-dead-branch and bounded one-cell default parity only; arbitrary default algorithm grids, visible sparks/ParticlePool behavior, rings, blackhole, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Beams Two-Cell Column Geometry Slice
+
+This slice extends the bounded Beams port from one-cell and 2×1 row geometry to a 1×2 live Rust run. It covers row-beam traversal across stacked rows, vertical final-gradient color separation, shared fade timing, the Rust-observed lower-cell dim rounding, and offset final-wipe brighten timing. It intentionally does not implement arbitrary grids, fill characters, rings, blackhole, LaserEtch default, or synthgrid; task 2.2 remains incomplete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Beams 1×2 column | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing one-cell and 2×1 row Beams parity were retained. | `swift test --filter beamsEffectMatchesACompleteTwoCellColumnIndependentRustRun` — exit 1 after the RED test; Swift completed at tick 1 and rendered final `A\nB` while Rust emitted 38 frames beginning with row beam symbols. | Same command — exit 0; 1 Swift Testing test passed after adding the bounded 1×2 Beams renderer. | `swift test --filter beamsEffectMatchesAComplete` — exit 0; 3 Beams tests passed. `swift test --filter EffectFrameParityTests` — exit 0; 22 tests passed. | No shared core change; effect-local bounded renderer only. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused RED | `swift test --filter beamsEffectMatchesACompleteTwoCellColumnIndependentRustRun` — exit 1; mismatch showed premature completion at tick 1 and final text instead of Rust beam frames. |
+| Focused GREEN | `swift test --filter beamsEffectMatchesACompleteTwoCellColumnIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Beams triangulation | `swift test --filter beamsEffectMatchesAComplete` — exit 0; one-cell, 1×2 column, and 2×1 row Beams tests passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 22 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 76 Swift Testing tests passed. |
+| Whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert the 1×2 Beams test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the two-cell column branch in `Sources/ttfx-swift/Effects/BeamsEffect.swift`, and this section. Keep the committed Beams one-cell and 2×1 row, OrbittingVolley, and LaserEtch grouped-branch slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Beams now has one-cell, bounded 2×1 row, and bounded 1×2 column parity only; arbitrary multi-cell grids/fill characters, rings, blackhole, LaserEtch default, and synthgrid remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

@@ -740,4 +740,203 @@ struct EffectFrameParityTests {
     #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured fireworks frames")
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
+@Test func ringsEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "rings", "--ring-gap", "1", "--spin-duration", "1",
+            "--spin-speed", "1-1", "--disperse-duration", "1", "--spin-disperse-cycles", "1",
+            "--ring-colors", "ab48ff", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "vertical"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 107)
+    let status = try assertFrameParity(
+        RingsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            ringsConfiguration: .init(
+                ringColors: [Color(hex: "ab48ff")],
+                ringGap: 1,
+                spinDuration: 1,
+                spinSpeed: 1...1,
+                disperseDuration: 1,
+                spinDisperseCycles: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .vertical
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "rings one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell rings frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func synthGridEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "100",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "synthgrid"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 60)
+    let status = try assertFrameParity(
+        SynthGridEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "synthgrid one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell synthgrid frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func blackholeEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "600",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "blackhole", "--blackhole-color", "ffffff",
+            "--star-colors", "ffcc0d", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 483)
+    let status = try assertFrameParity(
+        BlackholeEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            blackholeConfiguration: .init(
+                blackholeColor: Color(hex: "ffffff"),
+                starColors: [Color(hex: "ffcc0d")],
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "blackhole one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell blackhole frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func laserEtchDefaultAlgorithmMatchesBoundedOneCellRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "55",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "laseretch"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 55)
+    let status = try assertFrameParity(
+        LaserEtchEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "laseretch default one-cell Rust run"
+    )
+    #expect(status.finalStatus == .running, "Rust default laseretch remains active beyond this bounded ParticlePool/spark slice")
+    #expect(status.firstCompletionTick == nil)
+}
+
+@Test func beamsEffectMatchesACompleteTwoCellColumnIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 2)
+    let input = "A\nB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "2", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 38)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams two-cell column independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell column beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }

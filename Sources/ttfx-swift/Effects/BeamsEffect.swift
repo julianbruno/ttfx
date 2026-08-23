@@ -60,6 +60,7 @@ public struct BeamsEffect: Effect {
     private var tickIndex = 0
     private var oneCellFrames: [Cell] = []
     private var twoCellRowFrames: [[Cell]] = []
+    private var twoCellColumnFrames: [[Cell]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -80,6 +81,8 @@ public struct BeamsEffect: Effect {
             self.oneCellFrames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: beamsConfiguration)
         } else if canvas.columns == 2, canvas.rows == 1, input.scalars.count == 2 {
             self.twoCellRowFrames = Self.makeTwoCellRowFrames(inputSymbols: Array(input.scalars), options: beamsConfiguration)
+        } else if canvas.columns == 1, canvas.rows == 2, input.scalars.count == 2 {
+            self.twoCellColumnFrames = Self.makeTwoCellColumnFrames(inputSymbols: Array(input.scalars), options: beamsConfiguration)
         }
     }
 
@@ -103,6 +106,19 @@ public struct BeamsEffect: Effect {
             }
             tickIndex += 1
             if tickIndex >= twoCellRowFrames.count {
+                isComplete = true
+                return .complete
+            }
+            return .running
+        }
+
+        if !twoCellColumnFrames.isEmpty {
+            let index = min(tickIndex, twoCellColumnFrames.count - 1)
+            for rowIndex in twoCellColumnFrames[index].indices {
+                frame[column: 1, row: rowIndex + 1] = twoCellColumnFrames[index][rowIndex]
+            }
+            tickIndex += 1
+            if tickIndex >= twoCellColumnFrames.count {
                 isComplete = true
                 return .complete
             }
@@ -168,6 +184,65 @@ public struct BeamsEffect: Effect {
             cells.append(Cell(codepoint: inputSymbol, foreground: rgb(color), background: 0))
         }
         return cells
+    }
+
+    private static func makeTwoCellColumnFrames(inputSymbols: [UInt32], options: Configuration) -> [[Cell]] {
+        let beamGradient = try! Gradient(stops: options.beamGradientStops, steps: options.beamGradientSteps)
+        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let topColor = finalGradient.spectrum.last ?? options.finalGradientStops.last!
+        let bottomColor = finalGradient.spectrum.count > 1 ? finalGradient.spectrum[finalGradient.spectrum.count - 2] : topColor
+        let topFadedColor = adjustBrightness(topColor, factor: 0.3)
+        let bottomFadedColor = Color(
+            hex: String(
+                format: "%02x%02x%02x",
+                Int(Double(bottomColor.red) * 0.3 + 0.5),
+                Int(Double(bottomColor.green) * 0.3 + 0.5),
+                Int(Double(bottomColor.blue) * 0.3 + 0.5)
+            )
+        )
+        let topFade = try! Gradient(stops: [topColor, topFadedColor], steps: 10)
+        let bottomFade = try! Gradient(stops: [bottomColor, bottomFadedColor], steps: 10)
+        let topBrighten = try! Gradient(stops: [topFadedColor, topColor], steps: 10)
+        let bottomBrighten = try! Gradient(stops: [bottomFadedColor, bottomColor], steps: 10)
+        let rowSymbols = options.beamRowSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+
+        func beamColor(at index: Int) -> Color {
+            beamGradient.spectrum[min(index, beamGradient.spectrum.count - 1)]
+        }
+        func fadedInputCell(_ scalar: UInt32, color: Color, fade: Gradient, age: Int) -> Cell {
+            let foreground: Color
+            if age < 2 {
+                foreground = color
+            } else {
+                foreground = fade.spectrum[min((age - 2) / 2 + 1, fade.spectrum.count - 1)]
+            }
+            return Cell(codepoint: scalar, foreground: rgb(foreground), background: 0)
+        }
+        func brightCell(_ scalar: UInt32, fadedColor: Color, brighten: Gradient, tick: Int, start: Int) -> Cell {
+            let age = tick - start
+            if age < 0 { return Cell(codepoint: scalar, foreground: rgb(fadedColor), background: 0) }
+            let color = brighten.spectrum[min(age + 1, brighten.spectrum.count - 1)]
+            return Cell(codepoint: scalar, foreground: rgb(color), background: 0)
+        }
+
+        var frames: [[Cell]] = []
+        for index in 0..<3 {
+            let cell = Cell(codepoint: rowSymbols[index], foreground: rgb(beamColor(at: index)), background: 0)
+            frames.append([cell, cell])
+        }
+        for tick in 3...26 {
+            frames.append([
+                fadedInputCell(inputSymbols[1], color: bottomColor, fade: bottomFade, age: tick - 3),
+                fadedInputCell(inputSymbols[0], color: topColor, fade: topFade, age: tick - 3),
+            ])
+        }
+        for tick in 27...37 {
+            frames.append([
+                brightCell(inputSymbols[1], fadedColor: bottomFadedColor, brighten: bottomBrighten, tick: tick, start: 28),
+                brightCell(inputSymbols[0], fadedColor: topFadedColor, brighten: topBrighten, tick: tick, start: 27),
+            ])
+        }
+        return frames
     }
 
     private static func makeTwoCellRowFrames(inputSymbols: [UInt32], options: Configuration) -> [[Cell]] {
