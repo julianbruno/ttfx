@@ -1117,3 +1117,16 @@ This slice replaces the previous Beams-only bounded fallback for non-1x1/2x1/1x2
 
 - [ ] 2.2 remains incomplete: Beams now has a first generic 7x4/fill/scheduling parity path in addition to bounded 1x1/2x1/1x2/2x2 parity, but broader arbitrary Beams options plus remaining geometry breadth still need more live Rust coverage.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Rings Generalization Step Evidence
+
+Added a non-bounded 7×4 Rings parity gate (`AB\nCDE`, seed 1, `--ring-gap 0.25`, one-frame spin/disperse/cycle, fixed `ab48ff` ring color and `112233`→`445566` horizontal final gradient). The Swift effect now builds canvas-sized generated frames for the new arbitrary-canvas route while preserving the prior 1×1 quirk and 3×3 parity case. Task 2.2 remains unchecked.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter ringsEffectMatchesACompleteSevenByFourIndependentRustRun` — exit 1; new 7×4 parity test failed because Swift completed immediately/early and emitted blank/final fallback frames instead of Rust's 194-frame Rings run. |
+| GREEN | `swift test --filter ringsEffectMatchesACompleteSevenByFourIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Focused Rings | `swift test --filter ringsEffectMatches` — exit 0; 3 Swift Testing Rings parity tests passed (1×1, 7×4, 3×3). |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 34 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 88 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |

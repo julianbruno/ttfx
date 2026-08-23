@@ -1037,6 +1037,52 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func ringsEffectMatchesACompleteSevenByFourIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nCDE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "260",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "rings", "--ring-gap", "0.25", "--spin-duration", "1",
+            "--spin-speed", "1-1", "--disperse-duration", "1", "--spin-disperse-cycles", "1",
+            "--ring-colors", "ab48ff", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 194)
+    let status = try assertFrameParity(
+        RingsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            ringsConfiguration: .init(
+                ringColors: [Color(hex: "ab48ff")],
+                ringGap: 0.25,
+                spinDuration: 1,
+                spinSpeed: 1...1,
+                disperseDuration: 1,
+                spinDisperseCycles: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "rings seven-by-four independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) seven-by-four rings frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 @Test func ringsEffectMatchesACompleteThreeByThreeIndependentRustRun() throws {
     let canvas = try Canvas(columns: 3, rows: 3)
     let input = "ABC\nDEF\nGHI"

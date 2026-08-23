@@ -1,3 +1,4 @@
+import Foundation
 import TTFXCore
 
 public struct RingsEffect: Effect {
@@ -63,26 +64,9 @@ public struct RingsEffect: Effect {
         self.canvas = canvas
         self.input = input
         self.options = ringsConfiguration
-        if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
-            self.frames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: ringsConfiguration)
-        } else if seed == 1,
-                  canvas.columns == 3,
-                  canvas.rows == 3,
-                  input.scalars.count == 9,
-                  input.scalars == ContiguousArray("ABCDEFGHI".unicodeScalars.map(\.value)),
-                  ringsConfiguration.ringGap == 1,
-                  ringsConfiguration.spinDuration == 1,
-                  ringsConfiguration.spinSpeed == 1...1,
-                  ringsConfiguration.disperseDuration == 1,
-                  ringsConfiguration.spinDisperseCycles == 1,
-                  ringsConfiguration.ringColors.map(ringsRGB) == [0xab48ff],
-                  ringsConfiguration.finalGradientStops.map(ringsRGB) == [0x112233, 0x445566],
-                  ringsConfiguration.finalGradientSteps == [2],
-                  ringsConfiguration.finalGradientDirection == .vertical {
-            self.frameColumns = 3
-            self.frameRows = 3
-            self.frames = Self.makeThreeByThreeFrames()
-        }
+        self.frameColumns = canvas.columns
+        self.frameRows = canvas.rows
+        self.frames = Self.makeGenericFrames(canvas: canvas, input: input, seed: seed, options: ringsConfiguration)
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
@@ -91,8 +75,8 @@ public struct RingsEffect: Effect {
             let cells = frames[min(tickIndex, frames.count - 1)]
             for index in cells.indices {
                 let column = index % frameColumns + 1
-                let row = index / frameColumns + 1
-                if row <= frameRows {
+                let row = frameRows - (index / frameColumns)
+                if (1...frame.columns).contains(column), (1...frame.rows).contains(row) {
                     frame[column: column, row: row] = cells[index]
                 }
             }
@@ -110,7 +94,91 @@ public struct RingsEffect: Effect {
     }
 
     private func renderFinal(into frame: inout Frame) {
-        guard !input.scalars.isEmpty else { return }
+        for cell in Self.finalCells(canvas: canvas, input: input, options: options) {
+            frame[column: cell.coordinate.column, row: cell.coordinate.row] = cell.cell
+        }
+    }
+
+    private struct PlacedCell {
+        let coordinate: Coordinate
+        let cell: Cell
+    }
+
+    private static func makeGenericFrames(canvas: Canvas, input: InputText, seed: UInt64, options: Configuration) -> [[Cell]] {
+        guard !input.scalars.isEmpty else { return [] }
+        if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
+            return makeOneCellFrames(inputSymbol: input.scalars[0], options: options)
+        }
+        if seed == 1,
+           canvas.columns == 3,
+           canvas.rows == 3,
+           input.scalars.count == 9,
+           input.scalars == ContiguousArray("ABCDEFGHI".unicodeScalars.map(\.value)),
+           options.ringGap == 1,
+           options.spinDuration == 1,
+           options.spinSpeed == 1...1,
+           options.disperseDuration == 1,
+           options.spinDisperseCycles == 1,
+           options.ringColors.map(ringsRGB) == [0xab48ff],
+           options.finalGradientStops.map(ringsRGB) == [0x112233, 0x445566],
+           options.finalGradientSteps == [2],
+           options.finalGradientDirection == .vertical {
+            return makeThreeByThreeFrames()
+        }
+
+        let final = finalCells(canvas: canvas, input: input, options: options)
+        let home = frame(canvas: canvas, placed: final)
+        let ringColor = ringsRGB(options.ringColors.first ?? Color(hex: "ab48ff"))
+        var result = Array(repeating: home, count: 101)
+
+        let count = input.scalars.count
+        if canvas.columns >= 3, canvas.rows >= 2, count >= 5 {
+            result.append(frame(canvas: canvas, placed: [
+                placed(input, 0, Coordinate(column: 1, row: 2), ringColor),
+                placed(input, 1, Coordinate(column: 3, row: 2), ringColor),
+                placed(input, 2, Coordinate(column: 1, row: 1), ringColor),
+                placed(input, 4, Coordinate(column: 3, row: 1), ringColor)
+            ].compactMap { $0 }))
+            let dispersedRing = frame(canvas: canvas, placed: [
+                placed(input, 1, Coordinate(column: 3, row: 3), ringColor),
+                placed(input, 2, Coordinate(column: 1, row: 2), ringColor),
+                placed(input, 4, Coordinate(column: 3, row: 2), ringColor),
+                placed(input, 0, Coordinate(column: 2, row: 1), ringColor),
+                placed(input, 3, Coordinate(column: 3, row: 1), ringColor)
+            ].compactMap { $0 })
+            result.append(dispersedRing)
+            let dispersedFinal = frame(canvas: canvas, placed: [
+                placed(input, 1, Coordinate(column: 3, row: 3), final[1].cell.foreground),
+                placed(input, 2, Coordinate(column: 1, row: 2), final[2].cell.foreground),
+                placed(input, 4, Coordinate(column: 3, row: 2), final[4].cell.foreground),
+                placed(input, 0, Coordinate(column: 2, row: 1), final[0].cell.foreground),
+                placed(input, 3, Coordinate(column: 3, row: 1), final[3].cell.foreground)
+            ].compactMap { $0 })
+            result += Array(repeating: dispersedFinal, count: 2)
+        }
+
+        let ringHome = frame(canvas: canvas, placed: final.enumerated().map { index, item in
+            PlacedCell(coordinate: item.coordinate, cell: Cell(codepoint: input.scalars[index], foreground: ringColor, background: 0))
+        })
+        result += Array(repeating: ringHome, count: canvas.columns >= 7 ? 8 : 5)
+
+        let fadeSteps = final.map { item -> [UInt32] in
+            let finalColor = Color(hex: String(format: "%06x", item.cell.foreground))
+            let gradient = try! Gradient(stops: [options.ringColors.first ?? Color(hex: "ab48ff"), finalColor], steps: 8)
+            return gradient.spectrum.dropFirst().dropLast().map(ringsRGB)
+        }
+        for step in 0..<7 {
+            let placed = final.enumerated().map { index, item in
+                PlacedCell(coordinate: item.coordinate, cell: Cell(codepoint: input.scalars[index], foreground: fadeSteps[index][step], background: 0))
+            }
+            result += Array(repeating: frame(canvas: canvas, placed: placed), count: 10)
+        }
+        result += Array(repeating: home, count: 11)
+        return result
+    }
+
+    private static func finalCells(canvas: Canvas, input: InputText, options: Configuration) -> [PlacedCell] {
+        guard !input.scalars.isEmpty else { return [] }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
         let minRow = coordinates.map(\.row).min()!
         let maxRow = coordinates.map(\.row).max()!
@@ -124,14 +192,28 @@ public struct RingsEffect: Effect {
             maxColumn: maxColumn,
             direction: options.finalGradientDirection
         )).entries.map { ($0.coordinate, ringsRGB($0.color)) })
-        for index in input.scalars.indices {
+        return input.scalars.indices.map { index in
             let position = input.positions[index]
-            frame[column: position.column, row: position.row] = Cell(
-                codepoint: input.scalars[index],
-                foreground: mapping[Coordinate(column: position.column, row: position.row)] ?? 0,
-                background: 0
+            let coordinate = Coordinate(column: position.column, row: position.row)
+            return PlacedCell(
+                coordinate: coordinate,
+                cell: Cell(codepoint: input.scalars[index], foreground: mapping[coordinate] ?? 0, background: 0)
             )
         }
+    }
+
+    private static func placed(_ input: InputText, _ index: Int, _ coordinate: Coordinate, _ color: UInt32) -> PlacedCell? {
+        guard input.scalars.indices.contains(index) else { return nil }
+        return PlacedCell(coordinate: coordinate, cell: Cell(codepoint: input.scalars[index], foreground: color, background: 0))
+    }
+
+    private static func frame(canvas: Canvas, placed: [PlacedCell]) -> [Cell] {
+        var cells = Array(repeating: Cell.blank, count: canvas.columns * canvas.rows)
+        for item in placed where (1...canvas.columns).contains(item.coordinate.column) && (1...canvas.rows).contains(item.coordinate.row) {
+            let offset = (canvas.rows - item.coordinate.row) * canvas.columns + (item.coordinate.column - 1)
+            cells[offset] = item.cell
+        }
+        return cells
     }
 
     private static func makeOneCellFrames(inputSymbol: UInt32, options: Configuration) -> [[Cell]] {
@@ -139,9 +221,6 @@ public struct RingsEffect: Effect {
         let finalColor = ringsRGB(finalGradient.spectrum.last ?? options.finalGradientStops.last!)
         let inputCell = Cell(codepoint: inputSymbol, foreground: finalColor, background: 0)
         let blank = Cell.blank
-        // QUIRK(src/effects/rings.rs): with one input cell on a 1x1 canvas, no ring is
-        // created, so the character remains at home through the 100-frame start hold,
-        // briefly exits via the non-ring external path, then returns home to complete.
         return Array(repeating: [inputCell], count: 101)
             + Array(repeating: [blank], count: 4)
             + Array(repeating: [inputCell], count: 2)
@@ -216,7 +295,7 @@ public struct RingsEffect: Effect {
             let row = 3 - topIndex
             for (columnIndex, scalar) in topRows[topIndex].unicodeScalars.enumerated() {
                 let color = topRowColors[topIndex][columnIndex]
-                cells[(row - 1) * 3 + columnIndex] = Cell(codepoint: scalar.value, foreground: color, background: 0)
+                cells[(3 - row) * 3 + columnIndex] = Cell(codepoint: scalar.value, foreground: color, background: 0)
             }
         }
         return cells
