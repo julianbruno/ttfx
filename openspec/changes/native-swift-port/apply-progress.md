@@ -1698,3 +1698,67 @@ Tasks 2.3, 2.4, and 2.5 are closed after adding native Swift effect implementati
 - [x] 2.4 complete: each new effect was introduced through a RED live-Rust parity test before GREEN implementation.
 - [x] 2.5 complete: the 37-effect parity matrix is represented by the full `EffectFrameParityTests` gate and coverage check.
 - [ ] Phase 3–5 tasks remain untouched.
+
+## Phase 3.1 CLI ArgumentParser Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter CLIParsingTests` exit 1 after adding `tests/ttfx-cliTests/CLIParsingTests.swift`: `module 'TTFXCLI' has no member named 'parse'`, `helpMessage`, or `TTFXEffectRegistry`, proving the CLI parse/registry surface was absent. |
+| GREEN | `swift test --filter CLIParsingTests` exit 0; 5 Swift Testing tests passed for Rust global terminal flags, xterm/no-color/color validation, existing-color handling, anchors, random-effect include/exclude filters, hidden `--m0-dump`/`--parity-dump`/`--max-frames`/`--virtual-clock`, help visibility, and the full 37-effect registry. |
+| Full suite | `swift run ttfx --help` exit 0; emitted Swift ArgumentParser help with Rust-compatible global options and effect names. `swift test` exit 0; 130 Swift Testing tests passed. |
+| Scope limitation | This phase intentionally adds default-name effect selection/registry and completion-script option coverage only. It does not implement byte-exact ANSI rendering, execute effects from the CLI, or cover every effect-specific option; those remain Phase 3.2/3.3/3.4 work. |
+| Rollback boundary | Revert `Package.swift`, `Sources/ttfx-swift/CLI/main.swift`, `Sources/ttfx-swift/Effects/TTFXEffects.swift`, `tests/ttfx-cliTests/CLIParsingTests.swift`, task checkbox 3.1, and this evidence. |
+
+## Phase 3.2 ANSI Rendering Work Unit
+
+`TTFXANSI` now exposes the Rust byte literals for DEC cursor save/restore, hide/show cursor, reset, clear-to-end-of-screen, cursor movement, 24-bit SGR, and xterm SGR. `TTFXANSIRenderer` renders `Frame` values top-row-first to exact UTF-8 bytes, wrapping styled cells in reset bytes and honoring no-color and Rust-style xterm nearest-color conversion (strict first minimum across the 256-color palette model).
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter ANSIRenderingTests` — exit 1 before source existed; compilation reported missing `TTFXANSI`, `TTFXANSIRenderer`, and render options APIs. |
+| GREEN | `swift test --filter ANSIRenderingTests` — exit 0; 5 Swift Testing tests passed for cursor bytes, reset, movement, 24-bit/xterm SGR, no-color/xterm modes, and small-frame rendering. |
+| Full suite | `swift test` — exit 0; 130 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+
+### Exact Work Unit Inventory
+
+| File | Action | Responsibility |
+|---|---|---|
+| `Sources/ttfx-swift/Core/TTFXANSI.swift` | Created | Native Swift ANSI byte literals, SGR color encoding, no-color/xterm render options, and frame-to-string renderer. |
+| `tests/ttfx-swiftTests/Core/ANSIRenderingTests.swift` | Created | Strict RED→GREEN exact-byte tests for controls, colors, modes, and frame rendering. |
+| `openspec/changes/native-swift-port/tasks.md` | Modified | Marked task 3.2 complete after focused and full validation passed. |
+| `openspec/changes/native-swift-port/apply-progress.md` | Modified | Recorded task 3.2 evidence and inventory. |
+
+## Phase 4 SwiftUI Renderer/Gallery Work Unit
+
+This work unit implements the native SwiftUI-facing renderer slice without adding app-bundle complexity. The Metal path is intentionally a platform shell: it reports whether a default Metal device is available and keeps headless CI/tests protocol-backed through `TTFXFrameRenderer` and `TTFXDeterministicRenderer`.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | RED | GREEN | Triangulate/Refactor |
+|---|---|---|---|---|---|
+| SwiftUI renderer/gallery | `tests/ttfx-swiftUITests/RendererTests.swift` | SwiftUI model/unit | `swift test --filter TTFXSwiftUITests` exited 1 because `TTFXFrameSnapshot`, `TTFXGallery`, `TTFXDeterministicRenderer`, and `TTFXMetalRendererAvailability` did not exist. | `swift test --filter TTFXSwiftUITests` exited 0 with 4 Swift Testing tests passed after adding the `TTFXSwiftUI` target, frame snapshot mapping, deterministic gallery, scheduler, SwiftUI views, and Metal availability shell. | `swift test` exited 0 with 129 tests passed. `git diff --check` exited 0. The Metal test asserts availability messaging only; it does not require a real device in headless runs. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused RED command | `swift test --filter TTFXSwiftUITests` — exit 1; compile failures for absent SwiftUI renderer/gallery symbols. |
+| Focused GREEN command | `swift test --filter TTFXSwiftUITests` — exit 0; 4 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 129 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert `Package.swift`, remove `Sources/ttfx-swift/SwiftUI/`, remove `tests/ttfx-swiftUITests/`, and remove this section plus Phase 4 checkboxes. |
+
+### Implementation Notes
+
+- `TTFXFrameSnapshot` maps `TTFXCore.Frame` into stable top-to-bottom renderable cells and text lines suitable for snapshot tests and SwiftUI display.
+- `TTFXGallery` records a deterministic 37-effect demo list with stable IDs, sample text, seed, and canvas dimensions. `TTFXGalleryView` presents that list without an app target.
+- `TTFXDeterministicRenderer` provides protocol-backed real-time tick scheduling and skips frames inside the configured interval while preserving the most recent fixed-capacity snapshot.
+- `TTFXMetalRendererAvailability` and `TTFXMetalRenderer` are conditional shells around Metal availability. They do not claim GPU drawing parity because real Metal rendering is not exercised headlessly.
+
+### Task State
+
+- [x] 4.1 complete within the documented headless limitation: SwiftUI views plus protocol-backed renderer and Metal availability shell.
+- [x] 4.2 complete: deterministic gallery/demo model and view.
+- [x] 4.3 complete: snapshot, scheduling/fixed-capacity, gallery, and Metal availability tests.
+- [ ] Phase 3 and Phase 5 tasks remain outside this work unit.

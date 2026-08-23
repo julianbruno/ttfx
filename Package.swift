@@ -13,6 +13,10 @@ let package = Package(
             name: "ttfx-swift",
             targets: ["TTFXCore"]
         ),
+        .library(
+            name: "TTFXSwiftUI",
+            targets: ["TTFXSwiftUI"]
+        ),
         .executable(
             name: "ttfx",
             targets: ["TTFXCLI"]
@@ -31,10 +35,19 @@ let package = Package(
             dependencies: ["TTFXCore"],
             path: "Sources/ttfx-swift/Effects"
         ),
+        .target(
+            name: "TTFXSwiftUI",
+            dependencies: [
+                "TTFXCore",
+                "TTFXEffects"
+            ],
+            path: "Sources/ttfx-swift/SwiftUI"
+        ),
         .executableTarget(
             name: "TTFXCLI",
             dependencies: [
                 "TTFXCore",
+                "TTFXEffects",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             path: "Sources/ttfx-swift/CLI"
@@ -48,6 +61,16 @@ let package = Package(
             name: "TTFXEffectsTests",
             dependencies: ["TTFXEffects"],
             path: "tests/ttfx-effectsTests"
+        ),
+        .testTarget(
+            name: "TTFXCLITests",
+            dependencies: ["TTFXCLI"],
+            path: "tests/ttfx-cliTests"
+        ),
+        .testTarget(
+            name: "TTFXSwiftUITests",
+            dependencies: ["TTFXSwiftUI"],
+            path: "tests/ttfx-swiftUITests"
         )
     ]
 )

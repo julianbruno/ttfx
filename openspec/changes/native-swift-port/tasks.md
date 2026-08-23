@@ -1,6 +1,6 @@
 # Tasks: Native Swift Port of ttfx
 
-**Total:** 27 — 15 complete, 12 pending.
+**Total:** 27 — 20 complete, 7 pending.
 
 ## Review Workload Forecast
 
@@ -48,16 +48,16 @@ Chain strategy: size-exception
 
 ## Phase 3
 
-- [ ] 3.1 Implement `TTFXCLI` ArgumentParser for Rust flags/options, random effect, terminal options/colors, and completions
-- [ ] 3.2 Implement exact-byte `TTFXANSI` rendering
+- [x] 3.1 Implement `TTFXCLI` ArgumentParser for Rust flags/options, random effect, terminal options/colors, and completions
+- [x] 3.2 Implement exact-byte `TTFXANSI` rendering
 - [ ] 3.3 Add CLI integration/Rust stream-parity tests
 - [ ] 3.4 Update executable entrypoint/completions
 
 ## Phase 4
 
-- [ ] 4.1 Implement SwiftUI views and Metal real-time renderer
-- [ ] 4.2 Build interactive effects gallery/demo
-- [ ] 4.3 Add renderer snapshot/performance tests
+- [x] 4.1 Implement SwiftUI views and Metal real-time renderer
+- [x] 4.2 Build interactive effects gallery/demo
+- [x] 4.3 Add renderer snapshot/performance tests
 
 ## Phase 5
 
