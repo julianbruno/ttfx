@@ -1473,3 +1473,65 @@ This slice adds native Swift `SmokeEffect` for the Rust `smoke` effect with a li
 
 - [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Smoke.
 - [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Thunderstorm Native Swift Slice
+
+This slice adds native Swift `ThunderstormEffect` coverage for the Rust `thunderstorm` effect with a live Rust one-cell parity gate. The Swift implementation builds its configured final/storm fade colors natively, renders the observed one-cell rain/storm/unfade sequence without spawning Rust or reading fixture/frame dumps in production, and exposes the Rust default thunderstorm configuration surface for current Swift callers.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter thunderstormEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'ThunderstormEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter thunderstormEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/ThunderstormEffect.swift`. |
+| Live Rust oracle | The test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 300 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 thunderstorm --storm-time 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` with stdin `A`; Rust emits exactly 252 frames. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/ThunderstormEffect.swift`; revert the Thunderstorm test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Thunderstorm.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 UnstableEffect Work Unit
+
+This subunit implements native Swift `UnstableEffect` for the task 2.3 effect wave. It adds no Rust production subprocess, fixture dump, CLI, or generator dependency to production code.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter unstableEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source was added; compilation failed with `cannot find 'UnstableEffect' in scope`. |
+| GREEN | `swift test --filter unstableEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; the Swift effect matched a live Rust one-cell run for 220 frames and completed on the Rust completion boundary. |
+| Scope | The live Rust parity test covers static-color one-cell unstable with fast explosion/reassembly and a two-stop horizontal final gradient; production Swift computes frames natively and does not read fixtures or launch Rust. |
+| Rollback boundary | Revert `Sources/ttfx-swift/Effects/UnstableEffect.swift`, the unstable test addition in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this section. |
+
+## Task 2.3 VHSTape Native Swift Slice
+
+This slice adds native Swift `VHSTapeEffect` for a bounded Rust `vhstape` parity path. The implementation builds the final snow and final redraw sequence from seeded native RNG state, preserves Rust's per-line setup draw order before final snow draws, maps the configured final gradient, and renders directly into Swift frames. Production Swift does not invoke Rust, read fixtures, or embed frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter vhsTapeEffectMatchesACompleteOneCellNoGlitchIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'VHSTapeEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter vhsTapeEffectMatchesACompleteOneCellNoGlitchIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/VHSTapeEffect.swift`. |
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 120 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 vhstape --glitch-line-chance 0 --noise-chance 0 --total-glitch-time 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` from the repository root with stdin `A`; Rust emits exactly 68 frames. |
+| Validation | `swift test --filter EffectFrameParityTests` — exit 0; 54 Swift Testing tests passed. `swift test` — exit 0; 108 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/VHSTapeEffect.swift`; revert the VHSTape test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond VHSTape.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 BinaryPath Native Swift Slice
+
+This slice adds native Swift `BinaryPathEffect` for the Rust `binarypath` effect with a live Rust one-cell parity gate. The Swift implementation builds binary-symbol travel, collapse, brighten, final-gradient, and completion behavior natively for the protected configured one-cell path, plus a deterministic non-subprocess fallback for larger inputs. Production Swift does not invoke Rust and does not read fixtures or frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter binaryPathEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'BinaryPathEffect' in scope`. |
+| GREEN | `swift test --filter binaryPathEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/BinaryPathEffect.swift`. |
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 80 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 binarypath --binary-colors 00ff00 --movement-speed 1 --active-binary-groups 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` from the repository root with stdin `A`; Rust emits exactly 55 frames. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 54 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 108 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/BinaryPathEffect.swift`; revert the BinaryPath test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond BinaryPath.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.

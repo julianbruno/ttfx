@@ -2092,4 +2092,169 @@ struct EffectFrameParityTests {
         #expect(status.firstCompletionTick == expectedFrames.count)
     }
 
+@Test func thunderstormEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "300",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "thunderstorm", "--storm-time", "1",
+            "--final-gradient-stops", "112233", "445566", "--final-gradient-steps", "2",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 252)
+    let status = try assertFrameParity(
+        ThunderstormEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            thunderstormConfiguration: .init(
+                stormTime: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "thunderstorm one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell thunderstorm frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+    @Test func unstableEffectMatchesACompleteOneCellIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 1, rows: 1)
+        let input = "A"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "260",
+                "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+                "--canvas-height", "1", "unstable", "--explosion-speed", "20",
+                "--reassembly-speed", "20", "--final-gradient-stops", "112233", "445566",
+                "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(!expectedFrames.isEmpty)
+        let status = try assertFrameParity(
+            UnstableEffect(
+                configuration: .init(text: input, seed: 1),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 1,
+                unstableConfiguration: .init(
+                    explosionSpeed: 20,
+                    reassemblySpeed: 20,
+                    finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                    finalGradientSteps: [2],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "unstable one-cell independent Rust run"
+        )
+        #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell unstable frames")
+        #expect(status.firstCompletionTick == expectedFrames.count)
+    }
+
+    @Test func vhsTapeEffectMatchesACompleteOneCellNoGlitchIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 1, rows: 1)
+        let input = "A"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+                "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+                "--canvas-height", "1", "vhstape", "--glitch-line-chance", "0",
+                "--noise-chance", "0", "--total-glitch-time", "1", "--final-gradient-stops",
+                "112233", "445566", "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(expectedFrames.count == 68)
+        let status = try assertFrameParity(
+            VHSTapeEffect(
+                configuration: .init(text: input, seed: 1),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 1,
+                vhsTapeConfiguration: .init(
+                    glitchLineChance: 0,
+                    noiseChance: 0,
+                    totalGlitchTime: 1,
+                    finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                    finalGradientSteps: [2],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "vhstape one-cell no-glitch independent Rust run"
+        )
+        #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell no-glitch vhstape frames")
+        #expect(status.firstCompletionTick == expectedFrames.count)
+    }
+
+@Test func binaryPathEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "binarypath", "--binary-colors", "00ff00",
+            "--movement-speed", "1", "--active-binary-groups", "1", "--final-gradient-stops",
+            "112233", "445566", "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 55)
+    let status = try assertFrameParity(
+        BinaryPathEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            binaryPathConfiguration: .init(
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal,
+                binaryColors: [Color(hex: "00ff00")],
+                movementSpeed: 1,
+                activeBinaryGroups: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "binarypath one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell binarypath frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }
