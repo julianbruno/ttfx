@@ -1535,3 +1535,69 @@ This slice adds native Swift `BinaryPathEffect` for the Rust `binarypath` effect
 
 - [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond BinaryPath.
 - [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 BouncyBallsEffect Work Unit
+
+This subunit implements only native Swift `bouncyballs` parity for task 2.3. It adds no Rust production dependency and does not change persisted Rust frame fixtures.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter bouncyBallsEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed because `BouncyBallsEffect` was not in scope. |
+| GREEN | `swift test --filter bouncyBallsEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; one-cell live Rust run emitted 66 frames and Swift matched every frame and completion boundary. |
+| Triangulate | `swift test --filter bouncyBallsEffect` — exit 0; two live Rust parity tests passed, including a configured 7×4/seed-11 run with row grouping, random drop origins, ball delay, movement easing, and horizontal final gradient. |
+| Suite/full validation | `swift test --filter EffectFrameParityTests` — exit 0; 59 parity tests passed. `swift test` — exit 0; 113 Swift Testing tests passed. `git diff --check` — exit 0 after removing a trailing-space edit artifact. |
+| Rollback boundary | Revert `Sources/ttfx-swift/Effects/BouncyBallsEffect.swift`, the bouncyballs tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this section. |
+
+## Task 2.3 ColorShift Native Swift Slice
+
+This slice adds native Swift `ColorShiftEffect` for the Rust `colorshift` effect. The implementation builds per-character shifted gradient scenes, supports no-travel/travel direction/reverse travel, loop/cycle/skip-final behavior, coordinate-mapped final gradients, and renders directly into Swift frames. Production Swift does not invoke Rust and does not read fixtures or frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter EffectFrameParityTests/colorShiftEffectMatchesAConfiguredIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'ColorShiftEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter EffectFrameParityTests/colorShiftEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/ColorShiftEffect.swift`. |
+| TRIANGULATE | `swift test --filter EffectFrameParityTests/colorShiftEffectMatches` — exit 0; 2 Swift Testing tests passed, covering configured horizontal reverse/no-loop final-gradient completion and no-travel two-cycle skip-final completion. |
+| Live Rust oracle | The configured test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 80 --seed 7 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 colorshift --gradient-stops 112233 445566 --gradient-steps 3 --gradient-frames 2 --no-loop --travel-direction horizontal --reverse-travel-direction --cycles 1 --final-gradient-stops 778899 aabbcc --final-gradient-steps 2 --final-gradient-direction diagonal` with stdin `ACE\nB`. The no-travel test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 40 --seed 11 --ignore-terminal-dimensions --canvas-width 4 --canvas-height 2 colorshift --gradient-stops 112233 445566 --gradient-steps 2 --gradient-frames 1 --no-travel --cycles 2 --skip-final-gradient` with stdin `AB`. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 59 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 113 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/ColorShiftEffect.swift`; revert the two ColorShift tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond ColorShift.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Overflow Native Swift Slice
+
+This slice adds native Swift `OverflowEffect` for the Rust `overflow` effect. The implementation builds pending copied rows and final rows natively, applies seeded cycle/shuffle/delay/speed scheduling, moves rows upward from row 0, colors overflow copies from the overflow gradient, applies coordinate final-gradient colors to final rows, and renders directly into Swift frames. Production Swift does not invoke Rust, read fixtures, or embed frame dumps.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter overflowEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before source existed; compile failed with `cannot find 'OverflowEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter overflowEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/OverflowEffect.swift`. |
+| TRIANGULATE | `swift test --filter overflowEffect` — exit 0; 2 Swift Testing tests passed, covering a complete one-cell live Rust run and a two-cell live Rust run with explicit overflow gradient, cycle range, speed, final gradient, and completion boundary. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 59 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 113 Swift Testing tests passed. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/OverflowEffect.swift`; revert the two Overflow tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records remaining task 2.3 effect coverage beyond Overflow.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Slice Native Swift Slice
+
+This slice adds native Swift `SliceEffect` for the Rust `slice` effect with live Rust parity gates. The Swift implementation builds vertical, horizontal, and diagonal slice origins natively, maps the configured final gradient, advances eased off-canvas paths directly into Swift frames, and does not invoke Rust or read fixtures/frame dumps from production code.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter sliceEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 before production source existed; compile failed with `cannot find 'SliceEffect' in scope` and contextual initializer/member inference errors. |
+| GREEN | `swift test --filter sliceEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/SliceEffect.swift`. |
+| Triangulation | `swift test --filter sliceEffect` — exit 0; 2 Swift Testing tests passed, covering a complete 1×1 vertical live-Rust run and a configured 7×4 diagonal live-Rust run. |
+| Validation | `swift test --filter EffectFrameParityTests` — exit 0; 59 Swift Testing tests passed. `swift test` — exit 0; 113 Swift Testing tests passed. `git diff --check` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/SliceEffect.swift`; revert the two Slice tests in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Slice.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.

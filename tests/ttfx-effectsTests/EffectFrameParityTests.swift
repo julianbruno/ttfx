@@ -2257,4 +2257,354 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+    @Test func bouncyBallsEffectMatchesACompleteOneCellIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 1, rows: 1)
+        let input = "A"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+                "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+                "--canvas-height", "1", "bouncyballs", "--ball-colors", "00ff00",
+                "--ball-symbols", "*", "--ball-delay", "1", "--movement-speed", "1",
+                "--movement-easing", "out_sine", "--final-gradient-stops", "112233", "445566",
+                "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(expectedFrames.count == 66)
+        let status = try assertFrameParity(
+            BouncyBallsEffect(
+                configuration: .init(text: input, seed: 1),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 1,
+                bouncyBallsConfiguration: .init(
+                    ballColors: [Color(hex: "00ff00")],
+                    ballSymbols: ["*"],
+                    ballDelay: 1,
+                    movementSpeed: 1,
+                    movementEasing: .outSine,
+                    finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                    finalGradientSteps: [2],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "bouncyballs one-cell independent Rust run"
+        )
+        #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell bouncyballs frames")
+        #expect(status.firstCompletionTick == expectedFrames.count)
+    }
+
+    @Test func bouncyBallsEffectMatchesAConfiguredIndependentRustRun() throws {
+        let canvas = try Canvas(columns: 7, rows: 4)
+        let input = "AB\nC"
+        let result = try ProcessRunner().run(
+            executable: URL(fileURLWithPath: "/usr/bin/env"),
+            arguments: [
+                "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "200",
+                "--seed", "11", "--ignore-terminal-dimensions", "--canvas-width", "7",
+                "--canvas-height", "4", "bouncyballs", "--ball-colors", "112233",
+                "--ball-symbols", "x", "--ball-delay", "1", "--movement-speed", "1",
+                "--movement-easing", "out_sine", "--final-gradient-stops", "88aaff", "00ffcc",
+                "--final-gradient-steps", "4", "--final-gradient-direction", "horizontal"
+            ],
+            stdin: Data(input.utf8),
+            environment: ProcessInfo.processInfo.environment,
+            currentDirectory: repositoryRoot(),
+            timeout: 30
+        )
+        let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+        #expect(!expectedFrames.isEmpty)
+        let status = try assertFrameParity(
+            BouncyBallsEffect(
+                configuration: .init(text: input, seed: 11),
+                canvas: canvas,
+                input: canvas.ingest(input),
+                seed: 11,
+                bouncyBallsConfiguration: .init(
+                    ballColors: [Color(hex: "112233")],
+                    ballSymbols: ["x"],
+                    ballDelay: 1,
+                    movementSpeed: 1,
+                    movementEasing: .outSine,
+                    finalGradientStops: [Color(hex: "88aaff"), Color(hex: "00ffcc")],
+                    finalGradientSteps: [4],
+                    finalGradientDirection: .horizontal
+                )
+            ),
+            expectedFrames: expectedFrames,
+            canvas: canvas,
+            name: "bouncyballs configured independent Rust run"
+        )
+        #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured bouncyballs frames")
+        #expect(status.firstCompletionTick == expectedFrames.count)
+    }
+
+@Test func colorShiftEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "ACE\nB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "colorshift", "--gradient-stops", "112233", "445566",
+            "--gradient-steps", "3", "--gradient-frames", "2", "--no-loop",
+            "--travel-direction", "horizontal", "--reverse-travel-direction", "--cycles", "1",
+            "--final-gradient-stops", "778899", "aabbcc", "--final-gradient-steps", "2",
+            "--final-gradient-direction", "diagonal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        ColorShiftEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            colorShiftConfiguration: .init(
+                gradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                gradientSteps: [3],
+                gradientFrames: 2,
+                noLoop: true,
+                cycles: 1,
+                finalGradientStops: [Color(hex: "778899"), Color(hex: "aabbcc")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .diagonal,
+                travelDirection: .horizontal,
+                reverseTravelDirection: true
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "colorshift configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) colorshift frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func colorShiftEffectMatchesNoTravelSkipFinalIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 4, rows: 2)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "40",
+            "--seed", "11", "--ignore-terminal-dimensions", "--canvas-width", "4",
+            "--canvas-height", "2", "colorshift", "--gradient-stops", "112233", "445566",
+            "--gradient-steps", "2", "--gradient-frames", "1", "--no-travel",
+            "--cycles", "2", "--skip-final-gradient"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        ColorShiftEffect(
+            configuration: .init(text: input, seed: 11),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 11,
+            colorShiftConfiguration: .init(
+                gradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                gradientSteps: [2],
+                gradientFrames: 1,
+                noTravel: true,
+                cycles: 2,
+                skipFinalGradient: true
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "colorshift no-travel skip-final independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) colorshift no-travel frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func overflowEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "overflow", "--overflow-cycles-range", "1-1",
+            "--overflow-speed", "1", "--overflow-gradient-stops", "112233", "445566",
+            "--final-gradient-stops", "778899", "--final-gradient-steps", "1",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        OverflowEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            overflowConfiguration: .init(
+                overflowGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                overflowCyclesRange: 1...1,
+                overflowSpeed: 1,
+                finalGradientStops: [Color(hex: "778899")],
+                finalGradientSteps: [1],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "overflow one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell overflow frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func overflowEffectMatchesATwoCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 1)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "1", "overflow", "--overflow-cycles-range", "1-1",
+            "--overflow-speed", "1", "--overflow-gradient-stops", "112233", "445566",
+            "--final-gradient-stops", "778899", "aabbcc", "--final-gradient-steps", "2",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        OverflowEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            overflowConfiguration: .init(
+                overflowGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                overflowCyclesRange: 1...1,
+                overflowSpeed: 1,
+                finalGradientStops: [Color(hex: "778899"), Color(hex: "aabbcc")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "overflow two-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell overflow frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func sliceEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "20",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "slice", "--slice-direction", "vertical", "--movement-speed", "1",
+            "--movement-easing", "in_out_expo", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 2)
+    let status = try assertFrameParity(
+        SliceEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            sliceConfiguration: .init(
+                direction: .vertical,
+                movementSpeed: 1,
+                movementEasing: .inOutExpo,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "slice one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell slice frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func sliceEffectMatchesAConfiguredDiagonalIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "slice", "--slice-direction", "diagonal", "--movement-speed", "1",
+            "--movement-easing", "out_sine", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "4", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        SliceEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            sliceConfiguration: .init(
+                direction: .diagonal,
+                movementSpeed: 1,
+                movementEasing: .outSine,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "slice configured diagonal independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured diagonal slice frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }
