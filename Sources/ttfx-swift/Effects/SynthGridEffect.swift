@@ -68,17 +68,16 @@ public struct SynthGridEffect: Effect {
 
     private struct CharacterScene {
         let coordinate: Coordinate
-        let generationFrames: Int
-        let generationSymbol: UInt32
-        let generationColor: UInt32
+        let generationCells: [(codepoint: UInt32, color: UInt32)]
         let finalCodepoint: UInt32
         let finalColor: UInt32
         var age: Int = 0
         var active: Bool = false
         var complete: Bool = false
 
-        var currentCellCodepoint: UInt32 {
-            age <= generationFrames * 2 ? generationSymbol : 0
+        var currentCell: (codepoint: UInt32, color: UInt32)? {
+            guard age > 0, age <= generationCells.count * 2 else { return nil }
+            return generationCells[(age - 1) / 2]
         }
     }
 
@@ -214,22 +213,21 @@ public struct SynthGridEffect: Effect {
 
     private mutating func build() {
         built = true
-        let gridGradient = try! Gradient(stops: options.gridGradientStops, steps: options.gridGradientSteps)
-        let gridMapping = Dictionary(uniqueKeysWithValues: (try! gridGradient.coordinateColorMapping(
-            minRow: 1,
-            maxRow: canvas.rows,
-            minColumn: 1,
-            maxColumn: canvas.columns,
-            direction: options.gridGradientDirection
-        )).entries.map { ($0.coordinate, synthGridRGB($0.color)) })
-        _ = gridMapping
-
         gridLines = [
             GridLine(direction: .horizontal, coordinates: (1...canvas.columns).map { Coordinate(column: $0, row: 1) }, collapsed: (1...canvas.columns).map { Coordinate(column: $0, row: 1) }),
             GridLine(direction: .horizontal, coordinates: (1...canvas.columns).map { Coordinate(column: $0, row: canvas.rows) }, collapsed: (1...canvas.columns).map { Coordinate(column: $0, row: canvas.rows) }),
             GridLine(direction: .vertical, coordinates: (1..<canvas.rows).map { Coordinate(column: 1, row: $0) }, collapsed: (1..<canvas.rows).map { Coordinate(column: 1, row: $0) }),
             GridLine(direction: .vertical, coordinates: (1..<canvas.rows).map { Coordinate(column: canvas.columns, row: $0) }, collapsed: (1..<canvas.rows).map { Coordinate(column: canvas.columns, row: $0) })
         ]
+        let partitionIndexes = partitionLineIndexes()
+        for row in partitionIndexes.rows {
+            let coordinates = (1...canvas.columns).map { Coordinate(column: $0, row: row) }
+            gridLines.append(GridLine(direction: .horizontal, coordinates: coordinates, collapsed: coordinates))
+        }
+        for column in partitionIndexes.columns {
+            let coordinates = (1..<canvas.rows).map { Coordinate(column: column, row: $0) }
+            gridLines.append(GridLine(direction: .vertical, coordinates: coordinates, collapsed: coordinates))
+        }
 
         let finalColors = textColorMapping()
         var inputByCoordinate: [Coordinate: (codepoint: UInt32, color: UInt32)] = [:]
@@ -243,18 +241,17 @@ public struct SynthGridEffect: Effect {
             for column in 1...canvas.columns {
                 let coordinate = Coordinate(column: column, row: row)
                 let frameCount = rng.integer(in: 15...30)
-                var symbolScalar = options.textGenerationSymbols.first?.unicodeScalars.first?.value ?? 32
-                var color = inputByCoordinate[coordinate]?.color ?? 0
+                var generationCells: [(codepoint: UInt32, color: UInt32)] = []
+                generationCells.reserveCapacity(frameCount)
                 for _ in 0..<frameCount {
-                    symbolScalar = options.textGenerationSymbols[rng.integer(in: 0..<options.textGenerationSymbols.count)].unicodeScalars.first?.value ?? symbolScalar
-                    color = synthGridRGB(textGradient.spectrum[rng.integer(in: 0..<textGradient.spectrum.count)])
+                    let symbol = options.textGenerationSymbols[rng.integer(in: 0..<options.textGenerationSymbols.count)]
+                    let color = synthGridRGB(textGradient.spectrum[rng.integer(in: 0..<textGradient.spectrum.count)])
+                    generationCells.append((symbol.unicodeScalars.first?.value ?? Cell.blank.codepoint, color))
                 }
                 let final = inputByCoordinate[coordinate]
                 characterScenes.append(CharacterScene(
                     coordinate: coordinate,
-                    generationFrames: frameCount,
-                    generationSymbol: symbolScalar,
-                    generationColor: color,
+                    generationCells: generationCells,
                     finalCodepoint: final?.codepoint ?? Cell.blank.codepoint,
                     finalColor: final?.color ?? 0
                 ))
@@ -277,7 +274,8 @@ public struct SynthGridEffect: Effect {
             }
         case .addChars:
             let activeGroupCount = characterScenes.contains { $0.active && !$0.complete } ? 1 : 0
-            if !pendingGroups.isEmpty && Double(activeGroupCount) < Double(max(pendingGroups.count, 1)) * options.maxActiveBlocks {
+            let totalGroupCount = activeGroupCount + pendingGroups.count
+            if !pendingGroups.isEmpty && Double(activeGroupCount) < Double(totalGroupCount) * options.maxActiveBlocks {
                 let group = pendingGroups.removeFirst()
                 for index in group { characterScenes[index].active = true }
             }
@@ -298,7 +296,7 @@ public struct SynthGridEffect: Effect {
     private mutating func advanceActiveScenes() {
         for index in characterScenes.indices where characterScenes[index].active && !characterScenes[index].complete {
             characterScenes[index].age += 1
-            if characterScenes[index].age >= characterScenes[index].generationFrames * 2 + 1 {
+            if characterScenes[index].age >= characterScenes[index].generationCells.count * 2 + 1 {
                 characterScenes[index].complete = true
             }
         }
@@ -306,9 +304,19 @@ public struct SynthGridEffect: Effect {
 
     private func renderSynthGrid(into frame: inout Frame) {
         for scene in characterScenes where scene.active {
-            let codepoint = scene.complete ? scene.finalCodepoint : (scene.currentCellCodepoint == 0 ? scene.finalCodepoint : scene.currentCellCodepoint)
-            let color = scene.complete || scene.currentCellCodepoint == 0 ? scene.finalColor : scene.generationColor
-            frame[column: scene.coordinate.column, row: scene.coordinate.row] = Cell(codepoint: codepoint, foreground: color, background: 0)
+            if !scene.complete, let currentCell = scene.currentCell {
+                frame[column: scene.coordinate.column, row: scene.coordinate.row] = Cell(
+                    codepoint: currentCell.codepoint,
+                    foreground: currentCell.color,
+                    background: 0
+                )
+            } else {
+                frame[column: scene.coordinate.column, row: scene.coordinate.row] = Cell(
+                    codepoint: scene.finalCodepoint,
+                    foreground: scene.finalColor,
+                    background: 0
+                )
+            }
         }
 
         for line in gridLines {
@@ -322,15 +330,75 @@ public struct SynthGridEffect: Effect {
 
     private func makeGroups() -> [[Int]] {
         guard !characterScenes.isEmpty else { return [] }
-        var indices: [Int] = []
-        for row in 1...canvas.rows {
-            for column in 1...canvas.columns {
-                if let index = characterScenes.firstIndex(where: { $0.coordinate == Coordinate(column: column, row: row) }) {
-                    indices.append(index)
+
+        var rowIndexes = partitionLineIndexes().rows
+        var columnIndexes = partitionLineIndexes().columns
+        rowIndexes.append(canvas.rows + 1)
+        columnIndexes.append(canvas.columns + 1)
+
+        var groups: [[Int]] = []
+        var previousRowIndex = 1
+        for rowIndexValue in rowIndexes {
+            var blockEndRow = rowIndexValue
+            var previousColumnIndex = 1
+            for blockEndColumn in columnIndexes {
+                if blockEndRow == canvas.rows { blockEndRow += 1 }
+                var group: [Int] = []
+                for row in previousRowIndex..<blockEndRow {
+                    for column in previousColumnIndex..<blockEndColumn {
+                        if let index = characterScenes.firstIndex(where: { $0.coordinate == Coordinate(column: column, row: row) }) {
+                            group.append(index)
+                        }
+                    }
                 }
+                if !group.isEmpty { groups.append(group) }
+                previousColumnIndex = blockEndColumn
             }
+            previousRowIndex = blockEndRow
         }
-        return indices.isEmpty ? [] : [indices]
+        return groups
+    }
+
+    private func partitionLineIndexes() -> (rows: [Int], columns: [Int]) {
+        var rowIndexes: [Int] = []
+        var columnIndexes: [Int] = []
+        let rowGap: Int
+        let columnGap: Int
+        if canvas.rows > 2 * canvas.columns {
+            rowGap = Self.findEvenGap(canvas.rows) + 1
+            columnGap = rowGap * 2
+        } else {
+            columnGap = Self.findEvenGap(canvas.columns) + 1
+            rowGap = columnGap / 2
+        }
+
+        var rowIndex = 1 + rowGap
+        while rowIndex < canvas.rows {
+            if canvas.rows - rowIndex >= 2 { rowIndexes.append(rowIndex) }
+            rowIndex += max(rowGap, 1)
+        }
+        var columnIndex = 1 + columnGap
+        while columnIndex < canvas.columns {
+            if canvas.columns - columnIndex >= 2 { columnIndexes.append(columnIndex) }
+            columnIndex += max(columnGap, 1)
+        }
+        return (rowIndexes, columnIndexes)
+    }
+
+    private static func findEvenGap(_ dimension: Int) -> Int {
+        let adjusted = dimension - 2
+        guard adjusted > 0 else { return 0 }
+        var potentialGaps: [Int] = []
+        var gap = adjusted
+        while gap > 4 {
+            if adjusted % gap <= 1 { potentialGaps.append(gap) }
+            gap -= 1
+        }
+        guard let first = potentialGaps.first else { return 4 }
+        let target = adjusted / 5
+        return potentialGaps.dropFirst().reduce(first) { best, candidate in
+            abs(candidate - target) < abs(best - target) ? candidate : best
+        }
     }
 
     private func textColorMapping() -> [UInt32] {

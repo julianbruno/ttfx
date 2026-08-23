@@ -1380,4 +1380,86 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func blackholeEffectConsumesTenInputCellsBeforeFinalGradient() throws {
+    let canvas = try Canvas(columns: 5, rows: 2)
+    let input = "ABCDE\nFGHIJ"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "1200",
+            "--seed", "3", "--ignore-terminal-dimensions", "--canvas-width", "5",
+            "--canvas-height", "2", "blackhole", "--blackhole-color", "ffffff",
+            "--star-colors", "ffcc0d", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 521)
+
+    var effect = BlackholeEffect(
+        configuration: .init(text: input, seed: 3),
+        canvas: canvas,
+        input: canvas.ingest(input),
+        seed: 3,
+        blackholeConfiguration: .init(
+            blackholeColor: Color(hex: "ffffff"),
+            starColors: [Color(hex: "ffcc0d")],
+            finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+            finalGradientSteps: [2],
+            finalGradientDirection: .horizontal
+        )
+    )
+
+    var firstCompletionTick: Int?
+    var observedConsumedBlank = false
+    var finalBytes = Data()
+    for tick in 1...expectedFrames.count {
+        var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
+        let status = effect.tick(into: &frame)
+        if visibleGrid(for: frame) == "     \\n     " { observedConsumedBlank = true }
+        if status == .complete, firstCompletionTick == nil { firstCompletionTick = tick }
+        finalBytes = terminalBytes(for: frame)
+    }
+
+    #expect(observedConsumedBlank, "10-cell blackhole should consume the input into a blank singularity phase before cooling")
+    #expect(firstCompletionTick == expectedFrames.count)
+    #expect(finalBytes == expectedFrames.last)
+}
+
+@Test func synthGridEffectMatchesADefaultPartitionedMultiSymbolIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 8, rows: 6)
+    let input = "Swift\nTTE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "40",
+            "--seed", "42", "--ignore-terminal-dimensions", "--canvas-width", "8",
+            "--canvas-height", "6", "synthgrid"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 40)
+    let status = try assertFrameParity(
+        SynthGridEffect(
+            configuration: .init(text: input, seed: 42),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 42
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "synthgrid default partitioned multi-symbol independent Rust run"
+    )
+    #expect(status.finalStatus == .running, "Rust bounded default partitioned synthgrid run remains active beyond this slice")
+    #expect(status.firstCompletionTick == nil)
+}
+
 }

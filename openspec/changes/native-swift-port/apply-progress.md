@@ -1160,3 +1160,48 @@ This slice moves Beams beyond the prior 7x4 configured generic path with a diffe
 
 - [ ] 2.2 remains incomplete: Beams has bounded 1x1/2x1/1x2/2x2 plus generic 7x4 sparse and 3x3 dense configured parity, but broader arbitrary Beams options and remaining wider task 2.2 effect breadth remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Blackhole Native 10-Cell Consumption Step Evidence
+
+This slice adds a native Blackhole phase-machine path for non-scripted inputs without production Rust fallback, shell execution, fixture reads, or frame dump tables. It preserves the prior 1×1 and 2×1 exact parity scripts, then drives arbitrary input through starfield, consumed blank singularity, cooling preview, and final-gradient phases. Task 2.2 remains unchecked pending fuller byte-parity breadth.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter blackholeEffectConsumesTenInputCellsBeforeFinalGradient` — exit 1; the new 5×2/10-cell live Rust test observed no blank consumed phase, Swift completed at tick 1 instead of Rust's 521 frames, and final bytes did not match Rust's last frame. |
+| GREEN | `swift test --filter blackholeEffectConsumesTenInputCellsBeforeFinalGradient` — exit 0; 1 Swift Testing test passed. |
+| Focused Blackhole | `swift test --filter blackholeEffect` — exit 0; 3 Swift Testing Blackhole tests passed (1×1, 2×1, 10-cell consumption). |
+| Full suite | `swift test` — exit 0; 91 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Blackhole now has a native non-scripted consumption/default-final-gradient path protected by a 10-cell live Rust run, but fuller byte-parity for arbitrary Blackhole starfield/collapse/explosion behavior and remaining task 2.2 breadth are still pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 SynthGrid Default Partitioned Multi-Symbol Live-Rust Slice
+
+This slice broadens SynthGrid from the prior single-symbol/single-color generic 7×4 run to a bounded default Rust configuration on an 8×6 canvas. The new live oracle exercises the default multi-symbol generated text, multi-stop text/grid gradients, an internal partition grid line, shuffled block groups, and per-generated-frame RNG symbol/color sequencing without production Rust fallbacks or fixtures. Task 2.2 remains incomplete because this is a 40-frame bounded partition slice rather than complete arbitrary multi-block completion coverage.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| SynthGrid default 8×6 partitioned multi-symbol | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing SynthGrid 1×1, configured 4×3, and single-symbol 7×4 tests were retained. | `swift test --filter synthGridEffectMatchesADefaultMultiSymbolIndependentRustRun` — exit 1 after adding the RED test; Rust emitted 70 frames and Swift first mismatched at tick 21 because the generic path collapsed generated scenes to a single final random symbol/color per cell. The test was then narrowed to `synthGridEffectMatchesADefaultPartitionedMultiSymbolIndependentRustRun` with `--max-frames 40` on 8×6 to exercise partitioning while avoiding the 12×6 complete run's subprocess pipe timeout. | `swift test --filter synthGridEffectMatchesADefaultPartitionedMultiSymbolIndependentRustRun` — exit 0; 1 Swift Testing test passed after storing every generated two-frame symbol/color cell and adding Rust-shaped internal partition grid lines. | `swift test --filter synthGridEffect` — exit 0; 4 SynthGrid live-Rust parity tests passed, covering 1×1, configured 4×3, single-symbol 7×4, and bounded default partitioned 8×6 runs. | Kept the implementation effect-local; no shared Core change was needed. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 40 --seed 42 --ignore-terminal-dimensions --canvas-width 8 --canvas-height 6 synthgrid` with stdin `Swift
+TTE`; Rust emits exactly 40 bounded frames. |
+| Focused RED | `swift test --filter synthGridEffectMatchesADefaultMultiSymbolIndependentRustRun` — exit 1; mismatches began at tick 21 against the live Rust default multi-symbol run. |
+| Focused GREEN | `swift test --filter synthGridEffectMatchesADefaultPartitionedMultiSymbolIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| SynthGrid triangulation | `swift test --filter synthGridEffect` — exit 0; 4 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 91 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert the default partitioned SynthGrid test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the per-frame generated-cell and internal partition grid-line changes in `Sources/ttfx-swift/Effects/SynthGridEffect.swift`, and this section. Keep the prior SynthGrid 1×1/4×3/single-symbol 7×4 slices and other task 2.2 work. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: SynthGrid now covers bounded 1×1, configured 4×3, single-symbol 7×4, and bounded default partitioned 8×6 parity, but complete arbitrary multi-block completion and remaining task 2.2 breadth still require proof.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
