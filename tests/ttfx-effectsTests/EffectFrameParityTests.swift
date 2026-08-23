@@ -3,6 +3,8 @@ import Testing
 import TTFXCore
 import TTFXEffects
 
+private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
+
 private func repositoryRoot() -> URL {
     URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent()
@@ -20,14 +22,14 @@ private func terminalBytes(for frame: Frame) -> Data {
     for row in stride(from: frame.rows, through: 1, by: -1) {
         for column in 1...frame.columns {
             let cell = frame[column: column, row: row]
-            if cell.foreground != 0 {
+            if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
                 let red = cell.foreground >> 16
                 let green = (cell.foreground >> 8) & 0xFF
                 let blue = cell.foreground & 0xFF
                 output.append(Data("\u{1B}[38;2;\(red);\(green);\(blue)m".utf8))
             }
             output.append(Data(String(UnicodeScalar(cell.codepoint)!).utf8))
-            if cell.foreground != 0 {
+            if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
                 output.append(Data("\u{1B}[0m".utf8))
             }
         }
@@ -594,6 +596,54 @@ struct EffectFrameParityTests {
         name: "beams two-cell row independent Rust run"
     )
     #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func beamsEffectMatchesASevenByFourIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nCDE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 46)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams 7x4 independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) 7x4 beams frames")
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 

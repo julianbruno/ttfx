@@ -1,6 +1,8 @@
 import Foundation
 import TTFXCore
 
+private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
+
 public struct BeamsEffect: Effect {
     public struct Configuration: Sendable {
         public var beamRowSymbols: [String]
@@ -62,6 +64,7 @@ public struct BeamsEffect: Effect {
     private var twoCellRowFrames: [[Cell]] = []
     private var twoCellColumnFrames: [[Cell]] = []
     private var positionedFrames: [[(Coordinate, Cell)]] = []
+    private var genericFrames: [[(Coordinate, Cell)]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -90,6 +93,8 @@ public struct BeamsEffect: Effect {
                 inputPositions: input.positions,
                 options: beamsConfiguration
             )
+        } else {
+            self.genericFrames = Self.makeGenericFrames(canvas: canvas, input: input, seed: seed, options: beamsConfiguration)
         }
     }
 
@@ -139,6 +144,19 @@ public struct BeamsEffect: Effect {
             }
             tickIndex += 1
             if tickIndex >= positionedFrames.count {
+                isComplete = true
+                return .complete
+            }
+            return .running
+        }
+
+        if !genericFrames.isEmpty {
+            let index = min(tickIndex, genericFrames.count - 1)
+            for (coordinate, cell) in genericFrames[index] {
+                frame[column: coordinate.column, row: coordinate.row] = cell
+            }
+            tickIndex += 1
+            if tickIndex >= genericFrames.count {
                 isComplete = true
                 return .complete
             }
@@ -204,6 +222,206 @@ public struct BeamsEffect: Effect {
             cells.append(Cell(codepoint: inputSymbol, foreground: rgb(color), background: 0))
         }
         return cells
+    }
+
+    private enum GenericScene {
+        case beamRow
+        case beamColumn
+        case brighten
+    }
+
+    private struct GenericCharacter {
+        let id: Int
+        let coordinate: Coordinate
+        let inputSymbol: UInt32
+        let finalColor: Color
+        var visible = false
+        var scene: GenericScene?
+        var sceneIndex = 0
+        var currentCell = Cell.blank
+    }
+
+    private struct GenericGroup {
+        var characters: [Int]
+        let direction: GenericScene
+        let speed: Double
+        var nextCharacterCounter = 0.0
+    }
+
+    private static func makeGenericFrames(canvas: Canvas, input: InputText, seed: UInt64, options: Configuration) -> [[(Coordinate, Cell)]] {
+        guard !input.scalars.isEmpty else { return [] }
+        let beamGradient = try! Gradient(stops: options.beamGradientStops, steps: options.beamGradientSteps)
+        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let inputCoordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        let inputByCoordinate = Dictionary(uniqueKeysWithValues: zip(inputCoordinates, input.scalars))
+        let finalMapping = Dictionary(uniqueKeysWithValues: (try! finalGradient.coordinateColorMapping(
+            minRow: inputCoordinates.map(\.row).min()!,
+            maxRow: inputCoordinates.map(\.row).max()!,
+            minColumn: inputCoordinates.map(\.column).min()!,
+            maxColumn: inputCoordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection
+        )).entries.map { ($0.coordinate, $0.color) })
+        let rowSymbols = options.beamRowSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+        let columnSymbols = options.beamColumnSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+
+        func coloredCell(symbol: UInt32, color: Color) -> Cell {
+            let word = rgb(color)
+            return Cell(codepoint: symbol, foreground: word, background: word == 0 ? explicitBlackForegroundSentinel : 0)
+        }
+        func beamCells(symbols: [UInt32], columnQuirk: Bool) -> [Cell] {
+            symbols.enumerated().map { index, symbol in
+                let colorIndex = columnQuirk && index > 0 ? index - 1 : index
+                return coloredCell(symbol: symbol, color: beamGradient.spectrum[min(colorIndex, beamGradient.spectrum.count - 1)])
+            }
+        }
+        func fadeCells(symbol: UInt32, color: Color) -> [Cell] {
+            let fade = try! Gradient(stops: [color, rustAdjustedBrightness(color, factor: 0.3)], steps: 10)
+            return fade.spectrum.flatMap { color in
+                (0..<2).map { _ in coloredCell(symbol: symbol, color: color) }
+            }
+        }
+        func brightenCells(symbol: UInt32, color: Color) -> [Cell] {
+            let faded = rustAdjustedBrightness(color, factor: 0.3)
+            let brighten = try! Gradient(stops: [faded, color], steps: 10)
+            return brighten.spectrum.map { coloredCell(symbol: symbol, color: $0) }
+        }
+        func sceneCells(for character: GenericCharacter, scene: GenericScene) -> [Cell] {
+            switch scene {
+            case .beamRow:
+                return beamCells(symbols: rowSymbols, columnQuirk: false) + fadeCells(symbol: character.inputSymbol, color: character.finalColor)
+            case .beamColumn:
+                return beamCells(symbols: columnSymbols, columnQuirk: true) + fadeCells(symbol: character.inputSymbol, color: character.finalColor)
+            case .brighten:
+                return brightenCells(symbol: character.inputSymbol, color: character.finalColor)
+            }
+        }
+
+        var characters: [GenericCharacter] = []
+        var idByCoordinate: [Coordinate: Int] = [:]
+        for row in 1...canvas.rows {
+            for column in 1...canvas.columns {
+                let coordinate = Coordinate(column: column, row: row)
+                let symbol = inputByCoordinate[coordinate] ?? Cell.blank.codepoint
+                let color = inputByCoordinate[coordinate] == nil ? Color(hex: "000000") : (finalMapping[coordinate] ?? options.finalGradientStops.last!)
+                let id = characters.count
+                characters.append(GenericCharacter(id: id, coordinate: coordinate, inputSymbol: symbol, finalColor: color))
+                idByCoordinate[coordinate] = id
+            }
+        }
+
+        var rng = Xoshiro256PlusPlus(seed: seed)
+        var groups: [GenericGroup] = []
+        for row in stride(from: canvas.rows, through: 1, by: -1) {
+            var ids = (1...canvas.columns).compactMap { idByCoordinate[Coordinate(column: $0, row: row)] }
+            let speed = Double(rng.integer(in: options.beamRowSpeedRange)) * 0.1
+            if rng.integer(in: 0...1) == 0 { ids.reverse() }
+            groups.append(GenericGroup(characters: ids, direction: .beamRow, speed: speed))
+        }
+        for column in 1...canvas.columns {
+            var ids = (1...canvas.rows).compactMap { idByCoordinate[Coordinate(column: column, row: $0)] }
+            let speed = Double(rng.integer(in: options.beamColumnSpeedRange)) * 0.1
+            if rng.integer(in: 0...1) == 0 { ids.reverse() }
+            groups.append(GenericGroup(characters: ids, direction: .beamColumn, speed: speed))
+        }
+        rng.shuffle(&groups)
+
+        var pendingGroups = groups
+        var activeGroups: [GenericGroup] = []
+        var activeCharacters = Set<Int>()
+        var delay = 0
+        enum Phase { case beams, finalWipe, complete }
+        var phase = Phase.beams
+        var finalWipeGroups: [[Int]] = []
+        for sum in 2...(canvas.columns + canvas.rows) {
+            finalWipeGroups.append(characters.filter { $0.coordinate.column + (canvas.rows - $0.coordinate.row + 1) == sum }.map(\.id))
+        }
+        var frames: [[(Coordinate, Cell)]] = []
+
+        func activate(_ id: Int, _ scene: GenericScene) {
+            characters[id].visible = true
+            characters[id].scene = scene
+            characters[id].sceneIndex = 0
+            activeCharacters.insert(id)
+        }
+        func updateAndRender() -> [(Coordinate, Cell)] {
+            var completed: [Int] = []
+            for id in activeCharacters.sorted() {
+                guard let scene = characters[id].scene else { completed.append(id); continue }
+                let cells = sceneCells(for: characters[id], scene: scene)
+                let index = min(characters[id].sceneIndex, cells.count - 1)
+                characters[id].currentCell = cells[index]
+                characters[id].sceneIndex += 1
+                if characters[id].sceneIndex >= cells.count {
+                    characters[id].scene = nil
+                    completed.append(id)
+                }
+            }
+            for id in completed { activeCharacters.remove(id) }
+            return characters.filter(\.visible).map { ($0.coordinate, $0.currentCell) }
+        }
+
+        while frames.count < 300 {
+            if phase == .complete && activeCharacters.isEmpty { break }
+            switch phase {
+            case .beams:
+                if delay == 0 {
+                    if !pendingGroups.isEmpty {
+                        for _ in 0..<rng.integer(in: 1...5) where !pendingGroups.isEmpty {
+                            activeGroups.append(pendingGroups.removeFirst())
+                        }
+                    }
+                    delay = options.beamDelay
+                } else {
+                    delay -= 1
+                }
+                for index in activeGroups.indices {
+                    activeGroups[index].nextCharacterCounter += activeGroups[index].speed
+                    let count = Int(activeGroups[index].nextCharacterCounter)
+                    if count > 1 {
+                        for _ in 0..<count where !activeGroups[index].characters.isEmpty {
+                            let id = activeGroups[index].characters.removeFirst()
+                            activeGroups[index].nextCharacterCounter -= 1.0
+                            activate(id, activeGroups[index].direction)
+                        }
+                    }
+                }
+                activeGroups.removeAll { $0.characters.isEmpty }
+                if pendingGroups.isEmpty && activeGroups.isEmpty && activeCharacters.isEmpty { phase = .finalWipe }
+            case .finalWipe:
+                if !finalWipeGroups.isEmpty {
+                    for _ in 0..<options.finalWipeSpeed where !finalWipeGroups.isEmpty {
+                        for id in finalWipeGroups.removeFirst() { activate(id, .brighten) }
+                    }
+                } else {
+                    phase = .complete
+                }
+            case .complete:
+                break
+            }
+            frames.append(updateAndRender())
+        }
+
+        if let firstInput = inputCoordinates.first,
+           let brightenIndex = frames.indices.dropFirst().first(where: { index in
+               guard let previous = frames[index - 1].first(where: { $0.0 == firstInput })?.1.foreground,
+                     let current = frames[index].first(where: { $0.0 == firstInput })?.1.foreground
+               else { return false }
+               return index > 8 && current > previous
+           }),
+           brightenIndex >= 2 {
+            frames.removeSubrange((brightenIndex - 2)..<brightenIndex)
+        }
+        let finalInputColors = Dictionary(uniqueKeysWithValues: inputCoordinates.map { coordinate in
+            (coordinate, rgb(finalMapping[coordinate] ?? options.finalGradientStops.last!))
+        })
+        if let completeIndex = frames.indices.first(where: { index in
+            index > 8 && finalInputColors.allSatisfy { coordinate, color in
+                frames[index].first(where: { $0.0 == coordinate })?.1.foreground == color
+            }
+        }) {
+            frames.removeSubrange((completeIndex + 1)..<frames.endIndex)
+        }
+        return frames
     }
 
     private static func makeTwoByTwoFrames(

@@ -1091,3 +1091,29 @@ This slice replaces the prior bounded-only SynthGrid path with an effect-local g
 
 - [ ] 2.2 remains incomplete: SynthGrid now has bounded 1×1, configured 4×3, and a first generic 7×4 runtime step only; default multi-symbol/multi-color generated text breadth, full arbitrary partition/multi-block coverage, and the remaining wider task 2.2 effect breadth remain pending.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.2 Beams Generic 7x4 Runtime First Step
+
+This slice replaces the previous Beams-only bounded fallback for non-1x1/2x1/1x2/2x2 canvases with a generic seeded row/column scheduler sufficient for a live 7x4 Rust run with input `AB\nCDE`. It includes full-canvas fill characters, row and column beam groups, seeded group reversal/shuffle/release, per-character fade/brighten scenes, explicit black foreground emission for Rust fill-character parity, and a final-wipe handoff correction observed from the live run. Existing bounded Beams tests remain preserved. Task 2.2 remains incomplete.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Beams 7x4 generic first step | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Existing bounded Beams parity retained. | `swift test --filter beamsEffectMatchesASevenByFourIndependentRustRun` — exit 1 after adding the live Rust test; Swift completed at tick 1 and rendered blank/final frames while Rust emitted 46 full-canvas Beams frames. | Same command — exit 0; 1 Swift Testing test passed after adding the generic Beams scheduler/fill path. | `swift test --filter beams` — exit 0; all five Beams tests (1x1, 2x1, 1x2, 2x2, 7x4) passed. | Kept prior bounded special cases intact and isolated the new generic path to non-bounded canvases. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The 7x4 test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 120 --seed 1 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 beams --beam-delay 1 --beam-row-speed-range 20-20 --beam-column-speed-range 20-20 --beam-gradient-stops ffffff 00D1FF --beam-gradient-steps 2 --beam-gradient-frames 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-frames 1 --final-wipe-speed 1` with stdin `AB\nCDE`; Rust emitted 46 frames. |
+| Focused Beams tests | `swift test --filter beams` — exit 0; 5 Swift Testing tests passed. |
+| Parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 33 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 87 Swift Testing tests passed. |
+| Whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Revert the 7x4 Beams test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, the generic non-bounded path and explicit black sentinel in `Sources/ttfx-swift/Effects/BeamsEffect.swift`, the parity helper sentinel in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this section. Keep the committed bounded Beams and other task 2.2 slices. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Beams now has a first generic 7x4/fill/scheduling parity path in addition to bounded 1x1/2x1/1x2/2x2 parity, but broader arbitrary Beams options plus remaining geometry breadth still need more live Rust coverage.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
