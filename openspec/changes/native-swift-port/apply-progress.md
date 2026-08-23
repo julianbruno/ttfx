@@ -709,3 +709,26 @@ This task 2.1 work unit implements `SwarmEffect` parity evidence after Print, Sl
 
 - [x] 2.1 has evidence for all eight requested simple/particle effects: Print, Slide, Wipe, Expand, Rain, Bubbles, Fireworks, and Swarm.
 - [ ] 2.2–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.2 LaserEtch Grouped-Pattern Dead-Branch Slice
+
+This is a narrow task 2.2 slice only. It implements the Rust-documented grouped `--etch-pattern` dead branch for `LaserEtchEffect`, where `row_top_to_bottom` parses as a group but leaves `pending_chars` empty and emits exactly one blank frame. The default `algorithm` path, RecursiveBacktracker, ParticlePool, beam/spark behavior, CLI, and other task 2.2 effects remain unimplemented. Task 2.2 is not complete.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `laseretch` grouped pattern | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Rust-frame integration | Existing 2.1 effect parity suite was green at baseline. | `swift test --filter laserEtchGroupedPatternMatchesRustDeadBranchRun` — exit 1; compile failed because `LaserEtchEffect` and `.rowTopToBottom` did not exist. | `swift test --filter laserEtchGroupedPatternMatchesRustDeadBranchRun` — exit 0; Rust emitted 1 frame for `laseretch --etch-pattern row_top_to_bottom` and Swift returned `.complete` on tick 1 with matching bytes. | The live Rust command uses a max-frame cap of 5 against a 7x4 canvas and asserts the decoded frame count is exactly 1. | None; implementation stayed as the minimal grouped-branch parity seam. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused LaserEtch test | `swift test --filter laserEtchGroupedPatternMatchesRustDeadBranchRun` — exit 0; 1 Swift Testing test passed. |
+| Runtime/oracle harness | The independent test uses `ProcessRunner` to invoke `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 5 --seed 7 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 laseretch --etch-pattern row_top_to_bottom` from the repository root with stdin `AB\nC`; Rust emits exactly 1 frame. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/LaserEtchEffect.swift`; revert the LaserEtch test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep all task 2.1 effect evidence and admitted fixture bytes. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: only grouped-pattern dead-branch parity exists for LaserEtch; the default algorithm, RecursiveBacktracker, ParticlePool, and other 2.2 effects remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

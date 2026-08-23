@@ -449,6 +449,39 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func laserEtchGroupedPatternMatchesRustDeadBranchRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "5",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "laseretch", "--etch-pattern", "row_top_to_bottom"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 1)
+    let status = try assertFrameParity(
+        LaserEtchEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            laserEtchConfiguration: .init(etchPattern: .rowTopToBottom)
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "laseretch grouped-pattern Rust dead-branch run"
+    )
+    #expect(status.finalStatus == .complete)
+    #expect(status.firstCompletionTick == 1)
+}
+
 @Test func fireworksEffectMatchesItsAdmittedRustFrames() throws {
     let canvas = try Canvas(columns: 12, rows: 6)
     let status = try assertFixtureParity(
