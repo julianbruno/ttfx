@@ -1130,3 +1130,33 @@ Added a non-bounded 7×4 Rings parity gate (`AB\nCDE`, seed 1, `--ring-gap 0.25`
 | Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 34 Swift Testing tests passed. |
 | Full suite | `swift test` — exit 0; 88 Swift Testing tests passed. |
 | Diff hygiene | `git diff --check` — exit 0. |
+
+## Task 2.2 Rings Four-by-Two Generalization Evidence
+
+Added a live Rust 4×2 Rings parity gate (`AB\nCD`, seed 5, `--ring-gap 0.5`, one-frame spin/disperse/cycle, fixed `ab48ff` ring color and `112233`→`445566` horizontal final gradient). The Swift path now covers this additional shuffled four-character ring/disperse geometry while preserving existing 1×1, 3×3, and 7×4 Rings parity. Task 2.2 remains unchecked.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter ringsEffectMatchesAFourByTwoIndependentRustRun` — exit 1; new 4×2 live-Rust test failed at tick 101 and completed at tick 187 before Rust's 194-frame run. |
+| GREEN | `swift test --filter ringsEffectMatchesAFourByTwoIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Focused Rings | `swift test --filter ringsEffect` — exit 0; 4 Swift Testing Rings parity tests passed (1×1, 7×4, 4×2, 3×3). |
+| Full suite | `swift test` — exit 0; 89 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |
+
+## Task 2.2 Beams 3x3 Generalization Step Evidence
+
+This slice moves Beams beyond the prior 7x4 configured generic path with a different complete 3x3 live Rust parity run using full-grid input `ABC\nDEF\nGHI`, seed 1, one-tick beam delay, fixed row/column speeds, a two-stop beam gradient, and a two-stop vertical final gradient. The implementation removes the previous first-input brighten-frame deletion and schedules final wipe groups from the input bounding box diagonals instead of canvas-height diagonals, preserving sparse 7x4 fill-character parity while matching the dense 3x3 completion boundary. Task 2.2 remains unchecked.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter beamsEffectMatchesAThreeByThreeIndependentRustRun` — exit 1; Rust emitted 45 frames while Swift expected the newly added test's initial 41-frame assertion and then mismatched/final-wipe completed early under the previous generic handoff. |
+| GREEN | `swift test --filter beamsEffectMatchesAThreeByThreeIndependentRustRun` — exit 0; 1 Swift Testing test passed after input-bounds final-wipe scheduling. |
+| Focused Beams | `swift test --filter 'beamsEffect'` — exit 0; 6 Swift Testing Beams parity tests passed (1x1, 2x1, 1x2, 2x2, 7x4, and 3x3). |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 35 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 89 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |
+
+### Task State
+
+- [ ] 2.2 remains incomplete: Beams has bounded 1x1/2x1/1x2/2x2 plus generic 7x4 sparse and 3x3 dense configured parity, but broader arbitrary Beams options and remaining wider task 2.2 effect breadth remain pending.
+- [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.

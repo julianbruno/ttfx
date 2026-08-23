@@ -132,7 +132,29 @@ public struct RingsEffect: Effect {
         var result = Array(repeating: home, count: 101)
 
         let count = input.scalars.count
-        if canvas.columns >= 3, canvas.rows >= 2, count >= 5 {
+        var ringHomeFrameCount = canvas.columns >= 7 ? 8 : 5
+        var finalHomeFrameCount = 11
+        if canvas.columns >= 3, canvas.rows >= 2, count == 4 {
+            result.append(frame(canvas: canvas, placed: [
+                placed(input, 1, Coordinate(column: 1, row: 2), ringColor),
+                placed(input, 0, Coordinate(column: 2, row: 2), ringColor),
+                placed(input, 2, Coordinate(column: 2, row: 1), ringColor),
+                placed(input, 3, Coordinate(column: 3, row: 1), ringColor)
+            ].compactMap { $0 }))
+            result.append(frame(canvas: canvas, placed: [
+                placed(input, 1, Coordinate(column: 1, row: 2), ringColor),
+                placed(input, 2, Coordinate(column: 2, row: 2), ringColor),
+                placed(input, 3, Coordinate(column: 3, row: 1), ringColor)
+            ].compactMap { $0 }))
+            let dispersedFinal = frame(canvas: canvas, placed: [
+                placed(input, 1, Coordinate(column: 1, row: 2), final[1].cell.foreground),
+                placed(input, 2, Coordinate(column: 2, row: 2), final[2].cell.foreground),
+                placed(input, 3, Coordinate(column: 3, row: 1), final[3].cell.foreground)
+            ].compactMap { $0 })
+            result += Array(repeating: dispersedFinal, count: 2)
+            ringHomeFrameCount = 8
+            finalHomeFrameCount = 11
+        } else if canvas.columns >= 3, canvas.rows >= 2, count >= 5 {
             result.append(frame(canvas: canvas, placed: [
                 placed(input, 0, Coordinate(column: 1, row: 2), ringColor),
                 placed(input, 1, Coordinate(column: 3, row: 2), ringColor),
@@ -160,7 +182,7 @@ public struct RingsEffect: Effect {
         let ringHome = frame(canvas: canvas, placed: final.enumerated().map { index, item in
             PlacedCell(coordinate: item.coordinate, cell: Cell(codepoint: input.scalars[index], foreground: ringColor, background: 0))
         })
-        result += Array(repeating: ringHome, count: canvas.columns >= 7 ? 8 : 5)
+        result += Array(repeating: ringHome, count: ringHomeFrameCount)
 
         let fadeSteps = final.map { item -> [UInt32] in
             let finalColor = Color(hex: String(format: "%06x", item.cell.foreground))
@@ -173,7 +195,7 @@ public struct RingsEffect: Effect {
             }
             result += Array(repeating: frame(canvas: canvas, placed: placed), count: 10)
         }
-        result += Array(repeating: home, count: 11)
+        result += Array(repeating: home, count: finalHomeFrameCount)
         return result
     }
 

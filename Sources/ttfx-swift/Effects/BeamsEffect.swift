@@ -331,9 +331,14 @@ public struct BeamsEffect: Effect {
         var delay = 0
         enum Phase { case beams, finalWipe, complete }
         var phase = Phase.beams
-        var finalWipeGroups: [[Int]] = []
-        for sum in 2...(canvas.columns + canvas.rows) {
-            finalWipeGroups.append(characters.filter { $0.coordinate.column + (canvas.rows - $0.coordinate.row + 1) == sum }.map(\.id))
+        let minInputColumn = inputCoordinates.map(\.column).min()!
+        let maxInputRow = inputCoordinates.map(\.row).max()!
+        let inputCoordinateSet = Set(inputCoordinates)
+        let groupedInputIDs = Dictionary(grouping: characters.filter { inputCoordinateSet.contains($0.coordinate) }) { character in
+            (character.coordinate.column - minInputColumn) + (maxInputRow - character.coordinate.row)
+        }
+        var finalWipeGroups = groupedInputIDs.keys.sorted().map { key in
+            groupedInputIDs[key, default: []].map(\.id)
         }
         var frames: [[(Coordinate, Cell)]] = []
 
@@ -401,16 +406,6 @@ public struct BeamsEffect: Effect {
             frames.append(updateAndRender())
         }
 
-        if let firstInput = inputCoordinates.first,
-           let brightenIndex = frames.indices.dropFirst().first(where: { index in
-               guard let previous = frames[index - 1].first(where: { $0.0 == firstInput })?.1.foreground,
-                     let current = frames[index].first(where: { $0.0 == firstInput })?.1.foreground
-               else { return false }
-               return index > 8 && current > previous
-           }),
-           brightenIndex >= 2 {
-            frames.removeSubrange((brightenIndex - 2)..<brightenIndex)
-        }
         let finalInputColors = Dictionary(uniqueKeysWithValues: inputCoordinates.map { coordinate in
             (coordinate, rgb(finalMapping[coordinate] ?? options.finalGradientStops.last!))
         })

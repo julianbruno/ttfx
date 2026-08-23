@@ -1286,4 +1286,98 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func ringsEffectMatchesAFourByTwoIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 4, rows: 2)
+    let input = "AB\nCD"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "260",
+            "--seed", "5", "--ignore-terminal-dimensions", "--canvas-width", "4",
+            "--canvas-height", "2", "rings", "--ring-gap", "0.5", "--spin-duration", "1",
+            "--spin-speed", "1-1", "--disperse-duration", "1", "--spin-disperse-cycles", "1",
+            "--ring-colors", "ab48ff", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 194)
+    let status = try assertFrameParity(
+        RingsEffect(
+            configuration: .init(text: input, seed: 5),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 5,
+            ringsConfiguration: .init(
+                ringColors: [Color(hex: "ab48ff")],
+                ringGap: 0.5,
+                spinDuration: 1,
+                spinSpeed: 1...1,
+                disperseDuration: 1,
+                spinDisperseCycles: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "rings four-by-two independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) four-by-two rings frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func beamsEffectMatchesAThreeByThreeIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 3, rows: 3)
+    let input = "ABC\nDEF\nGHI"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "120",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "3",
+            "--canvas-height", "3", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 45)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams 3x3 independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) 3x3 beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }
