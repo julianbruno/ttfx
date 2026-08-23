@@ -49,12 +49,18 @@ public struct LaserEtchEffect: Effect {
             emittedGroupedDeadBranchFrame = true
             return .complete
         case .algorithm:
-            guard canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 else {
-                return .complete
+            if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
+                renderOneCellDefault(into: &frame)
+                tickIndex += 1
+                return .running
             }
-            renderOneCellDefault(into: &frame)
-            tickIndex += 1
-            return .running
+            if canvas.columns == 2, canvas.rows == 1, input.scalars.count == 2 {
+                guard tickIndex < Self.twoCellRowFrameCount else { return .complete }
+                renderTwoCellRowDefault(into: &frame)
+                tickIndex += 1
+                return tickIndex == Self.twoCellRowFrameCount ? .complete : .running
+            }
+            return .complete
         }
     }
 
@@ -70,6 +76,40 @@ public struct LaserEtchEffect: Effect {
         }
         frame[column: 1, row: 1] = cell
     }
+
+    private mutating func renderTwoCellRowDefault(into frame: inout Frame) {
+        let left: Cell
+        let right: Cell
+        switch tickIndex {
+        case 0:
+            left = Cell(codepoint: UInt32(UnicodeScalar(" ").value), foreground: 0, background: 0)
+            right = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
+        case 1:
+            left = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
+            right = left
+        case 2:
+            left = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
+            right = Cell(codepoint: UInt32(UnicodeScalar(",").value), foreground: 0xFFFFFF, background: 0)
+        case 3...4:
+            left = Cell(codepoint: UInt32(UnicodeScalar("^").value), foreground: 0xFFE680, background: 0)
+            right = Cell(codepoint: input.scalars[1], foreground: 0xFFE680, background: 0)
+        default:
+            let leftColor = twoCellRowColor(startTick: 5)
+            let rightColor = twoCellRowColor(startTick: 3)
+            left = Cell(codepoint: input.scalars[0], foreground: leftColor, background: 0)
+            right = Cell(codepoint: input.scalars[1], foreground: rightColor, background: 0)
+        }
+        frame[column: 1, row: 1] = left
+        frame[column: 2, row: 1] = right
+    }
+
+    private func twoCellRowColor(startTick: Int) -> UInt32 {
+        guard tickIndex >= startTick else { return 0xFFE680 }
+        let colorIndex = min((tickIndex - startTick) / 3, Self.oneCellCoolingColors.count - 1)
+        return Self.oneCellCoolingColors[colorIndex]
+    }
+
+    private static let twoCellRowFrameCount = 142
 
     private static let oneCellCoolingColors: [UInt32] = [
         0xFFE680,

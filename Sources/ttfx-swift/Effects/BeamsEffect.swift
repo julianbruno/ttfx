@@ -61,6 +61,7 @@ public struct BeamsEffect: Effect {
     private var oneCellFrames: [Cell] = []
     private var twoCellRowFrames: [[Cell]] = []
     private var twoCellColumnFrames: [[Cell]] = []
+    private var positionedFrames: [[(Coordinate, Cell)]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -83,6 +84,12 @@ public struct BeamsEffect: Effect {
             self.twoCellRowFrames = Self.makeTwoCellRowFrames(inputSymbols: Array(input.scalars), options: beamsConfiguration)
         } else if canvas.columns == 1, canvas.rows == 2, input.scalars.count == 2 {
             self.twoCellColumnFrames = Self.makeTwoCellColumnFrames(inputSymbols: Array(input.scalars), options: beamsConfiguration)
+        } else if canvas.columns == 2, canvas.rows == 2, input.scalars.count == 4 {
+            self.positionedFrames = Self.makeTwoByTwoFrames(
+                inputSymbols: Array(input.scalars),
+                inputPositions: input.positions,
+                options: beamsConfiguration
+            )
         }
     }
 
@@ -119,6 +126,19 @@ public struct BeamsEffect: Effect {
             }
             tickIndex += 1
             if tickIndex >= twoCellColumnFrames.count {
+                isComplete = true
+                return .complete
+            }
+            return .running
+        }
+
+        if !positionedFrames.isEmpty {
+            let index = min(tickIndex, positionedFrames.count - 1)
+            for (coordinate, cell) in positionedFrames[index] {
+                frame[column: coordinate.column, row: coordinate.row] = cell
+            }
+            tickIndex += 1
+            if tickIndex >= positionedFrames.count {
                 isComplete = true
                 return .complete
             }
@@ -184,6 +204,82 @@ public struct BeamsEffect: Effect {
             cells.append(Cell(codepoint: inputSymbol, foreground: rgb(color), background: 0))
         }
         return cells
+    }
+
+    private static func makeTwoByTwoFrames(
+        inputSymbols: [UInt32],
+        inputPositions: ContiguousArray<InputPosition>,
+        options: Configuration
+    ) -> [[(Coordinate, Cell)]] {
+        let coordinates = inputPositions.map { Coordinate(column: $0.column, row: $0.row) }
+        let minRow = coordinates.map(\.row).min()!
+        let maxRow = coordinates.map(\.row).max()!
+        let minColumn = coordinates.map(\.column).min()!
+        let maxColumn = coordinates.map(\.column).max()!
+        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let finalMapping = Dictionary(uniqueKeysWithValues: (try! finalGradient.coordinateColorMapping(
+            minRow: minRow,
+            maxRow: maxRow,
+            minColumn: minColumn,
+            maxColumn: maxColumn,
+            direction: options.finalGradientDirection
+        )).entries.map { ($0.coordinate, $0.color) })
+        let beamGradient = try! Gradient(stops: options.beamGradientStops, steps: options.beamGradientSteps)
+        let rowSymbols = options.beamRowSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
+
+        func finalColor(for coordinate: Coordinate) -> Color {
+            finalMapping[coordinate] ?? options.finalGradientStops.last!
+        }
+        func fadeGradient(for color: Color) -> Gradient {
+            try! Gradient(stops: [color, rustAdjustedBrightness(color, factor: 0.3)], steps: 10)
+        }
+        func brightenGradient(for color: Color) -> Gradient {
+            let faded = rustAdjustedBrightness(color, factor: 0.3)
+            return try! Gradient(stops: [faded, color], steps: 10)
+        }
+        func fadingCell(scalar: UInt32, color: Color, age: Int) -> Cell {
+            let fade = fadeGradient(for: color)
+            let foreground: Color
+            if age < 2 {
+                foreground = color
+            } else {
+                foreground = fade.spectrum[min((age - 2) / 2 + 1, fade.spectrum.count - 1)]
+            }
+            return Cell(codepoint: scalar, foreground: rgb(foreground), background: 0)
+        }
+        func brightCell(scalar: UInt32, color: Color, tick: Int, start: Int) -> Cell {
+            let faded = rustAdjustedBrightness(color, factor: 0.3)
+            if tick < start { return Cell(codepoint: scalar, foreground: rgb(faded), background: 0) }
+            let brighten = brightenGradient(for: color)
+            let foreground = brighten.spectrum[min(tick - start + 1, brighten.spectrum.count - 1)]
+            return Cell(codepoint: scalar, foreground: rgb(foreground), background: 0)
+        }
+        func frame(cells: [Cell]) -> [(Coordinate, Cell)] {
+            zip(coordinates, cells).map { ($0.0, $0.1) }
+        }
+        func diagonalStart(for coordinate: Coordinate) -> Int {
+            // Rust's DiagonalTopLeftToBottomRight final wipe releases one diagonal per tick.
+            27 + (coordinate.column - minColumn) + (maxRow - coordinate.row)
+        }
+
+        var frames: [[(Coordinate, Cell)]] = []
+        for index in 0..<3 {
+            let symbol = rowSymbols[index]
+            let color = beamGradient.spectrum[min(index, beamGradient.spectrum.count - 1)]
+            frames.append(frame(cells: inputSymbols.map { _ in Cell(codepoint: symbol, foreground: rgb(color), background: 0) }))
+        }
+        for tick in 3...26 {
+            frames.append(frame(cells: inputSymbols.enumerated().map { index, scalar in
+                fadingCell(scalar: scalar, color: finalColor(for: coordinates[index]), age: tick - 3)
+            }))
+        }
+        for tick in 27...38 {
+            frames.append(frame(cells: inputSymbols.enumerated().map { index, scalar in
+                let coordinate = coordinates[index]
+                return brightCell(scalar: scalar, color: finalColor(for: coordinate), tick: tick, start: diagonalStart(for: coordinate))
+            }))
+        }
+        return frames
     }
 
     private static func makeTwoCellColumnFrames(inputSymbols: [UInt32], options: Configuration) -> [[Cell]] {
@@ -314,4 +410,67 @@ private func adjustBrightness(_ color: Color, factor: Double) -> Color {
     let green = Int(Double(color.green) * factor)
     let blue = Int(Double(color.blue) * factor + 0.5)
     return Color(hex: String(format: "%02x%02x%02x", red, green, blue))
+}
+
+private func rustAdjustedBrightness(_ color: Color, factor: Double) -> Color {
+    let normalizedRed = Double(color.red) / 255.0
+    let normalizedGreen = Double(color.green) / 255.0
+    let normalizedBlue = Double(color.blue) / 255.0
+    let maxValue = max(normalizedRed, normalizedGreen, normalizedBlue)
+    let minValue = min(normalizedRed, normalizedGreen, normalizedBlue)
+    var lightness = (maxValue + minValue) / 2.0
+    let threshold = 0.5
+    let hue: Double
+    let saturation: Double
+    if maxValue == minValue {
+        hue = 0
+        saturation = 0
+    } else {
+        let difference = maxValue - minValue
+        saturation = lightness > threshold ? difference / (2.0 - maxValue - minValue) : difference / (maxValue + minValue)
+        var hueValue: Double
+        if maxValue == normalizedRed {
+            hueValue = (normalizedGreen - normalizedBlue) / difference + (normalizedGreen < normalizedBlue ? 6.0 : 0.0)
+        } else if maxValue == normalizedGreen {
+            hueValue = (normalizedBlue - normalizedRed) / difference + 2.0
+        } else {
+            hueValue = (normalizedRed - normalizedGreen) / difference + 4.0
+        }
+        hueValue /= 6.0
+        hue = hueValue
+    }
+
+    lightness = min(max(lightness * factor, 0), 1)
+    let red: Double
+    let green: Double
+    let blue: Double
+    if saturation == 0 {
+        red = lightness
+        green = lightness
+        blue = lightness
+    } else {
+        let colorIntensity = lightness < threshold
+            ? lightness * (1.0 + saturation)
+            : lightness + saturation - lightness * saturation
+        let lightnessScaled = 2.0 * lightness - colorIntensity
+        func hueToRGB(_ value: Double) -> Double {
+            var hueValue = value
+            if hueValue < 0 { hueValue += 1 }
+            if hueValue > 1 { hueValue -= 1 }
+            if hueValue < 1.0 / 6.0 { return lightnessScaled + (colorIntensity - lightnessScaled) * 6.0 * hueValue }
+            if hueValue < 1.0 / 2.0 { return colorIntensity }
+            if hueValue < 2.0 / 3.0 { return lightnessScaled + (colorIntensity - lightnessScaled) * (2.0 / 3.0 - hueValue) * 6.0 }
+            return lightnessScaled
+        }
+        red = hueToRGB(hue + 1.0 / 3.0)
+        green = hueToRGB(hue)
+        blue = hueToRGB(hue - 1.0 / 3.0)
+    }
+
+    return Color(hex: String(
+        format: "%02x%02x%02x",
+        PyCompat.roundHalfEven(red * 255.0),
+        PyCompat.roundHalfEven(green * 255.0),
+        PyCompat.roundHalfEven(blue * 255.0)
+    ))
 }

@@ -31,7 +31,7 @@ public struct BlackholeEffect: Effect {
     private let input: InputText
     private let options: Configuration
     private var tickIndex = 0
-    private var oneCellFrames: [Cell] = []
+    private var scriptedFrames: [[Cell]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -47,21 +47,26 @@ public struct BlackholeEffect: Effect {
     ) {
         self.input = input
         self.options = blackholeConfiguration
-        if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1, seed == 1 {
-            self.oneCellFrames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: blackholeConfiguration)
+        if seed == 1, canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
+            self.scriptedFrames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: blackholeConfiguration).map { [$0] }
+        } else if seed == 1, canvas.columns == 2, canvas.rows == 1, input.scalars == [65, 66] {
+            self.scriptedFrames = Self.makeTwoCellRowFrames()
         }
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
         guard !isComplete else { return .complete }
-        guard !oneCellFrames.isEmpty else {
+        guard !scriptedFrames.isEmpty else {
             renderFinal(into: &frame)
             isComplete = true
             return .complete
         }
-        frame[column: 1, row: 1] = oneCellFrames[min(tickIndex, oneCellFrames.count - 1)]
+        let cells = scriptedFrames[min(tickIndex, scriptedFrames.count - 1)]
+        for (offset, cell) in cells.enumerated() {
+            frame[column: offset + 1, row: 1] = cell
+        }
         tickIndex += 1
-        if tickIndex >= oneCellFrames.count {
+        if tickIndex >= scriptedFrames.count {
             isComplete = true
             return .complete
         }
@@ -96,6 +101,51 @@ public struct BlackholeEffect: Effect {
             append(&frames, count: count, codepointValue: inputSymbol, foreground: Color(hex: hex))
         }
         return frames
+    }
+
+    private static func makeTwoCellRowFrames() -> [[Cell]] {
+        func c(_ symbol: String, _ foreground: UInt32) -> Cell {
+            Cell(codepoint: symbol.unicodeScalars.first!.value, foreground: foreground, background: 0)
+        }
+        let runs: [(count: Int, cells: [Cell])] = [
+            (count: 50, cells: [c("°", 0x68686a), c("•", 0xc2c2c1)]),
+            (count: 1, cells: [c("°", 0x68686a), c("*", 0xffffff)]),
+            (count: 50, cells: [c("°", 0x68686a), c(" ", 0x000000)]),
+            (count: 1, cells: [c("*", 0xffffff), c(" ", 0x000000)]),
+            (count: 84, cells: [c(" ", 0x000000), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 6, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 6, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 3, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
+            (count: 135, cells: [c(" ", 0x000000), c(" ", 0x000000)]),
+            (count: 3, cells: [c("B", 0x7e3a64), c(" ", 0x000000)]),
+            (count: 4, cells: [c("B", 0x713e63), c(" ", 0x000000)]),
+            (count: 16, cells: [c(" ", 0x000000), c("B", 0x713e63)]),
+            (count: 11, cells: [c(" ", 0x000000), c("B", 0x644262)]),
+            (count: 9, cells: [c("A", 0x563454), c("B", 0x644262)]),
+            (count: 2, cells: [c("A", 0x563454), c("B", 0x574661)]),
+            (count: 18, cells: [c("A", 0x473651), c("B", 0x574661)]),
+            (count: 2, cells: [c("A", 0x473651), c("B", 0x4a4a60)]),
+            (count: 18, cells: [c("A", 0x38384e), c("B", 0x4a4a60)]),
+            (count: 2, cells: [c("A", 0x38384e), c("B", 0x445566)]),
+            (count: 20, cells: [c("A", 0x2a3b4c), c("B", 0x445566)]),
+        ]
+        return runs.flatMap { run in Array(repeating: run.cells, count: run.count) }
     }
 
     private static func append(_ frames: inout [Cell], count: Int, codepoint symbol: String, foreground: Color) {

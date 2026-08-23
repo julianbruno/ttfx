@@ -939,4 +939,213 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func beamsEffectMatchesACompleteTwoByTwoIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 2)
+    let input = "AB\nCD"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "2", "beams", "--beam-delay", "1",
+            "--beam-row-speed-range", "20-20", "--beam-column-speed-range", "20-20",
+            "--beam-gradient-stops", "ffffff", "00D1FF", "--beam-gradient-steps", "2",
+            "--beam-gradient-frames", "1", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-frames", "1", "--final-wipe-speed", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 39)
+    let status = try assertFrameParity(
+        BeamsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            beamsConfiguration: .init(
+                beamDelay: 1,
+                beamRowSpeedRange: 20...20,
+                beamColumnSpeedRange: 20...20,
+                beamGradientStops: [Color(hex: "ffffff"), Color(hex: "00D1FF")],
+                beamGradientSteps: [2],
+                beamGradientFrames: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientFrames: 1,
+                finalWipeSpeed: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "beams two-by-two independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-by-two beams frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func ringsEffectMatchesACompleteThreeByThreeIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 3, rows: 3)
+    let input = "ABC\nDEF\nGHI"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "220",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "3",
+            "--canvas-height", "3", "rings", "--ring-gap", "1", "--spin-duration", "1",
+            "--spin-speed", "1-1", "--disperse-duration", "1", "--spin-disperse-cycles", "1",
+            "--ring-colors", "ab48ff", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "vertical"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 194)
+    let status = try assertFrameParity(
+        RingsEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            ringsConfiguration: .init(
+                ringColors: [Color(hex: "ab48ff")],
+                ringGap: 1,
+                spinDuration: 1,
+                spinSpeed: 1...1,
+                disperseDuration: 1,
+                spinDisperseCycles: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .vertical
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "rings three-by-three independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) three-by-three rings frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func blackholeEffectMatchesACompleteTwoCellRowIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 1)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "800",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "1", "blackhole", "--blackhole-color", "ffffff",
+            "--star-colors", "ffcc0d", "--final-gradient-stops", "112233", "445566",
+            "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 489)
+    let status = try assertFrameParity(
+        BlackholeEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            blackholeConfiguration: .init(
+                blackholeColor: Color(hex: "ffffff"),
+                starColors: [Color(hex: "ffcc0d")],
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "blackhole two-cell row independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell row blackhole frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func laserEtchDefaultAlgorithmMatchesCompleteTwoCellRowRustRun() throws {
+    let canvas = try Canvas(columns: 2, rows: 1)
+    let input = "AB"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "160",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "2",
+            "--canvas-height", "1", "laseretch"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 142)
+    let status = try assertFrameParity(
+        LaserEtchEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "laseretch default two-cell row Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) two-cell default laseretch frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func synthGridEffectMatchesACompleteSmallGridIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 4, rows: 3)
+    let input = "AB\nCD"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "200",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "4",
+            "--canvas-height", "3", "synthgrid", "--grid-gradient-stops", "ffffff", "ffffff",
+            "--grid-gradient-steps", "1", "--text-gradient-stops", "112233", "112233",
+            "--text-gradient-steps", "1", "--text-generation-symbols", "x", "--max-active-blocks", "1"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 68)
+    let status = try assertFrameParity(
+        SynthGridEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            synthGridConfiguration: .init(
+                gridGradientStops: [Color(hex: "ffffff"), Color(hex: "ffffff")],
+                gridGradientSteps: [1],
+                textGradientStops: [Color(hex: "112233"), Color(hex: "112233")],
+                textGradientSteps: [1],
+                textGenerationSymbols: ["x"],
+                maxActiveBlocks: 1
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "synthgrid small-grid independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) small-grid synthgrid frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }
