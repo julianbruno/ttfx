@@ -11,6 +11,7 @@ public enum ProcessRunnerError: Error, Sendable {
     case launchFailed(String)
     case timedOut(TimeInterval)
     case nonzeroExit(Int32, stdout: Data, stderr: Data)
+    case unsupportedPlatform
 }
 
 public struct ProcessRunner: Sendable {
@@ -24,6 +25,7 @@ public struct ProcessRunner: Sendable {
         currentDirectory: URL?,
         timeout: TimeInterval
     ) throws -> ProcessResult {
+        #if os(macOS)
         guard executable.isFileURL, FileManager.default.isExecutableFile(atPath: executable.path) else {
             throw ProcessRunnerError.executableUnavailable(executable)
         }
@@ -68,6 +70,9 @@ public struct ProcessRunner: Sendable {
             throw ProcessRunnerError.nonzeroExit(result.exitCode, stdout: result.stdout, stderr: result.stderr)
         }
         return result
+        #else
+        throw ProcessRunnerError.unsupportedPlatform
+        #endif
     }
 }
 
