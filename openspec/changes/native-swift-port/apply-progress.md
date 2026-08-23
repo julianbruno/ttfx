@@ -1272,3 +1272,71 @@ Task 2.2 is now closed after the bounded slices were followed by non-bounded/gen
 
 - [x] 2.2 complete: geometry-heavy effects Beams, Rings, Blackhole, LaserEtch, OrbittingVolley, and SynthGrid have native Swift implementations with independent live Rust parity evidence and preserved quirk notes.
 - [ ] 2.3–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Task 2.3 Highlight Effect Evidence
+
+Added native Swift `HighlightEffect` for the Rust `highlight` algorithm. The implementation builds static final-gradient base colors, groups input characters by the configured highlight direction, applies the Rust `in_out_circ` 100-step sequence easer, keeps all characters visible before activation, and plays the HSL brightness-adjusted highlight scene without any production Rust subprocess, fixture reads, or frame-dump tables.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter highlightEffectMatchesAConfiguredIndependentRustRun` — exit 1; compile failed because `HighlightEffect` was absent. |
+| GREEN | `swift test --filter highlightEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed after native highlight implementation. |
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 150 --seed 7 --ignore-terminal-dimensions --canvas-width 7 --canvas-height 4 highlight --highlight-brightness 1.5 --highlight-direction diagonal_bottom_left_to_top_right --highlight-width 2 --final-gradient-stops 112233 445566 --final-gradient-steps 4 --final-gradient-direction horizontal` with stdin `AB\nCDE`; Rust emits exactly 117 frames. |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 41 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 95 Swift Testing tests passed. |
+| Rollback boundary | Revert `Sources/ttfx-swift/Effects/HighlightEffect.swift`, the highlight live-Rust test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and this section. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete until the remaining assigned task 2.3 effects have native Swift parity evidence.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.
+
+## Phase 2.3 MiddleoutEffect Work Unit
+
+This subunit implements the native Swift `middleout` effect only. It adds no Rust production subprocess, fixture table, or frame-dump table to production code; the dedicated parity test invokes live Rust through the existing argument-array `ProcessRunner` harness.
+
+### TDD Cycle Evidence
+
+| Work unit | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| `middleout` | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust frame parity | Existing effect parity harness and prior native effects compiled before adding `MiddleoutEffect`. | `swift test --filter middleoutEffectMatchesAConfiguredIndependentRustRun` exited 1 before source existed: compile failed with `cannot find 'MiddleoutEffect' in scope` plus contextual initializer/member inference errors. | The same command exited 0 after adding `Sources/ttfx-swift/Effects/MiddleoutEffect.swift`; live Rust emitted 68 configured frames and Swift matched every frame byte-for-byte with completion at frame 68. | `swift test --filter EffectFrameParityTests` exercised the full live/fixture effect parity suite including middleout and existing effects. | Corrected the terminal six-frame final-color hold to match Rust's full scene duration, then reran focused parity. |
+
+### Work Unit Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Focused middleout test | `swift test --filter middleoutEffectMatchesAConfiguredIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 41 Swift Testing tests passed. |
+| Full suite | `swift test` — exit 0; 95 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/MiddleoutEffect.swift`, revert the middleout test addition in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`, and remove this progress section. |
+
+### Middleout Implementation Notes
+
+`MiddleoutEffect` reproduces Rust's two-phase center-line expansion followed by full expansion, center/full movement speeds and easings, starting color, coordinate-mapped final gradient, center calculation, collision winner ordering by input iteration, and the Rust full-scene terminal color hold. The live parity test covers a horizontal configured run with explicit speeds, easings, starting color, final stops/steps, and horizontal final-gradient direction.
+
+## Task 2.3 Waves Native Swift Slice
+
+This slice adds a native Swift `WavesEffect` backed by a live Rust one-cell parity gate. The implementation ports the Rust wave/final scene timing, cyclic symbol/color distribution, wave-direction group releases, coordinate final-gradient mapping, painter ordering, and the scene-completion quirk where a one-frame wave immediately activates the final scene before the rendered frame. Production Swift does not invoke Rust and does not read fixture/frame-dump tables.
+
+### TDD Cycle Evidence
+
+| Slice | Test file | Layer | Safety net | RED | GREEN | Triangulate | Refactor |
+|---|---|---|---|---|---|---|---|
+| Waves 1x1 live Rust parity | `tests/ttfx-effectsTests/EffectFrameParityTests.swift` | Live Rust parity | Task 2.2 closure tests were present; no production Waves source existed. | `swift test --filter wavesEffectMatchesACompleteOneCellIndependentRustRun` — exit 1 after adding the RED test; compile failed with `cannot find 'WavesEffect' in scope`. | Same command — exit 0; 1 Swift Testing test passed after adding `Sources/ttfx-swift/Effects/WavesEffect.swift`. | `swift test --filter EffectFrameParityTests` — exit 0; 41 Swift Testing tests passed, including the new Waves live Rust run and all existing effect parity gates. | Kept the port effect-local; no shared Core or Rust code change was needed. |
+
+### Validation Evidence
+
+| Evidence | Exact result |
+|---|---|
+| Live Rust oracle | The new test invokes `/usr/bin/env cargo run --quiet -- --parity-dump --max-frames 80 --seed 1 --ignore-terminal-dimensions --canvas-width 1 --canvas-height 1 waves --wave-symbols x --wave-gradient-stops ffffff --wave-gradient-steps 1 --wave-count 1 --wave-length 1 --final-gradient-stops 112233 445566 --final-gradient-steps 2 --final-gradient-direction horizontal` from the repository root with stdin `A`; Rust emits 31 frames through the test harness. |
+| Focused Waves test | `swift test --filter wavesEffectMatchesACompleteOneCellIndependentRustRun` — exit 0; 1 Swift Testing test passed. |
+| Effect parity suite | `swift test --filter EffectFrameParityTests` — exit 0; 41 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 95 Swift Testing tests passed. |
+| Diff hygiene | `git diff --check` — exit 0. |
+| Rollback boundary | Remove `Sources/ttfx-swift/Effects/WavesEffect.swift`; revert the Waves test in `tests/ttfx-effectsTests/EffectFrameParityTests.swift`; and remove this section. Keep task 2.2 closure evidence and prior effect implementations. |
+
+### Task State
+
+- [ ] 2.3 remains incomplete unless/until the orchestrator records the remaining task 2.3 effect coverage beyond Waves.
+- [ ] 2.4–2.5 and all Phase 3–5 tasks remain untouched.

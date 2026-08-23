@@ -1526,4 +1526,139 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func highlightEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nCDE"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "150",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "highlight", "--highlight-brightness", "1.5",
+            "--highlight-direction", "diagonal_bottom_left_to_top_right", "--highlight-width", "2",
+            "--final-gradient-stops", "112233", "445566", "--final-gradient-steps", "4",
+            "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(expectedFrames.count == 117)
+    let status = try assertFrameParity(
+        HighlightEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            highlightConfiguration: .init(
+                highlightBrightness: 1.5,
+                highlightDirection: .diagonalBottomLeftToTopRight,
+                highlightWidth: 2,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [4],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "highlight configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured highlight frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func middleoutEffectMatchesAConfiguredIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 7, rows: 4)
+    let input = "AB\nC"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "100",
+            "--seed", "7", "--ignore-terminal-dimensions", "--canvas-width", "7",
+            "--canvas-height", "4", "middleout", "--expand-direction", "horizontal",
+            "--center-movement-speed", "1.0", "--full-movement-speed", "1.0",
+            "--center-easing", "out_sine", "--full-easing", "in_out_sine",
+            "--starting-color", "112233", "--final-gradient-stops", "445566", "778899",
+            "--final-gradient-steps", "3", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        MiddleoutEffect(
+            configuration: .init(text: input, seed: 7),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 7,
+            middleoutConfiguration: .init(
+                startingColor: Color(hex: "112233"),
+                expandDirection: .horizontal,
+                centerMovementSpeed: 1.0,
+                fullMovementSpeed: 1.0,
+                centerEasing: .outSine,
+                fullEasing: .inOutSine,
+                finalGradientStops: [Color(hex: "445566"), Color(hex: "778899")],
+                finalGradientSteps: [3],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "middleout configured independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) configured middleout frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
+@Test func wavesEffectMatchesACompleteOneCellIndependentRustRun() throws {
+    let canvas = try Canvas(columns: 1, rows: 1)
+    let input = "A"
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/usr/bin/env"),
+        arguments: [
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "80",
+            "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
+            "--canvas-height", "1", "waves", "--wave-symbols", "x",
+            "--wave-gradient-stops", "ffffff", "--wave-gradient-steps", "1",
+            "--wave-count", "1", "--wave-length", "1", "--final-gradient-stops",
+            "112233", "445566", "--final-gradient-steps", "2", "--final-gradient-direction", "horizontal"
+        ],
+        stdin: Data(input.utf8),
+        environment: ProcessInfo.processInfo.environment,
+        currentDirectory: repositoryRoot(),
+        timeout: 30
+    )
+    let expectedFrames = try FrameDumpDecoder.decode(result.stdout)
+    #expect(!expectedFrames.isEmpty)
+    let status = try assertFrameParity(
+        WavesEffect(
+            configuration: .init(text: input, seed: 1),
+            canvas: canvas,
+            input: canvas.ingest(input),
+            seed: 1,
+            wavesConfiguration: .init(
+                waveSymbols: ["x"],
+                waveGradientStops: [Color(hex: "ffffff")],
+                waveGradientSteps: [1],
+                waveCount: 1,
+                waveLength: 1,
+                finalGradientStops: [Color(hex: "112233"), Color(hex: "445566")],
+                finalGradientSteps: [2],
+                finalGradientDirection: .horizontal
+            )
+        ),
+        expectedFrames: expectedFrames,
+        canvas: canvas,
+        name: "waves one-cell independent Rust run"
+    )
+    #expect(status.finalStatus == .complete, "Rust emitted \(expectedFrames.count) one-cell waves frames")
+    #expect(status.firstCompletionTick == expectedFrames.count)
+}
+
 }
