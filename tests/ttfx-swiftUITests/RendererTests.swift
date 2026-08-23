@@ -63,3 +63,35 @@ import TTFXCore
     #expect(!availability.message.isEmpty)
     #expect(availability.isAvailable || availability.message.contains("unavailable"))
 }
+
+@Test func metalUploadPlanPacksGlyphCellsInStableRowMajorOrder() throws {
+    var frame = try Frame(columns: 2, rows: 1)
+    frame[column: 1, row: 1] = Cell(codepoint: UInt32(UnicodeScalar("Z").value), foreground: 0x112233, background: 0x445566)
+    frame[column: 2, row: 1] = Cell(codepoint: UInt32(UnicodeScalar("Ω").value), foreground: 0xaabbcc, background: 0)
+    let snapshot = TTFXFrameSnapshot(frame: frame)
+
+    let plan = TTFXMetalFrameUploadPlan(snapshot: snapshot, cellSize: TTFXMetalCellSize(width: 8, height: 16))
+
+    #expect(plan.columns == 2)
+    #expect(plan.rows == 1)
+    #expect(plan.cellCount == 2)
+    #expect(plan.byteCount == MemoryLayout<TTFXMetalGlyphCell>.stride * 2)
+    #expect(plan.cells.map(\.codepoint) == [UInt32(UnicodeScalar("Z").value), UInt32(UnicodeScalar("Ω").value)])
+    #expect(plan.cells.map(\.cellOriginX) == [0, 8])
+    #expect(plan.cells.map(\.cellOriginY) == [0, 0])
+    #expect(plan.cells[0].foregroundRGB == 0x112233)
+    #expect(plan.cells[0].backgroundRGB == 0x445566)
+}
+
+@Test func metalCommandPlanIsDeterministicWithoutRequiringAHeadlessGPU() throws {
+    var frame = try Frame(columns: 1, rows: 1)
+    frame[column: 1, row: 1] = Cell(codepoint: UInt32(UnicodeScalar("M").value), foreground: 0xffffff, background: 0)
+    let snapshot = TTFXFrameSnapshot(frame: frame)
+    let uploadPlan = TTFXMetalFrameUploadPlan(snapshot: snapshot, cellSize: TTFXMetalCellSize(width: 10, height: 20))
+
+    let commandPlan = TTFXMetalCommandPlan(uploadPlan: uploadPlan, drawableSize: TTFXMetalDrawableSize(width: 10, height: 20), canEncodeGPUCommands: false)
+
+    #expect(commandPlan.operations == [.allocateGlyphCellBuffer(bytes: uploadPlan.byteCount), .uploadGlyphCells(count: 1), .skipGPUEncoding(reason: "Metal device or drawable unavailable in headless test environment")])
+    #expect(commandPlan.drawableSize.width == 10)
+    #expect(commandPlan.uploadPlan.cells[0].codepoint == UInt32(UnicodeScalar("M").value))
+}

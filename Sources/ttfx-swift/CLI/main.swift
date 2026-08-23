@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import TTFXCore
 import TTFXEffects
 
 public enum ExistingColorHandling: String, ExpressibleByArgument, Equatable, Sendable {
@@ -168,22 +169,132 @@ public struct TTFXCLI: ParsableCommand {
             guard !candidates.isEmpty else {
                 throw ValidationError("No effects available after filtering.")
             }
+            if parityDump {
+                try dumpParity(effectName: candidates[0])
+                return
+            }
             print("Swift renderer pending for random effect selection")
             return
         }
-        guard effectName != nil else {
+        guard let effectName else {
             throw ValidationError("No effect specified.")
         }
-        print("Swift ANSI rendering is implemented in Phase 3.2; CLI parsing selected '\(selectedEffectName!)'.")
+        if parityDump {
+            try dumpParity(effectName: effectName)
+            return
+        }
+        try runTerminalStream(effectName: effectName)
     }
 
+    public static let completionOptionNames: [String] = [
+        "--version",
+        "--input-file",
+        "--tab-width",
+        "--xterm-colors",
+        "--no-color",
+        "--terminal-background-color",
+        "--existing-color-handling",
+        "--wrap-text",
+        "--frame-rate",
+        "--canvas-width",
+        "--canvas-height",
+        "--anchor-canvas",
+        "--anchor-text",
+        "--ignore-terminal-dimensions",
+        "--reuse-canvas",
+        "--no-eol",
+        "--no-restore-cursor",
+        "--seed",
+        "--print-completion",
+        "--random-effect",
+        "--include-effects",
+        "--exclude-effects",
+        "--help"
+    ]
+
     public static func completionScript(for shell: CompletionShell) -> String {
+        let effects = TTFXEffectRegistry.names.joined(separator: " ")
+        let options = completionOptionNames.joined(separator: " ")
         switch shell {
         case .bash:
-            return "# bash completion for ttfx\n_ttfx_effects=\"\(TTFXEffectRegistry.names.joined(separator: " "))\""
+            return """
+            # bash completion for ttfx
+            _ttfx() {
+                local cur
+                COMPREPLY=()
+                cur="${COMP_WORDS[COMP_CWORD]}"
+
+                if [[ "$cur" == -* ]]; then
+                    COMPREPLY=( $(compgen -W "\(options)" -- "$cur") )
+                else
+                    COMPREPLY=( $(compgen -W "\(effects)" -- "$cur") )
+                fi
+                return 0
+            }
+            complete -F _ttfx ttfx
+            """
         case .zsh:
-            return "#compdef ttfx\n# zsh completion for ttfx\nlocal -a effects=(\(TTFXEffectRegistry.names.joined(separator: " ")))"
+            let zshOptions = completionOptionNames
+                .map { "'\($0)'" }
+                .joined(separator: " \\n    ")
+            return """
+            #compdef ttfx
+            # zsh completion for ttfx
+            local -a effects
+            effects=(\(effects))
+            _arguments \
+                \(zshOptions) \
+                '*:effect:($effects)'
+            """
         }
+    }
+
+
+
+    static func runForTesting(arguments: [String], standardInput: Data) throws -> Data {
+        let cli = try parse(arguments)
+        return try cli.renderOutput(standardInput: standardInput)
+    }
+
+    func renderOutput(standardInput: Data) throws -> Data {
+        let selected: String
+        if randomEffect {
+            guard let first = randomEffectCandidates().first else {
+                throw ValidationError("No effects available after filtering.")
+            }
+            selected = first
+        } else if let effectName {
+            selected = effectName
+        } else {
+            throw ValidationError("No effect specified.")
+        }
+
+        let text = try inputText(standardInput: standardInput)
+        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
+        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
+        let canvas = try Canvas(columns: columns, rows: rows)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let input = canvas.ingest(text)
+        var effect = try makeEffect(named: selected, configuration: configuration, canvas: canvas, input: input)
+        var output = Data()
+        let limit = parityDump || m0Dump ? (maxFrames ?? UInt64.max) : 1
+        var emitted: UInt64 = 0
+        while emitted < limit {
+            var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
+            let status = effect.tick(into: &frame)
+            let bytes = terminalBytes(for: frame)
+            if parityDump || m0Dump {
+                output.append(Data("\(bytes.count)\n".utf8))
+                output.append(bytes)
+                output.append(10)
+            } else {
+                output.append(bytes)
+                if !terminalOptions.noEOL { output.append(10) }
+            }
+            emitted += 1
+            if status == .complete { break }
+        }
+        return output
     }
 
     public func randomEffectCandidates() -> [String] {
@@ -195,6 +306,116 @@ public struct TTFXCLI: ParsableCommand {
             names = names.filter { !excludeEffects.contains($0) }
         }
         return names
+    }
+}
+
+private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
+
+private extension TTFXCLI {
+    func runTerminalStream(effectName: String) throws {
+        let text = try inputText()
+        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
+        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
+        let canvas = try Canvas(columns: columns, rows: rows)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let input = canvas.ingest(text)
+        var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
+        var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
+        var status = effect.tick(into: &frame)
+        while status == .running {
+            status = effect.tick(into: &frame)
+        }
+        FileHandle.standardOutput.write(terminalBytes(for: frame))
+        if !terminalOptions.noEOL {
+            FileHandle.standardOutput.write(Data("\n".utf8))
+        }
+    }
+
+    func dumpParity(effectName: String) throws {
+        let text = try inputText()
+        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
+        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
+        let canvas = try Canvas(columns: columns, rows: rows)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let input = canvas.ingest(text)
+        var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
+        var emitted: UInt64 = 0
+        let limit = maxFrames ?? UInt64.max
+        while emitted < limit {
+            var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
+            let status = effect.tick(into: &frame)
+            writeParityFrame(frame)
+            emitted += 1
+            if status == .complete { break }
+        }
+        FileHandle.standardError.write(Data("frames=\(emitted)\n".utf8))
+    }
+
+    func inputText(standardInput: Data) throws -> String {
+        if let inputFile {
+            return String(decoding: try Data(contentsOf: URL(fileURLWithPath: inputFile)), as: UTF8.self)
+        }
+        return String(decoding: standardInput, as: UTF8.self)
+    }
+
+    func inputText() throws -> String {
+        let data: Data
+        if let inputFile {
+            data = try Data(contentsOf: URL(fileURLWithPath: inputFile))
+        } else {
+            data = FileHandle.standardInput.readDataToEndOfFile()
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    func makeEffect(named name: String, configuration: EffectConfiguration, canvas: Canvas, input: InputText) throws -> any Effect {
+        guard let effect = EffectRegistry.makeEffect(
+            named: name,
+            configuration: configuration,
+            canvas: canvas,
+            input: input,
+            seed: configuration.seed
+        ) else {
+            throw ValidationError("unknown effect '\(name)'")
+        }
+        return effect
+    }
+
+
+    func writeParityFrame(_ frame: Frame) {
+        let bytes = terminalBytes(for: frame)
+        FileHandle.standardOutput.write(Data("\(bytes.count)\n".utf8))
+        FileHandle.standardOutput.write(bytes)
+        FileHandle.standardOutput.write(Data("\n".utf8))
+    }
+
+    func terminalBytes(for frame: Frame) -> Data {
+        var output = Data()
+        for row in stride(from: frame.rows, through: 1, by: -1) {
+            for column in 1...frame.columns {
+                let cell = frame[column: column, row: row]
+                if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
+                    let red = cell.foreground >> 16
+                    let green = (cell.foreground >> 8) & 0xFF
+                    let blue = cell.foreground & 0xFF
+                    output.append(Data("\u{1B}[38;2;\(red);\(green);\(blue)m".utf8))
+                }
+                output.append(Data(String(UnicodeScalar(cell.codepoint) ?? " ").utf8))
+                if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
+                    output.append(Data("\u{1B}[0m".utf8))
+                }
+            }
+            if row != 1 { output.append(10) }
+        }
+        return output
+    }
+
+    func inferredColumns(from text: String) -> Int {
+        max(1, text.split(separator: "\n", omittingEmptySubsequences: false).map(\.count).max() ?? 1)
+    }
+
+    func inferredRows(from text: String) -> Int {
+        max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
     }
 }
 

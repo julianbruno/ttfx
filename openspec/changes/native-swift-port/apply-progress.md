@@ -1731,21 +1731,21 @@ Tasks 2.3, 2.4, and 2.5 are closed after adding native Swift effect implementati
 
 ## Phase 4 SwiftUI Renderer/Gallery Work Unit
 
-This work unit implements the native SwiftUI-facing renderer slice without adding app-bundle complexity. The Metal path is intentionally a platform shell: it reports whether a default Metal device is available and keeps headless CI/tests protocol-backed through `TTFXFrameRenderer` and `TTFXDeterministicRenderer`.
+This work unit implements the native SwiftUI-facing renderer slice without adding app-bundle complexity. The Metal path now creates a default Metal device/command queue when the platform provides one, exposes deterministic glyph-cell upload and command plans for headless tests, and bridges snapshots into an `MTKView` representable. GPU presentation remains a visual integration limitation because CI/headless tests do not own a drawable-backed renderer.
 
 ### TDD Cycle Evidence
 
 | Work unit | Test file | Layer | RED | GREEN | Triangulate/Refactor |
 |---|---|---|---|---|---|
-| SwiftUI renderer/gallery | `tests/ttfx-swiftUITests/RendererTests.swift` | SwiftUI model/unit | `swift test --filter TTFXSwiftUITests` exited 1 because `TTFXFrameSnapshot`, `TTFXGallery`, `TTFXDeterministicRenderer`, and `TTFXMetalRendererAvailability` did not exist. | `swift test --filter TTFXSwiftUITests` exited 0 with 4 Swift Testing tests passed after adding the `TTFXSwiftUI` target, frame snapshot mapping, deterministic gallery, scheduler, SwiftUI views, and Metal availability shell. | `swift test` exited 0 with 129 tests passed. `git diff --check` exited 0. The Metal test asserts availability messaging only; it does not require a real device in headless runs. |
+| SwiftUI renderer/gallery | `tests/ttfx-swiftUITests/RendererTests.swift` | SwiftUI model/unit | Initial Phase 4 RED: `swift test --filter TTFXSwiftUITests` exited 1 because `TTFXFrameSnapshot`, `TTFXGallery`, `TTFXDeterministicRenderer`, and `TTFXMetalRendererAvailability` did not exist. Metal hardening RED: `swift test --filter TTFXSwiftUITests` exited 1 because `TTFXMetalFrameUploadPlan`, `TTFXMetalCellSize`, `TTFXMetalGlyphCell`, `TTFXMetalCommandPlan`, and `TTFXMetalDrawableSize` did not exist. | Metal hardening GREEN: `swift test --filter TTFXSwiftUITests` exited 0 with 6 Swift Testing tests passed after adding glyph-cell packing, upload/command plans, device/command-queue-backed renderer preparation, and the MetalKit SwiftUI bridge. | Headless triangulation asserts deterministic buffer bytes, glyph order, origins, colors, and a no-drawable skip command plan. Real GPU drawing is not claimed by tests because the package test runner has no controlled drawable. |
 
 ### Work Unit Evidence
 
 | Evidence | Exact result |
 |---|---|
-| Focused RED command | `swift test --filter TTFXSwiftUITests` — exit 1; compile failures for absent SwiftUI renderer/gallery symbols. |
-| Focused GREEN command | `swift test --filter TTFXSwiftUITests` — exit 0; 4 Swift Testing tests passed. |
-| Full Swift suite | `swift test` — exit 0; 129 Swift Testing tests passed. |
+| Focused RED command | `swift test --filter TTFXSwiftUITests` — exit 1; compile failures for absent Metal upload/command-plan symbols. |
+| Focused GREEN command | `swift test --filter TTFXSwiftUITests` — exit 0; 6 Swift Testing tests passed. |
+| Full Swift suite | `swift test` — exit 0; 141 Swift Testing tests passed. |
 | Diff whitespace | `git diff --check` — exit 0. |
 | Rollback boundary | Revert `Package.swift`, remove `Sources/ttfx-swift/SwiftUI/`, remove `tests/ttfx-swiftUITests/`, and remove this section plus Phase 4 checkboxes. |
 
@@ -1754,7 +1754,9 @@ This work unit implements the native SwiftUI-facing renderer slice without addin
 - `TTFXFrameSnapshot` maps `TTFXCore.Frame` into stable top-to-bottom renderable cells and text lines suitable for snapshot tests and SwiftUI display.
 - `TTFXGallery` records a deterministic 37-effect demo list with stable IDs, sample text, seed, and canvas dimensions. `TTFXGalleryView` presents that list without an app target.
 - `TTFXDeterministicRenderer` provides protocol-backed real-time tick scheduling and skips frames inside the configured interval while preserving the most recent fixed-capacity snapshot.
-- `TTFXMetalRendererAvailability` and `TTFXMetalRenderer` are conditional shells around Metal availability. They do not claim GPU drawing parity because real Metal rendering is not exercised headlessly.
+- `TTFXMetalFrameUploadPlan` packs each snapshot into stable `TTFXMetalGlyphCell` records with deterministic byte counts, glyph codepoints, RGB colors, and cell origins for headless buffer tests.
+- `TTFXMetalRenderer` conditionally creates a Metal device and command queue, prepares shared glyph buffers/command buffers when available, and still returns a deterministic skip operation when no drawable/device is available.
+- `TTFXMetalFrameView` bridges snapshots into `MTKView` on supported SwiftUI platforms. It prepares the renderer plan during draw callbacks; it does not claim visual GPU parity in headless tests.
 
 ### Task State
 
@@ -1762,3 +1764,67 @@ This work unit implements the native SwiftUI-facing renderer slice without addin
 - [x] 4.2 complete: deterministic gallery/demo model and view.
 - [x] 4.3 complete: snapshot, scheduling/fixed-capacity, gallery, and Metal availability tests.
 - [ ] Phase 3 and Phase 5 tasks remain outside this work unit.
+
+## Phase 3.3/3.4 Native CLI Runtime Work Unit
+
+The CLI now executes native Swift effects by registry name and emits length-prefixed parity-dump frames without invoking the Rust production subprocess. `EffectRegistry.makeEffect` maps all 37 Rust registry names to the existing Swift effect implementations with default `EffectConfiguration`, canvas-ingested stdin text, and the selected seed. The executable entrypoint reads stdin or `--input-file`, builds a native canvas, ticks the selected effect, and writes either rendered frame bytes or parity-dump `length\nframe\n` records.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter CLIRuntimeTests` — exit 1 before production runtime wiring; compile failed because `TTFXCLI.runForTesting` did not exist. |
+| GREEN | `swift test --filter CLIRuntimeTests` — exit 0; 1 Swift Testing test passed, iterating every `TTFXEffectRegistry.names` entry with `--parity-dump --max-frames 1 --canvas-width 1 --canvas-height 1 --seed 1 <effect>` and stdin `A`, decoding exactly one non-empty length-prefixed frame for each effect. |
+| Full suite | `swift run ttfx --help` — exit 0 and emitted help with the 37 effect names. `swift test` — exit 0; 140 Swift Testing tests passed. `git diff --check` — exit 0. |
+| Scope note | `openspec/changes/native-swift-port/tasks.md` was not changed in this delegated work unit; the native runtime acceptance is covered, but the orchestrator should decide whether the broader task wording requiring Rust stream-parity tests is satisfied by the existing effect parity suite plus this no-Rust CLI runtime test. |
+
+### Exact Work Unit Inventory
+
+| File | Action | Responsibility |
+|---|---|---|
+| `Sources/ttfx-swift/CLI/main.swift` | Modified | Replaced the parser-only placeholder with native stdin/input-file runtime execution, parity-dump framing, testable runtime entrypoint, default canvas fallback, seed propagation, and ANSI render options. |
+| `Sources/ttfx-swift/Effects/TTFXEffects.swift` | Modified | Added the 37-name registry factory mapping every Rust registry name to the existing Swift `Effect` implementation. |
+| `tests/ttfx-cliTests/CLIRuntimeTests.swift` | Created | Added registry-wide native CLI runtime coverage for one length-prefixed parity frame per effect without a production Rust subprocess. |
+| `openspec/changes/native-swift-port/apply-progress.md` | Modified | Recorded this work-unit evidence and left task checkbox ownership to the orchestrator. |
+
+## Phase 3.4 Executable Entrypoint and Completions Evidence
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter CLIParsingTests` — exit 1 after adding bash/zsh completion contract tests; failures showed bash lacked `complete -F _ttfx ttfx`, zsh lacked `_arguments`, and both scripts omitted global options while only listing effects. |
+| GREEN | `swift test --filter CLIParsingTests` — exit 0; 7 Swift Testing tests passed, including bash and zsh scripts with stable `ttfx` command name, all 37 effects, all public global options, and hidden parity flags excluded. |
+| Runtime entrypoint | `swift run ttfx --print-completion bash` — exit 0; built product `ttfx` and printed a bash completion function ending in `complete -F _ttfx ttfx` with all global options and effect names. `swift run ttfx --help` — exit 0; help used `USAGE: ttfx` and listed all 37 effects in overview/argument text. |
+| Full suite | `swift test` — exit 0; 141 Swift Testing tests passed. |
+
+### Implementation Notes
+
+- Completion generation remains native Swift and uses the in-process effect registry; no production Rust subprocess fallback was added.
+- Bash completions complete global options for dash-prefixed words and effect names otherwise.
+- Zsh completions declare `#compdef ttfx`, list the same public options through `_arguments`, and complete the positional effect from the 37-effect registry.
+
+### Task State
+
+- [x] 3.4 complete: executable `ttfx` prints bash completions and help through the Swift entrypoint; bash/zsh completion metadata covers all public global options and all 37 effect names.
+- [ ] 3.3 and Phase 5 tasks remain outside this work unit.
+
+## Phase 3.3 CLI Parity Dump Integration Work Unit
+
+The Swift executable now executes native effect implementations for hidden `--parity-dump` mode, reading stdin or `--input-file`, constructing the configured canvas/seed/input, and writing Rust-compatible length-prefixed UTF-8 terminal frames. The CLI parity path stays native Swift only; tests use live Rust only as an oracle.
+
+| Evidence | Exact result |
+|---|---|
+| RED | `swift test --filter CLIParityDumpTests/swiftParityDumpMatchesLiveRustForFocusedEffects` — exit 1 after adding the CLI integration tests. For `print`, `wipe`, and `expand`, Swift stdout was the placeholder parsing message and failed equality with live Rust; decoding Swift stdout failed with `FrameDumpError.invalidLength`. An initial attempt using `swift run` inside the test timed out and was corrected to execute the already-built `.build/debug/ttfx` binary before recording this behavior RED. |
+| GREEN | `swift test --filter CLIParityDumpTests/swiftParityDumpMatchesLiveRustForFocusedEffects` — exit 0; 3 Swift Testing cases passed, comparing Swift CLI hidden `--parity-dump` stdout byte-for-byte with live Rust for `print`, `wipe`, and nontrivial `expand`. |
+| TRIANGULATE | `swift test --filter CLIParityDumpTests/swiftParityDumpDecodesForEveryRustEffectName` — exit 0; all 37 Rust effect names emitted one nonempty length-prefixed Swift CLI frame decodable by `FrameDumpDecoder`. |
+| Focused CLI suite | `swift test --filter CLI` — exit 0; 7 Swift Testing tests passed across parsing, hidden flags, registry, focused Rust stream parity, and the 37-effect smoke matrix. |
+| Full suite | `swift test` — exit 0; 141 Swift Testing tests passed. |
+| Diff whitespace | `git diff --check` — exit 0. |
+| Scope limitation | Exact live-Rust byte parity is asserted for `print`, `wipe`, and `expand`; all 37 effects are smoke-tested for CLI dump shape, not full-stream byte equality. Effect-specific option parity remains outside this 3.3 slice. |
+| Rollback boundary | Remove `tests/ttfx-cliTests/CLIParityDumpTests.swift`; revert the `--parity-dump` execution/factory additions in `Sources/ttfx-swift/CLI/main.swift`; revert task checkbox 3.3 and remove this section. |
+
+### Exact Work Unit Inventory
+
+| File | Action | Responsibility |
+|---|---|---|
+| `tests/ttfx-cliTests/CLIParityDumpTests.swift` | Created | CLI integration tests invoking the built Swift executable, comparing focused live-Rust stream bytes, and smoke-decoding all 37 effect dumps. |
+| `Sources/ttfx-swift/CLI/main.swift` | Modified | Native Swift `--parity-dump` runtime path, stdin/input-file ingestion, effect factory for all registry names, and Rust-compatible length-prefixed terminal-frame output. |
+| `openspec/changes/native-swift-port/tasks.md` | Modified | Marked task 3.3 complete after focused parity and smoke tests passed. |
+| `openspec/changes/native-swift-port/apply-progress.md` | Modified | Recorded Phase 3.3 strict-TDD evidence, limitations, and rollback boundary. |
