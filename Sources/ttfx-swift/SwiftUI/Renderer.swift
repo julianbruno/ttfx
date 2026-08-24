@@ -37,6 +37,11 @@ public struct TTFXMetalRendererAvailability: Equatable, Sendable {
     public let isAvailable: Bool
     public let message: String
 
+    public init(isAvailable: Bool, message: String) {
+        self.isAvailable = isAvailable
+        self.message = message
+    }
+
     public static var current: TTFXMetalRendererAvailability {
         #if canImport(Metal)
         if TTFXMetalRenderer.hasDefaultDevice {

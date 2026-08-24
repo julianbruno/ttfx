@@ -1,0 +1,347 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B7CC1D9C946D67C65744BDA /* TTFXGalleryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C068E59BDD282F8F8F10A61F /* TTFXGalleryViewModel.swift */; };
+		1A328730ACB73F4C7A555F1D /* TTFXGalleryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1A631E7B30174DA2629663A /* TTFXGalleryApp.swift */; };
+		D3E0A6BEEFF47C3DF3B4FAF8 /* ttfx-swift in Frameworks */ = {isa = PBXBuildFile; productRef = 0CCFB5480E07682B9198E0F3 /* ttfx-swift */; };
+		E735A0B8444CF8188471490E /* TTFXGalleryRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BE6E2619978EB2C97EBFE8C1 /* TTFXGalleryRootView.swift */; };
+		F99F968B24A9E438BC3B458D /* TTFXSwiftUI in Frameworks */ = {isa = PBXBuildFile; productRef = 3E9D0F4A6C4C4F7ACA203CA3 /* TTFXSwiftUI */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		57A0935D7B92250D5676DF84 /* ttfx */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ttfx; path = .; sourceTree = SOURCE_ROOT; };
+		BE6E2619978EB2C97EBFE8C1 /* TTFXGalleryRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTFXGalleryRootView.swift; sourceTree = "<group>"; };
+		C068E59BDD282F8F8F10A61F /* TTFXGalleryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTFXGalleryViewModel.swift; sourceTree = "<group>"; };
+		E1A631E7B30174DA2629663A /* TTFXGalleryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TTFXGalleryApp.swift; sourceTree = "<group>"; };
+		E47BBEC112D76E41B1DB9804 /* TTFXGalleryApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TTFXGalleryApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		339670226E609355E62A0F33 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D3E0A6BEEFF47C3DF3B4FAF8 /* ttfx-swift in Frameworks */,
+				F99F968B24A9E438BC3B458D /* TTFXSwiftUI in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		086B575E6AB0830E9955D05B /* TTFXGalleryApp */ = {
+			isa = PBXGroup;
+			children = (
+				E1A631E7B30174DA2629663A /* TTFXGalleryApp.swift */,
+				BE6E2619978EB2C97EBFE8C1 /* TTFXGalleryRootView.swift */,
+				C068E59BDD282F8F8F10A61F /* TTFXGalleryViewModel.swift */,
+			);
+			name = TTFXGalleryApp;
+			path = "Sources/ttfx-swift/SwiftUI/TTFXGalleryApp";
+			sourceTree = "<group>";
+		};
+		A907424957D7D94C23041D18 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				57A0935D7B92250D5676DF84 /* ttfx */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		DCC37211B1D1951BF92A8F81 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E47BBEC112D76E41B1DB9804 /* TTFXGalleryApp.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		EC7B5ED0D60090D5D447493C = {
+			isa = PBXGroup;
+			children = (
+				A907424957D7D94C23041D18 /* Packages */,
+				086B575E6AB0830E9955D05B /* TTFXGalleryApp */,
+				DCC37211B1D1951BF92A8F81 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		63C89830AE529F4F33C6CF1D /* TTFXGalleryApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DC5D29BE1B33EF1C8F14AD59 /* Build configuration list for PBXNativeTarget "TTFXGalleryApp" */;
+			buildPhases = (
+				6B477E64E662B4FD2F3FD3A6 /* Sources */,
+				339670226E609355E62A0F33 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TTFXGalleryApp;
+			packageProductDependencies = (
+				0CCFB5480E07682B9198E0F3 /* ttfx-swift */,
+				3E9D0F4A6C4C4F7ACA203CA3 /* TTFXSwiftUI */,
+			);
+			productName = TTFXGalleryApp;
+			productReference = E47BBEC112D76E41B1DB9804 /* TTFXGalleryApp.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		3EA4FC2EE26EBC2EE04D5C3A /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = 328A7257B20097CFF1AA43C9 /* Build configuration list for PBXProject "TTFXGalleryApp" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EC7B5ED0D60090D5D447493C;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				EB468564CA513CDAFF1DAE1E /* XCLocalSwiftPackageReference "." */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = DCC37211B1D1951BF92A8F81 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				63C89830AE529F4F33C6CF1D /* TTFXGalleryApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		6B477E64E662B4FD2F3FD3A6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				1A328730ACB73F4C7A555F1D /* TTFXGalleryApp.swift in Sources */,
+				E735A0B8444CF8188471490E /* TTFXGalleryRootView.swift in Sources */,
+				0B7CC1D9C946D67C65744BDA /* TTFXGalleryViewModel.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		65160A8911409B1592FA0E1A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "TTFX Gallery";
+				INFOPLIST_KEY_CFBundleIdentifier = codes.suscodigos.ttfx.gallery;
+				INFOPLIST_KEY_CFBundleName = TTFXGalleryApp;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = codes.suscodigos.ttfx.gallery;
+				PRODUCT_NAME = TTFXGalleryApp;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		99F9FD2F564B2C322AA332E9 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "TTFX Gallery";
+				INFOPLIST_KEY_CFBundleIdentifier = codes.suscodigos.ttfx.gallery;
+				INFOPLIST_KEY_CFBundleName = TTFXGalleryApp;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				PRODUCT_BUNDLE_IDENTIFIER = codes.suscodigos.ttfx.gallery;
+				PRODUCT_NAME = TTFXGalleryApp;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		A1C5F137453ADBA7E039DEA5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A4ED2C686E5ED42EAD221C8A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		328A7257B20097CFF1AA43C9 /* Build configuration list for PBXProject "TTFXGalleryApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1C5F137453ADBA7E039DEA5 /* Debug */,
+				A4ED2C686E5ED42EAD221C8A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DC5D29BE1B33EF1C8F14AD59 /* Build configuration list for PBXNativeTarget "TTFXGalleryApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65160A8911409B1592FA0E1A /* Debug */,
+				99F9FD2F564B2C322AA332E9 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		EB468564CA513CDAFF1DAE1E /* XCLocalSwiftPackageReference "." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = .;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0CCFB5480E07682B9198E0F3 /* ttfx-swift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = "ttfx-swift";
+		};
+		3E9D0F4A6C4C4F7ACA203CA3 /* TTFXSwiftUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = TTFXSwiftUI;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 3EA4FC2EE26EBC2EE04D5C3A /* Project object */;
+}

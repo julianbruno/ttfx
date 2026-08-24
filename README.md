@@ -156,6 +156,23 @@ swift run ttfx --print-completion bash
 swift run ttfx --print-completion zsh
 ```
 
+The package also includes a macOS-first SwiftUI gallery app for native effect previewing:
+
+```sh
+swift build --product TTFXGalleryApp
+xcodegen generate
+open TTFXGalleryApp.xcodeproj   # select the TTFXGalleryApp scheme and My Mac, then Run
+```
+
+The SwiftPM executable is kept for package build/test coverage. The XcodeGen project is the
+standalone macOS `.app` launch path because it provides the required bundle identifier
+`codes.suscodigos.ttfx.gallery`.
+
+`TTFXGalleryApp` lists `EffectRegistry.names` in registry order, lets you edit text, seed,
+canvas bounds, effect selection, and playback, and renders through the native SwiftUI snapshot
+path with deterministic fallback status for headless environments. iOS Simulator launch support
+is deferred until it can share the lifecycle without extra project wiring.
+
 The Swift package currently exposes:
 
 | Area | Current status |

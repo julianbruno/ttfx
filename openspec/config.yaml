@@ -76,20 +76,16 @@ rules:
     - Keep each task independently verifiable and compatible with one pull request.
     - Pair every behavior task with its RED test and verification command.
   apply:
-    tdd: true
-    test_command: swift test
-    guidelines:
-      - Follow RED-GREEN-REFACTOR without skipping the failing-test proof.
-      - Restore an executable Swift test baseline before implementing Swift behavior.
-      - Follow existing code patterns and keep existing Rust parity behavior intact.
-      - Do not run receipt-driven development or any review lifecycle.
+    - Follow RED-GREEN-REFACTOR without skipping the failing-test proof.
+    - Use `swift test` as the default Swift implementation test command.
+    - Restore an executable Swift test baseline before implementing Swift behavior.
+    - Follow existing code patterns and keep existing Rust parity behavior intact.
+    - Do not run receipt-driven development or any review lifecycle.
   verify:
-    test_command: ./bin/test && swift test
-    build_command: cargo build && swift build
-    coverage_threshold: 0
-    guidelines:
-      - Report unavailable or failing capabilities explicitly; never claim skipped checks passed.
-      - Verify the implementation against proposal, specifications, design, and completed tasks.
+    - Run `./bin/test && swift test` for full verification when available.
+    - Run `cargo build && swift build` for build verification when available.
+    - Report unavailable or failing capabilities explicitly; never claim skipped checks passed.
+    - Verify the implementation against proposal, specifications, design, and completed tasks.
   archive:
     - Warn before merging destructive deltas.
     - Preserve the archived change as an immutable audit trail.

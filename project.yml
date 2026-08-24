@@ -1,0 +1,39 @@
+name: TTFXGalleryApp
+options:
+  bundleIdPrefix: codes.suscodigos.ttfx
+  deploymentTarget:
+    macOS: "14.0"
+packages:
+  ttfx-swift:
+    path: .
+targets:
+  TTFXGalleryApp:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Sources/ttfx-swift/SwiftUI/TTFXGalleryApp
+    dependencies:
+      - package: ttfx-swift
+        product: ttfx-swift
+      - package: ttfx-swift
+        product: TTFXSwiftUI
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: codes.suscodigos.ttfx.gallery
+        PRODUCT_NAME: TTFXGalleryApp
+        INFOPLIST_KEY_CFBundleName: TTFXGalleryApp
+        INFOPLIST_KEY_CFBundleDisplayName: TTFX Gallery
+        INFOPLIST_KEY_CFBundleIdentifier: codes.suscodigos.ttfx.gallery
+        GENERATE_INFOPLIST_FILE: YES
+        SWIFT_VERSION: 6.0
+        MACOSX_DEPLOYMENT_TARGET: 14.0
+schemes:
+  TTFXGalleryApp:
+    build:
+      targets:
+        TTFXGalleryApp: all
+    run:
+      config: Debug
+    test:
+      config: Debug

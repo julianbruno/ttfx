@@ -20,6 +20,10 @@ let package = Package(
         .executable(
             name: "ttfx",
             targets: ["TTFXCLI"]
+        ),
+        .executable(
+            name: "TTFXGalleryApp",
+            targets: ["TTFXGalleryApp"]
         )
     ],
     dependencies: [
@@ -41,7 +45,17 @@ let package = Package(
                 "TTFXCore",
                 "TTFXEffects"
             ],
-            path: "Sources/ttfx-swift/SwiftUI"
+            path: "Sources/ttfx-swift/SwiftUI",
+            exclude: ["TTFXGalleryApp"]
+        ),
+        .executableTarget(
+            name: "TTFXGalleryApp",
+            dependencies: [
+                "TTFXCore",
+                "TTFXEffects",
+                "TTFXSwiftUI"
+            ],
+            path: "Sources/ttfx-swift/SwiftUI/TTFXGalleryApp"
         ),
         .executableTarget(
             name: "TTFXCLI",
@@ -71,6 +85,11 @@ let package = Package(
             name: "TTFXSwiftUITests",
             dependencies: ["TTFXSwiftUI"],
             path: "tests/ttfx-swiftUITests"
+        ),
+        .testTarget(
+            name: "TTFXGalleryAppTests",
+            dependencies: ["TTFXGalleryApp"],
+            path: "tests/TTFXGalleryAppTests"
         )
     ]
 )
