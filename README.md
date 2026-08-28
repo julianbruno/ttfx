@@ -2,6 +2,14 @@
 
 Terminal text effects as a single static binary. Pipe text in, pick an effect:
 
+> [!NOTE]
+> **Swift port work in progress.** This repository now includes an experimental native Swift port
+> beside the Rust CLI: `TTFXCore`, `TTFXEffects`, `TTFXSwiftUI`, and a macOS-first
+> `TTFXGalleryApp` for previewing effects from Xcode. The Swift code is being built as a parity
+> port of the existing implementation, not as a replacement for the production Rust binary yet.
+> Start with [`docs/swift-port/swift-port-architecture.md`](docs/swift-port/swift-port-architecture.md)
+> if you want to understand how the Swift modules map back to the original Rust code.
+
 ```sh
 ls -la | ttfx decrypt
 cat banner.txt | ttfx beams
