@@ -17,8 +17,8 @@ import TTFXEffects
 
 @MainActor
 @Test func rootViewUsesLargePreviewArea() throws {
-    #expect(TTFXGalleryRootView.previewMinimumWidth >= 200)
-    #expect(TTFXGalleryRootView.previewMinimumHeight >= 200)
+    #expect(TTFXGalleryRootView.previewMinimumWidth >= 640)
+    #expect(TTFXGalleryRootView.previewMinimumHeight >= 480)
 }
 
 @MainActor
@@ -48,8 +48,8 @@ import TTFXEffects
 @Test func previewFontSizeIsConfigurableAndClampedToSafeBounds() throws {
     var model = try TTFXGalleryViewModel(metalAvailability: .init(isAvailable: false, message: "headless"))
 
-    #expect(model.previewFontSize == TTFXGalleryViewModel.defaultPreviewFontSize)
-    #expect(model.previewFontSize > 16)
+    #expect(model.previewFontSize == 48)
+    #expect(TTFXGalleryViewModel.defaultPreviewFontSize == 48)
 
     model.setPreviewFontSize(4)
     #expect(model.previewFontSize == TTFXGalleryViewModel.minimumPreviewFontSize)
@@ -59,6 +59,37 @@ import TTFXEffects
 
     model.setPreviewFontSize(28)
     #expect(model.previewFontSize == 28)
+
+    model.incrementPreviewFontSize()
+    #expect(model.previewFontSize == 29)
+
+    model.decrementPreviewFontSize()
+    #expect(model.previewFontSize == 28)
+}
+
+@Test func previewCanvasSizeScalesWithCanvasAndFontControls() throws {
+    let small = TTFXGalleryRootView.visiblePreviewMinimumSize(canvasWidth: 24, canvasHeight: 8, fontSize: 48)
+    let wide = TTFXGalleryRootView.visiblePreviewMinimumSize(canvasWidth: 48, canvasHeight: 8, fontSize: 48)
+    let tall = TTFXGalleryRootView.visiblePreviewMinimumSize(canvasWidth: 24, canvasHeight: 16, fontSize: 48)
+
+    #expect(small.width >= TTFXGalleryRootView.previewMinimumWidth)
+    #expect(small.height >= TTFXGalleryRootView.previewMinimumHeight)
+    #expect(wide.width > small.width)
+    #expect(tall.height > small.height)
+}
+
+@Test func canvasControlStepsReinitializeRenderedPreview() throws {
+    var model = try TTFXGalleryViewModel(metalAvailability: .init(isAvailable: false, message: "headless"))
+    let initialSummary = model.previewSummary
+
+    model.incrementCanvasWidth()
+    model.incrementCanvasHeight()
+
+    #expect(model.canvasWidth == 25)
+    #expect(model.canvasHeight == 9)
+    #expect(model.previewSummary != initialSummary)
+    #expect(model.previewSummary == "print seed 42 canvas 25x9")
+    #expect(model.currentSnapshot.visibleTextLines.count == 9)
 }
 
 @Test func loopPlaybackResetsAtDeterministicFrameBudgetAndContinuesOnlyWhenEnabled() throws {

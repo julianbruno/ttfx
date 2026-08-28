@@ -2,9 +2,9 @@ import SwiftUI
 import TTFXSwiftUI
 
 public struct TTFXGalleryRootView: View {
-    public static let controlsMinimumWidth = 280.0
-    public static let previewMinimumWidth = 200.0
-    public static let previewMinimumHeight = 340.0
+    nonisolated public static let controlsMinimumWidth = 300.0
+    nonisolated public static let previewMinimumWidth = 640.0
+    nonisolated public static let previewMinimumHeight = 480.0
 
     nonisolated public static func visiblePreviewLines(snapshot: TTFXFrameSnapshot, sampleText: String) -> [String] {
         visiblePreviewLines(visibleTextLines: snapshot.visibleTextLines, sampleText: sampleText)
@@ -17,6 +17,12 @@ public struct TTFXGalleryRootView: View {
             return lines.isEmpty ? [""] : lines
         }
         return visibleTextLines
+    }
+
+    nonisolated public static func visiblePreviewMinimumSize(canvasWidth: Int, canvasHeight: Int, fontSize: Double) -> CGSize {
+        let width = max(previewMinimumWidth, Double(canvasWidth) * fontSize * 0.68 + 32)
+        let height = max(previewMinimumHeight, Double(canvasHeight) * fontSize * 1.2 + 32)
+        return CGSize(width: width, height: height)
     }
 
     public static let accessibilityLabels = [
@@ -55,10 +61,18 @@ public struct TTFXGalleryRootView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     GroupBox("Preview") {
-                        preview
-                            .accessibilityLabel("TTFX preview")
-                            .accessibilityValue("\(viewModel.previewSummary) rendering \(viewModel.sampleText)")
-                            .frame(minWidth: Self.previewMinimumWidth, maxWidth: .infinity, minHeight: Self.previewMinimumHeight, alignment: .topLeading)
+                        ScrollView([.horizontal, .vertical]) {
+                            preview
+                                .accessibilityLabel("TTFX preview")
+                                .accessibilityValue("\(viewModel.previewSummary) rendering \(viewModel.sampleText)")
+                                .frame(
+                                    minWidth: visiblePreviewMinimumSize.width,
+                                    minHeight: visiblePreviewMinimumSize.height,
+                                    alignment: .topLeading
+                                )
+                                .padding(8)
+                        }
+                        .frame(minWidth: Self.previewMinimumWidth, maxWidth: .infinity, minHeight: Self.previewMinimumHeight, alignment: .topLeading)
                     }
 
                     Text(viewModel.rendererStatus)
@@ -69,10 +83,18 @@ public struct TTFXGalleryRootView: View {
             }
         }
         .padding()
-        .frame(minWidth: 860, minHeight: 560)
+        .frame(minWidth: 1120, minHeight: 760)
         .onReceive(Timer.publish(every: Double(viewModel.frameIntervalMilliseconds) / 1000.0, on: .main, in: .common).autoconnect()) { _ in
             viewModel.advanceFrame()
         }
+    }
+
+    private var visiblePreviewMinimumSize: CGSize {
+        Self.visiblePreviewMinimumSize(
+            canvasWidth: viewModel.canvasWidth,
+            canvasHeight: viewModel.canvasHeight,
+            fontSize: viewModel.previewFontSize
+        )
     }
 
     @ViewBuilder
@@ -127,21 +149,19 @@ public struct TTFXGalleryRootView: View {
 
             GridRow {
                 Text("Canvas")
-                HStack {
-                    TextField("Canvas width", value: Binding(get: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Stepper("Width: \(viewModel.canvasWidth) columns", value: Binding(get: {
                         viewModel.canvasWidth
                     }, set: { newValue in
                         viewModel.setCanvasWidth(newValue)
-                    }), format: .number)
+                    }), in: TTFXGalleryViewModel.minimumCanvasColumns...TTFXGalleryViewModel.maximumCanvasColumns)
                     .accessibilityLabel("Canvas width")
 
-                    Text("×")
-
-                    TextField("Canvas height", value: Binding(get: {
+                    Stepper("Height: \(viewModel.canvasHeight) rows", value: Binding(get: {
                         viewModel.canvasHeight
                     }, set: { newValue in
                         viewModel.setCanvasHeight(newValue)
-                    }), format: .number)
+                    }), in: TTFXGalleryViewModel.minimumCanvasRows...TTFXGalleryViewModel.maximumCanvasRows)
                     .accessibilityLabel("Canvas height")
                 }
             }
@@ -158,11 +178,11 @@ public struct TTFXGalleryRootView: View {
 
             GridRow {
                 Text("Font size")
-                TextField("Preview font size", value: Binding(get: {
-                    viewModel.previewFontSize
+                Stepper("\(Int(viewModel.previewFontSize)) pt", value: Binding(get: {
+                    Int(viewModel.previewFontSize)
                 }, set: { newValue in
-                    viewModel.setPreviewFontSize(newValue)
-                }), format: .number)
+                    viewModel.setPreviewFontSize(Double(newValue))
+                }), in: Int(TTFXGalleryViewModel.minimumPreviewFontSize)...Int(TTFXGalleryViewModel.maximumPreviewFontSize))
                 .accessibilityLabel("Preview font size")
             }
 

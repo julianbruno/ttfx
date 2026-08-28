@@ -20,6 +20,7 @@
 - Updated the app-local visible preview to display the text-field content directly when present, while retaining snapshot fallback for empty input.
 - Moved controls into a fixed-width `Controls` sidebar beside the preview so the effect picker remains visible instead of being lost above the larger preview area.
 - Made the visible preview prefer rendered effect snapshot lines whenever the selected effect produces non-blank output, falling back to the text-field content only for blank frames so effect selection/playback can visibly change the preview.
+- Increased the default configurable preview font to 48 pt, enlarged the preview region to 640×480 minimum, made preview canvas sizing scale from canvas columns/rows and font size, and replaced fragile canvas/font text fields with steppers so canvas changes immediately reinitialize the rendered preview.
 
 ## Strict TDD evidence
 
@@ -80,6 +81,8 @@
 - GREEN after selector layout fix: `swift test --filter TTFXGalleryAppTests` — exit 0, 12 tests passed; `swift build --product TTFXGalleryApp` — exit 0; `xcodebuild -project TTFXGalleryApp.xcodeproj -scheme TTFXGalleryApp -destination 'generic/platform=macOS' build` — exit 0.
 - RED after dynamic-preview feedback: focused tests failed because the visible preview had no public rendered-line selection seam and always showed literal text-field content.
 - GREEN after dynamic-preview fix: `swift test --filter TTFXGalleryAppTests` — exit 0, 14 tests passed; `swift build --product TTFXGalleryApp` — exit 0; `xcodebuild -project TTFXGalleryApp.xcodeproj -scheme TTFXGalleryApp -destination 'generic/platform=macOS' build` — exit 0.
+- RED after preview/canvas sizing feedback: focused tests failed because default font was not 48 pt, preview minimum size stayed below the requested larger canvas, no canvas-size-to-preview-size seam existed, and model had no step methods for immediate canvas/font controls.
+- GREEN after preview/canvas sizing fix: `swift test --filter TTFXGalleryAppTests` — exit 0, 16 tests passed; `swift build --product TTFXGalleryApp` — exit 0; `openspec validate standalone-swift-gui-app --strict` — exit 0; `xcodebuild -project TTFXGalleryApp.xcodeproj -scheme TTFXGalleryApp -destination 'generic/platform=macOS' build` — exit 0.
 - Changed-line budget check: changed/new files are approximately 1125 lines plus small tracked diffs and generated Xcode project metadata, below the 6000-line single-PR budget.
 
 ## Remaining tasks

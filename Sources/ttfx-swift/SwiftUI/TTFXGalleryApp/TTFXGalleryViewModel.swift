@@ -48,8 +48,8 @@ public struct TTFXGalleryViewModel {
     public static let minimumFramesPerSecond = 1
     public static let maximumFramesPerSecond = 120
     public static let minimumPreviewFontSize = 12.0
-    public static let maximumPreviewFontSize = 72.0
-    public static let defaultPreviewFontSize = 24.0
+    public static let maximumPreviewFontSize = 144.0
+    public static let defaultPreviewFontSize = 48.0
     public static let minimumLoopFrameBudget = 1
 
     public let effectNames: [String]
@@ -131,6 +131,22 @@ public struct TTFXGalleryViewModel {
         reinitializeRenderer()
     }
 
+    public mutating func incrementCanvasWidth() {
+        setCanvasWidth(canvasWidth + 1)
+    }
+
+    public mutating func decrementCanvasWidth() {
+        setCanvasWidth(canvasWidth - 1)
+    }
+
+    public mutating func incrementCanvasHeight() {
+        setCanvasHeight(canvasHeight + 1)
+    }
+
+    public mutating func decrementCanvasHeight() {
+        setCanvasHeight(canvasHeight - 1)
+    }
+
     public mutating func setFramesPerSecond(_ framesPerSecond: Int) {
         self.framesPerSecond = Self.clamp(framesPerSecond, lower: Self.minimumFramesPerSecond, upper: Self.maximumFramesPerSecond)
         reinitializeRenderer()
@@ -138,6 +154,14 @@ public struct TTFXGalleryViewModel {
 
     public mutating func setPreviewFontSize(_ previewFontSize: Double) {
         self.previewFontSize = Self.clamp(previewFontSize, lower: Self.minimumPreviewFontSize, upper: Self.maximumPreviewFontSize)
+    }
+
+    public mutating func incrementPreviewFontSize() {
+        setPreviewFontSize(previewFontSize + 1)
+    }
+
+    public mutating func decrementPreviewFontSize() {
+        setPreviewFontSize(previewFontSize - 1)
     }
 
     public mutating func setLooping(_ isLooping: Bool) {
