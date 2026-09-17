@@ -11,8 +11,8 @@ struct ComparisonRootView: View {
     @State private var selection: String? = "print"
     @State private var search = ""
     @State private var error: String?
-    @State private var showSwiftCLI = true
-    @State private var showSwiftUI = true
+    @SceneStorage("comparison.showSwiftCLI") private var showSwiftCLI = true
+    @SceneStorage("comparison.showSwiftUI") private var showSwiftUI = true
     @State private var player = ComparisonPlayer()
     private var names: [String] { EffectRegistry.names.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) } }
     var body: some View {
@@ -49,12 +49,7 @@ struct ComparisonRootView: View {
                         Text("\(manifest.columns) × \(manifest.rows) · \(manifest.fps) fps · seed \(manifest.seed)")
                             .foregroundStyle(.secondary)
                     }
-                    Toggle("Show Swift CLI", isOn: $showSwiftCLI)
-                        .toggleStyle(.switch)
-                        .help("Show or hide the pure-Swift CLI ANSI replay pane.")
-                    Toggle("Show SwiftUI", isOn: $showSwiftUI)
-                        .toggleStyle(.switch)
-                        .help("Show or hide the right SwiftUI comparison pane.")
+                    ComparisonTrackControls(showSwiftCLI: $showSwiftCLI, showSwiftUI: $showSwiftUI)
                     HStack(alignment: .top, spacing: 18) {
                         videoPane("Rust terminal", video: effect.rust, avPlayer: player.rust, manifest: manifest)
                         videoPane("Swift Metal", video: effect.metal, avPlayer: player.metal, manifest: manifest)

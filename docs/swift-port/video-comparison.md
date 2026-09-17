@@ -46,7 +46,7 @@ For each selected effect, the app shows four synchronized panes:
 
 Use **Play** or Space to play/pause, and scrub the shared timeline. All present videos use the same host clock. If one video ends earlier, it holds its final frame while the others continue.
 
-The Swift CLI and SwiftUI panes are independently optional: **Show Swift CLI** and **Show SwiftUI** hide or show them. Older libraries missing `swiftCLI` show a CLI missing-recording notice. If an old two-track library has no `swiftui.mp4` or `swiftUI` manifest entries, the app keeps the right pane as a missing-recording notice until the library is regenerated.
+The **Optional panes** group contains independent **Swift CLI** and **SwiftUI** toggle buttons. Each shows **Visible** with a checkmark or **Hidden** with an empty circle, so state does not rely on color. Use ⌘1 for Swift CLI and ⌘2 for SwiftUI, or focus either control and activate it with the keyboard. Hover for renderer details; VoiceOver announces the pane name and visibility. The group wraps when space is limited. Visibility belongs to the window and is restored with its scene, not saved as a global preference. Rust terminal and Swift Metal always remain visible. Older libraries missing `swiftCLI` show a CLI missing-recording notice. If an old two-track library has no `swiftui.mp4` or `swiftUI` manifest entries, the app keeps the right pane as a missing-recording notice until the library is regenerated.
 
 ## What gets generated
 

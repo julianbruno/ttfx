@@ -157,3 +157,22 @@ import Foundation
         try TTFXVideoCapture.ansiDump(binary: binary.path, name: "print", text: "", fps: 25, seed: 42, cap: 2, output: output, label: "Swift CLI")
     }
 }
+
+@Test func optionalTrackControlsExplainIndependentVisibility() {
+    let cli = OptionalComparisonTrack.swiftCLI
+    let ui = OptionalComparisonTrack.swiftUI
+    #expect(cli.title == "Swift CLI")
+    #expect(ui.title == "SwiftUI")
+    #expect(cli.symbol == "terminal")
+    #expect(ui.symbol == "macwindow")
+    #expect(cli.shortcut == "1")
+    #expect(ui.shortcut == "2")
+    #expect(cli.visibilityLabel(isVisible: true) == "Visible")
+    #expect(cli.visibilityLabel(isVisible: false) == "Hidden")
+    #expect(cli.accessibilityLabel == "Swift CLI comparison pane")
+    #expect(ui.accessibilityLabel == "SwiftUI comparison pane")
+    #expect(cli.help(isVisible: true).contains("Hide"))
+    #expect(ui.help(isVisible: false).contains("Show"))
+    #expect(cli.detail.contains("ANSI"))
+    #expect(ui.detail.contains("fallback"))
+}
