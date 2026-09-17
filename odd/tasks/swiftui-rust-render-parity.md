@@ -15,7 +15,7 @@ English artifacts. Strict TDD enabled by explicit user request and AGENTS.md: ob
 ## Tasks
 - [x] T01 Fix production grid renderer and capture metrics with pixel-level regression tests; update docs. Checks: swift test --filter 'TTFXSwiftUITests|TTFXComparisonTests|TTFXGalleryAppTests'; swift test --no-parallel. Record RED/GREEN and work-unit commit.
 - [x] T03 Preserve Rust terminal default-white and explicit-black sentinel semantics with RED/GREEN pixel regressions; rerun focused and serial suites.
-- [ ] T02 Regenerate local comparison videos; verify dimensions, frames and representative visual output against Rust. Record runtime evidence and work-unit commit for tracked evidence.
+- [x] T02 Regenerate local comparison videos; verify dimensions, frames and representative visual output against Rust. Record runtime evidence and work-unit commit for tracked evidence.
 
 ## Acceptance
 SwiftUI preserves each cell's foreground/background, blank backgrounds, grid coordinates, Menlo glyph size and canvas placement matching Rust export. Gallery fallback remains usable. Videos use genuine SwiftUI rendering, not copied Rust/Metal pixels.
@@ -40,10 +40,22 @@ Exploration confirmed plain Text lines drop colors and ignore export cell metric
 - `swift test --no-parallel`: 198 tests in 5 suites passed (112.920 seconds).
 - Runtime: T02 initial regeneration exposed white rectangles in beams frame 50; fix addresses the exact sentinel cause. Final regenerated proof pending.
 - Rollback: revert terminal color resolution, its regression test and recording-doc sentence only.
-- Work-unit commit: pending creation.
+- Work-unit commit: `f097908`.
+
+### T02 evidence
+- `.build/debug/TTFXVideoCapture`: regenerated all 37 effects, 111 videos, all complete; GPU required approved local escalation after sandbox reported unavailable.
+- Metadata: `/opt/homebrew/bin/ffprobe -v error -select_streams v:0 -show_entries stream=width,height,nb_frames,r_frame_rate -of json <video>` checked every track against manifest: 384 × 192, 25 FPS, exact frame counts.
+- Runtime comparison: decoded first/middle/final frame per effect using `/opt/homebrew/bin/ffmpeg -v error -i <video> -vf select=eq(n\,FRAME) -frames:v 1 -f rawvideo -pix_fmt rgb24 -`; compared Rust/SwiftUI RGB across 111 samples.
+- Maximum sampled mean absolute channel error: 0.4347/255 (synthgrid frame 192); largest count of pixels with any channel delta >40: 8/73,728. Remaining tiny differences are rasterization/encoding tolerance, not a byte-identical-video claim.
+- Screenshot effect: errorcorrect frame 60 matched placement/colors/glyph scale (initial RGB MAE 0.097); beams sentinel regression now visually matches Rust with no white rectangles.
+- Local ignored evidence: `artifacts/video-comparison/swiftui-parity-check.json`, `swiftui-parity-errorcorrect.png` (Rust/Metal/SwiftUI), `swiftui-parity-beams.png` (Rust/SwiftUI).
+- Rollback: generated library can be regenerated from previous renderer; tracked evidence doc can be reverted without touching code.
+- Work-unit commit: pending evidence commit.
+- RDD off (global), no native review executed. No remote, push or PR operations.
 
 ## Next step
-T02 regenerate all 37 effects after T03, verify all 111 video metadata records and sample first/middle/final Rust/SwiftUI frames.
+Parent final independent check/readback and Engram synchronization. No implementation work remains; Metal sentinel discrepancy is preexisting and outside SwiftUI scope.
+
 
 
 
