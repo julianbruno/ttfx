@@ -1,14 +1,18 @@
 # ttfx
 
-Terminal text effects as a single static binary. Pipe text in, pick an effect:
+Terminal text effects as a single static binary. Pipe text in, pick an effect.
+
+This repository now carries a three-generation port lineage:
+
+1. **Original:** [TerminalTextEffects](https://github.com/ChrisBuilds/terminaltexteffects) (TTE), the Python project by **ChrisBuilds**.
+2. **First port:** `ttfx`, a Rust parity port by **37signals / omacom-io**, built as a dependency-free terminal binary.
+3. **Current native port work:** a Swift parity port of the Rust port, developed in this same repository through `TTFXCore`, `TTFXEffects`, `TTFXSwiftUI`, `TTFXGalleryApp`, and the video-comparison tooling.
 
 > [!NOTE]
-> **Swift port work in progress.** This repository now includes an experimental native Swift port
-> beside the Rust CLI: `TTFXCore`, `TTFXEffects`, `TTFXSwiftUI`, and `TTFXGalleryApp` (macOS and
-> iOS Simulator) for previewing effects from Xcode. The Swift code is being built as a parity
-> port of the existing implementation, not as a replacement for the production Rust binary yet.
-> Start with [`docs/swift-port/swift-port-architecture.md`](docs/swift-port/swift-port-architecture.md)
-> if you want to understand how the Swift modules map back to the original Rust code.
+> **Swift port work in progress.** The Swift code is being built as a parity port of the Rust implementation,
+> which is itself a parity port of the original Python TTE project. It does not replace the production Rust
+> binary yet. Start with [`docs/swift-port/swift-port-architecture.md`](docs/swift-port/swift-port-architecture.md)
+> if you want to understand how the Swift modules map back to the Rust code and, through it, to TTE.
 
 ```sh
 ls -la | ttfx decrypt
@@ -21,12 +25,20 @@ git log --oneline -10 | ttfx matrix
 
 ## Credit where it's due
 
-**This is a port of [TerminalTextEffects](https://github.com/ChrisBuilds/terminaltexteffects)
-(TTE) by [ChrisBuilds](https://github.com/ChrisBuilds).** Every effect, the animation engine,
-and the command-line interface are their design — this project translates that work to Rust
-and adds nothing of its own to the art. If you like what you see here, star the original.
+**The art and behavior begin upstream with [TerminalTextEffects](https://github.com/ChrisBuilds/terminaltexteffects)
+(TTE), authored by [ChrisBuilds](https://github.com/ChrisBuilds).** Every effect concept, the animation-engine
+shape, and the user-facing CLI vocabulary come from TTE. If you like the effects, star and credit the original
+project first.
 
-TTE is MIT licensed and so is this port; the original copyright is preserved in
+This repository's Rust `ttfx` implementation is a parity port of TTE, copyrighted by **37signals / omacom-io**
+under the same MIT license. It translates the Python engine into a single dependency-free Rust binary while
+preserving TTE's frame behavior as closely as possible.
+
+The Swift implementation is a **port of that port**: it maps the Rust engine/effects/CLI and renderer seams into
+Swift modules for native apps, SwiftUI/Metal preview, and side-by-side video comparison. The Swift code uses the
+Rust binary as its local oracle, and the Rust binary traces back to TTE.
+
+TTE is MIT licensed and so are these ports; the original copyright is preserved in
 [LICENSE](LICENSE) and [NOTICE](NOTICE). Please file *effect* ideas upstream, where they belong.
 
 ## Why a port
@@ -151,9 +163,12 @@ Upstream is not vendored here — the harness fetches it, because it's their cod
 
 ## Native Swift port
 
-A native Swift port is being developed alongside the Rust binary. It lives in the
-root Swift package and does **not** replace the Rust `ttfx` product or change the Rust parity
-claims above. Status and architecture: [`docs/swift-port/README.md`](docs/swift-port/README.md).
+A native Swift port is being developed alongside the Rust binary. This is intentionally a
+**port of the Rust port**, not a direct reimagining of TTE: Python TTE defines the original behavior,
+Rust `ttfx` is the production parity port in this repository, and Swift follows the Rust model while
+checking itself against Rust-backed parity tests. It lives in the root Swift package and does **not**
+replace the Rust `ttfx` product or change the Rust parity claims above. Status and architecture:
+[`docs/swift-port/README.md`](docs/swift-port/README.md).
 
 ```sh
 swift package resolve

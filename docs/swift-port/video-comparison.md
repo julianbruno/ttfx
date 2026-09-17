@@ -25,7 +25,24 @@ Rust + Swift
 Visual comparison
 ```
 
-Each effect folder contains `rust.mp4`, `swiftui.mp4`, `metal.mp4`, and the original length-prefixed `rust.frames` evidence. `manifest.json` records frame counts, completion state, capture settings and source revision. Older two-track libraries without `swiftui.mp4` still load; the app only shows the SwiftUI toggle when that track is present. `provenance.json` records commands and whether the working tree was modified. These are local generated artifacts, ignored by Git.
+### Rust terminal replay details
+
+The Rust implementation is part of this repository, not an external checkout: `Cargo.toml` defines the `ttfx` package and the Rust sources live under `src/` (`src/main.rs`, `src/cli.rs`, `src/engine/**`, and `src/effects/**`). The capture script builds that code with `cargo build --release` and uses `target/release/ttfx` as the Rust oracle.
+
+The `Rust terminal` video is not a screen recording. `TTFXVideoCapture` runs the Rust binary with `--parity-dump`, fixed canvas/seed/fps arguments, and the sample text on stdin. Rust emits length-prefixed ANSI frames, which are preserved as `rust.frames` next to the rendered video. Swift parses those frames and sends each one through `Sources/TTFXVideoCapture/ANSIRasterizer.swift`.
+
+`ANSIRasterizer` implements the bounded terminal replay used by the comparison videos:
+
+- It allocates a BGRA CoreGraphics bitmap sized from the terminal grid (`columns × 16` by `rows × 24`).
+- It starts with a black canvas and interprets ANSI SGR color/style sequences from the Rust frame stream.
+- Supported SGR includes reset, bold on/off, inverse on/off, foreground/background reset, 16-color ANSI, xterm-256, and truecolor `38;2;r;g;b` / `48;2;r;g;b`.
+- It draws each non-space Unicode scalar with CoreText using Menlo at size 20, clipping to a 16×24 cell and caching `CTLine`s by scalar/color/bold.
+- It converts the ANSI top-to-bottom row order into CoreGraphics coordinates with `height - (row + 1) * 24`.
+- The resulting BGRA frames are piped to `ffmpeg` as rawvideo and encoded as `rust.mp4`.
+
+This means the Rust video uses the real Rust engine and its real ANSI output, but the pixels are produced by a deterministic CoreText/Menlo replay, not by Terminal.app, iTerm2, or a live terminal emulator. It is suitable for repeatable visual comparison; it is not a claim that every terminal application will rasterize the output identically.
+
+Each effect folder contains `rust.mp4`, `swiftui.mp4`, `metal.mp4`, and the original length-prefixed `rust.frames` evidence. `manifest.json` records frame counts, completion state, capture settings and source revision. Older two-track libraries without `swiftui.mp4` still load; the app only shows the SwiftUI toggle when that track is present. `provenance.json` records commands and whether the working tree was modified. These are local generated artifacts, ignored by Git. See [Video comparison schemas](video-comparison-schemas.md) for every field and safe manual workflows.
 
 ## Long effects and reruns
 

@@ -22,7 +22,8 @@ internal enum CaptureError: LocalizedError {
             print("TTFXVideoCapture [--output directory] [--rust binary] [--ffmpeg binary] [--effect name] [--max-frames 3000] [--fps 25] [--seed 42]")
             return
         }
-        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        let root = projectRoot(currentDirectory: currentDirectory)
         let output = URL(fileURLWithPath: option("--output", root.appendingPathComponent("artifacts/video-comparison").path))
         let rust = option("--rust", root.appendingPathComponent("target/release/ttfx").path)
         let ffmpeg = option("--ffmpeg", "/opt/homebrew/bin/ffmpeg")
@@ -35,16 +36,15 @@ internal enum CaptureError: LocalizedError {
         guard selected == "all" || EffectRegistry.contains(selected) else { throw CaptureError.message("Unknown effect: \(selected)") }
         let effects = selected == "all" ? EffectRegistry.names : [selected]
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        let revision = try command("/usr/bin/git", ["rev-parse", "HEAD"]).trimmingCharacters(in: .whitespacesAndNewlines)
-        let dirty = try command("/usr/bin/git", ["status", "--porcelain"])
-        var manifest = ComparisonManifest(generatedAt: ISO8601DateFormatter().string(from: Date()), revision: revision + (dirty.isEmpty ? "" : " (working tree modified)"), text: text, seed: seed, columns: columns, rows: rows, fps: fps, maxFrames: maxFrames, effects: [])
+        let git = gitMetadata(repository: root)
+        var manifest = ComparisonManifest(generatedAt: ISO8601DateFormatter().string(from: Date()), revision: git.revision, text: text, seed: seed, columns: columns, rows: rows, fps: fps, maxFrames: maxFrames, effects: [])
         // A single-effect rerun updates a compatible existing library without dropping other pairs.
         if selected != "all", let existing = try? ComparisonManifest.load(from: output) {
             guard existing.text == text, existing.seed == seed, existing.fps == fps, existing.columns == columns, existing.rows == rows else { throw CaptureError.message("Existing library settings differ; choose a new output folder") }
             manifest.effects = existing.effects.filter { $0.name != selected }
         }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        let provenance: [String: String] = ["rustBinary": rust, "ffmpegBinary": ffmpeg, "rustCommand": "--parity-dump --seed \(seed) --frame-rate \(fps) --max-frames \(maxFrames + 1) --ignore-terminal-dimensions --canvas-width 24 --canvas-height 8 --anchor-text sw --anchor-canvas sw EFFECT", "workingTreeStatus": dirty, "captureMethod": "Rust ANSI replay through CoreText; Swift native effect frames through production Metal shaders; one encoded frame per engine tick. No frame sampling or duration normalization."]
+        let provenance: [String: String] = ["rustBinary": rust, "ffmpegBinary": ffmpeg, "rustCommand": "--parity-dump --seed \(seed) --frame-rate \(fps) --max-frames \(maxFrames + 1) --ignore-terminal-dimensions --canvas-width 24 --canvas-height 8 --anchor-text sw --anchor-canvas sw EFFECT", "workingTreeStatus": git.workingTreeStatus, "captureMethod": "Rust ANSI replay through CoreText; Swift native effect frames through production Metal shaders; one encoded frame per engine tick. No frame sampling or duration normalization."]
         try encoder.encode(provenance).write(to: output.appendingPathComponent("provenance.json"), options: .atomic)
         let renderer = TTFXMetalRenderer()
         guard renderer.canEncodeGPUCommands else { throw CaptureError.message("Metal GPU unavailable; no substitute renderer is used") }
@@ -113,11 +113,46 @@ internal enum CaptureError: LocalizedError {
         return pixels
     }
 
-    static func command(_ executable: String, _ arguments: [String]) throws -> String {
+    static func projectRoot(currentDirectory: URL, sourceFile: String = #filePath, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let override = environment["TTFX_REPOSITORY_ROOT"], !override.isEmpty {
+            return URL(fileURLWithPath: override).standardizedFileURL
+        }
+        if let root = firstAncestorContainingProjectFiles(from: currentDirectory) { return root }
+        let sourceDirectory = URL(fileURLWithPath: sourceFile).deletingLastPathComponent()
+        if let root = firstAncestorContainingProjectFiles(from: sourceDirectory) { return root }
+        return currentDirectory.standardizedFileURL
+    }
+
+    static func firstAncestorContainingProjectFiles(from url: URL) -> URL? {
+        var candidate = url.standardizedFileURL
+        let fileManager = FileManager.default
+        for _ in 0..<64 {
+            let hasCargo = fileManager.fileExists(atPath: candidate.appendingPathComponent("Cargo.toml").path)
+            let hasPackage = fileManager.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path)
+            if hasCargo && hasPackage { return candidate }
+            let parent = candidate.deletingLastPathComponent()
+            if parent.path == candidate.path { return nil }
+            candidate = parent
+        }
+        return nil
+    }
+
+    static func gitMetadata(repository: URL) -> (revision: String, workingTreeStatus: String) {
+        let revision = optionalCommand("/usr/bin/git", ["-C", repository.path, "rev-parse", "HEAD"])?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let dirty = optionalCommand("/usr/bin/git", ["-C", repository.path, "status", "--porcelain"])
+        guard let revision else {
+            return ("unknown (not a git repository)", "unavailable: not a git repository")
+        }
+        return (revision + ((dirty ?? "").isEmpty ? "" : " (working tree modified)"), dirty ?? "unavailable")
+    }
+
+    static func optionalCommand(_ executable: String, _ arguments: [String]) -> String? {
         let process = Process(), pipe = Pipe()
-        process.executableURL = URL(fileURLWithPath: executable); process.arguments = arguments; process.standardOutput = pipe
-        try process.run(); let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw CaptureError.message("Command failed: \(executable)") }
+        process.executableURL = URL(fileURLWithPath: executable); process.arguments = arguments; process.standardOutput = pipe; process.standardError = Pipe()
+        do { try process.run() } catch { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile(); process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
         return String(decoding: data, as: UTF8.self)
     }
     static func rustDump(binary: String, name: String, text: String, fps: Int, seed: UInt64, cap: Int, output: URL) throws {

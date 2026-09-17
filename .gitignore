@@ -5,9 +5,12 @@
 __pycache__/
 .claude/
 /reference/tte/
+
+# Local agent/runtime state
 /.atl/
-# Local Pi runtime state
-.atl/
+/.codegraph/
+/.codex/
+
 # Reproducible visual comparison recordings (regenerate with tools/video-comparison/capture.sh)
 /artifacts/video-comparison/
 /artifacts/video-comparison-before-parity/

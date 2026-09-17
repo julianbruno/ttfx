@@ -46,6 +46,34 @@ import Foundation
 
 @testable import TTFXVideoCapture
 
+@Test func videoCaptureProjectRootFallsBackFromDerivedDataToSourceCheckout() throws {
+    let fakeRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let fakeSource = fakeRoot.appendingPathComponent("Sources/TTFXVideoCapture/TTFXVideoCapture.swift")
+    let derivedData = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("Build/Products/Debug")
+    try FileManager.default.createDirectory(at: fakeSource.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: derivedData, withIntermediateDirectories: true)
+    try Data().write(to: fakeRoot.appendingPathComponent("Cargo.toml"))
+    try Data().write(to: fakeRoot.appendingPathComponent("Package.swift"))
+    defer { try? FileManager.default.removeItem(at: fakeRoot); try? FileManager.default.removeItem(at: derivedData.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+
+    #expect(TTFXVideoCapture.projectRoot(currentDirectory: derivedData, sourceFile: fakeSource.path, environment: [:]).path == fakeRoot.path)
+}
+
+@Test func videoCaptureProjectRootHonorsEnvironmentOverride() throws {
+    let override = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    #expect(TTFXVideoCapture.projectRoot(currentDirectory: FileManager.default.temporaryDirectory, environment: ["TTFX_REPOSITORY_ROOT": override.path]).path == override.path)
+}
+
+@Test func videoCaptureGitMetadataSurvivesNonRepositoryDirectory() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+
+    let metadata = TTFXVideoCapture.gitMetadata(repository: root)
+    #expect(metadata.revision == "unknown (not a git repository)")
+    #expect(metadata.workingTreeStatus == "unavailable: not a git repository")
+}
+
 @Test func rustFrameDecoderPreservesUnicodeAndDetectsTruncation() throws {
     let frame = "\u{1b}[38;2;255;0;0mΩ\u{1b}[0m\n"
     var data = Data("\(frame.utf8.count)\n".utf8)
