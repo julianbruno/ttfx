@@ -1,5 +1,7 @@
 import Foundation
 import Testing
+import TTFXCore
+import TTFXEffects
 @testable import TTFXCLI
 
 @Suite struct CLIRuntimeTests {
@@ -21,6 +23,39 @@ import Testing
             #expect(frames.count == 1, "\(effectName) should emit exactly one parity-dump frame")
             #expect(!frames[0].isEmpty, "\(effectName) should emit a non-empty frame payload")
         }
+    }
+
+    @Test func printSpeedFlagChangesParityDumpOutput() throws {
+        let speedCLI = try TTFXCLI.parse([
+            "--parity-dump", "--max-frames", "32", "--seed", "1",
+            "--canvas-width", "12", "--canvas-height", "6",
+            "print", "--print-speed", "5"
+        ])
+        #expect(speedCLI.effectArguments == ["--print-speed", "5"])
+        let settings = try ParsedEffectSettings.parse(effectName: "print", arguments: speedCLI.effectArguments)
+        #expect(settings.int("print-speed") == 5)
+        var printOptions = PrintEffect.Configuration()
+        printOptions.apply(settings)
+        #expect(printOptions.printSpeed == 5)
+        let defaultOutput = try TTFXCLI.runForTesting(
+            arguments: [
+                "--parity-dump", "--max-frames", "32", "--seed", "1",
+                "--canvas-width", "12", "--canvas-height", "6",
+                "print"
+            ],
+            standardInput: Data("Swift\nTTE".utf8)
+        )
+        let speedOutput = try TTFXCLI.runForTesting(
+            arguments: [
+                "--parity-dump", "--max-frames", "32", "--seed", "1",
+                "--canvas-width", "12", "--canvas-height", "6",
+                "print", "--print-speed", "5"
+            ],
+            standardInput: Data("Swift\nTTE".utf8)
+        )
+        #expect(!defaultOutput.isEmpty)
+        #expect(!speedOutput.isEmpty)
+        #expect(defaultOutput != speedOutput)
     }
 }
 

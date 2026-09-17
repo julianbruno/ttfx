@@ -137,6 +137,9 @@ public struct TTFXCLI: ParsableCommand {
     @Argument(help: "Effect to run. Use one of: \(TTFXEffectRegistry.names.joined(separator: ", "))")
     public var effectName: String?
 
+    @Argument(parsing: .allUnrecognized, help: "Per-effect TTE flags after the effect name")
+    public var effectArguments: [String] = []
+
     public init() {}
 
     public var selectedEffectName: String? {
@@ -152,6 +155,33 @@ public struct TTFXCLI: ParsableCommand {
         }
         if let effectName, !TTFXEffectRegistry.contains(effectName) {
             throw ValidationError("unknown effect '\(effectName)'")
+        }
+        if let effectName {
+            do {
+                _ = try ParsedEffectSettings.parse(effectName: effectName, arguments: effectArguments)
+            } catch let error as EffectOptionError {
+                throw ValidationError(error.description)
+            }
+        } else if !effectArguments.isEmpty {
+            throw ValidationError("unexpected arguments: \(effectArguments.joined(separator: " "))")
+        }
+    }
+
+    public static func helpMessage(forEffect name: String) -> String {
+        EffectFlagCatalog.help(for: name)
+    }
+
+    public static func main() {
+        let arguments = Array(CommandLine.arguments.dropFirst())
+        if let effect = effectHelpRequest(in: arguments) {
+            print(helpMessage(forEffect: effect))
+            return
+        }
+        do {
+            let command = try parse(arguments)
+            try command.run()
+        } catch {
+            exit(withError: error)
         }
     }
 
@@ -321,13 +351,14 @@ private extension TTFXCLI {
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
         var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
-        var status = effect.tick(into: &frame)
-        while status == .running {
+        var status = TickStatus.running
+        while true {
             status = effect.tick(into: &frame)
-        }
-        FileHandle.standardOutput.write(terminalBytes(for: frame))
-        if !terminalOptions.noEOL {
-            FileHandle.standardOutput.write(Data("\n".utf8))
+            FileHandle.standardOutput.write(terminalBytes(for: frame))
+            if !terminalOptions.noEOL {
+                FileHandle.standardOutput.write(Data("\n".utf8))
+            }
+            if status == .complete { break }
         }
     }
 
@@ -369,12 +400,21 @@ private extension TTFXCLI {
     }
 
     func makeEffect(named name: String, configuration: EffectConfiguration, canvas: Canvas, input: InputText) throws -> any Effect {
+        let settings: ParsedEffectSettings
+        do {
+            settings = (name == effectName)
+                ? try ParsedEffectSettings.parse(effectName: name, arguments: effectArguments)
+                : .empty
+        } catch let error as EffectOptionError {
+            throw ValidationError(error.description)
+        }
         guard let effect = EffectRegistry.makeEffect(
             named: name,
             configuration: configuration,
             canvas: canvas,
             input: input,
-            seed: configuration.seed
+            seed: configuration.seed,
+            settings: settings
         ) else {
             throw ValidationError("unknown effect '\(name)'")
         }
@@ -417,6 +457,15 @@ private extension TTFXCLI {
     func inferredRows(from text: String) -> Int {
         max(1, text.split(separator: "\n", omittingEmptySubsequences: false).count)
     }
+}
+
+private func effectHelpRequest(in arguments: [String]) -> String? {
+    guard let effectIndex = arguments.firstIndex(where: { TTFXEffectRegistry.contains($0) }) else {
+        return nil
+    }
+    let rest = arguments[(effectIndex + 1)...]
+    guard rest.contains("-h") || rest.contains("--help") else { return nil }
+    return arguments[effectIndex]
 }
 
 private func validateEffectFilters(_ names: [String], option: String) throws {

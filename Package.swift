@@ -78,7 +78,7 @@ let package = Package(
         ),
         .testTarget(
             name: "TTFXCLITests",
-            dependencies: ["TTFXCLI"],
+            dependencies: ["TTFXCLI", "TTFXCore", "TTFXEffects"],
             path: "tests/ttfx-cliTests"
         ),
         .testTarget(

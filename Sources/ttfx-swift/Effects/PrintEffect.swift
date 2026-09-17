@@ -1,8 +1,33 @@
 import TTFXCore
 
 public struct PrintEffect: Effect {
-    private static let printSpeed = 2
-    private static let printHeadReturnSpeed = 1.5
+    public struct Configuration: Sendable {
+        public var printSpeed: Int
+        public var printHeadReturnSpeed: Double
+        public var printHeadEasing: Easing
+        public var finalGradientStops: [Color]
+        public var finalGradientSteps: [Int]
+        public var finalGradientDirection: GradientDirection
+
+        public init(
+            printSpeed: Int = 2,
+            printHeadReturnSpeed: Double = 1.5,
+            printHeadEasing: Easing = .inOutQuad,
+            finalGradientStops: [Color] = [Color(hex: "02b8bd"), Color(hex: "c1f0e3"), Color(hex: "00ffa0")],
+            finalGradientSteps: [Int] = [12],
+            finalGradientDirection: GradientDirection = .diagonal
+        ) {
+            precondition(printSpeed > 0, "print speed must be positive")
+            precondition(printHeadReturnSpeed > 0, "print head return speed must be positive")
+            self.printSpeed = printSpeed
+            self.printHeadReturnSpeed = printHeadReturnSpeed
+            self.printHeadEasing = printHeadEasing
+            self.finalGradientStops = finalGradientStops
+            self.finalGradientSteps = finalGradientSteps
+            self.finalGradientDirection = finalGradientDirection
+        }
+    }
+
     private static let printHeadColor: UInt32 = 0xFFFFFF
 
     private struct Glyph {
@@ -26,6 +51,7 @@ public struct PrintEffect: Effect {
     }
 
     private let canvas: Canvas
+    private let options: Configuration
     private var rows: [[Int]] = []
     private var glyphs: [Glyph] = []
     private var currentRow = 0
@@ -39,7 +65,18 @@ public struct PrintEffect: Effect {
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
+        self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, printConfiguration: .init())
+    }
+
+    public init(
+        configuration: EffectConfiguration,
+        canvas: Canvas,
+        input: InputText,
+        seed: UInt64,
+        printConfiguration: Configuration
+    ) {
         self.canvas = canvas
+        self.options = printConfiguration
         build(input: input)
     }
 
@@ -102,15 +139,15 @@ public struct PrintEffect: Effect {
 
     private func finalColorMap(bottom: Int, top: Int, left: Int, right: Int) -> [Coordinate: UInt32] {
         let gradient = try! Gradient(
-            stops: [.init(hex: "02b8bd"), .init(hex: "c1f0e3"), .init(hex: "00ffa0")],
-            steps: [12]
+            stops: options.finalGradientStops,
+            steps: options.finalGradientSteps
         )
         let mapping = try! gradient.coordinateColorMapping(
             minRow: bottom,
             maxRow: top,
             minColumn: left,
             maxColumn: right,
-            direction: .diagonal
+            direction: options.finalGradientDirection
         )
         return Dictionary(uniqueKeysWithValues: mapping.entries.map { entry in
             (entry.coordinate, rgb(entry.color))
@@ -159,7 +196,7 @@ public struct PrintEffect: Effect {
         guard currentRow < rows.count else { return }
 
         if currentGlyph < rows[currentRow].count {
-            let end = min(currentGlyph + Self.printSpeed, rows[currentRow].count)
+            let end = min(currentGlyph + options.printSpeed, rows[currentRow].count)
             for index in currentGlyph..<end {
                 let glyph = rows[currentRow][index]
                 glyphs[glyph].visible = true
@@ -193,7 +230,7 @@ public struct PrintEffect: Effect {
         carriageReturn = .init(
             startColumn: headColumn,
             targetColumn: targetColumn,
-            steps: PyCompat.roundHalfEven(Double(distance) / Self.printHeadReturnSpeed)
+            steps: PyCompat.roundHalfEven(Double(distance) / options.printHeadReturnSpeed)
         )
     }
 
@@ -208,7 +245,7 @@ public struct PrintEffect: Effect {
 
         carriageReturn.currentStep += 1
         let fraction = Double(carriageReturn.currentStep) / Double(carriageReturn.steps)
-        let easing = Easing.inOutQuad.value(at: fraction)
+        let easing = options.printHeadEasing.value(at: fraction)
         headColumn = PyCompat.roundHalfEven(
             Double(carriageReturn.startColumn) + Double(carriageReturn.targetColumn - carriageReturn.startColumn) * easing
         )

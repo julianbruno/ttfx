@@ -1,5 +1,6 @@
 import ArgumentParser
 import Testing
+import TTFXEffects
 @testable import TTFXCLI
 
 @Suite struct CLIParsingTests {
@@ -154,5 +155,48 @@ import Testing
             "slice", "slide", "smoke", "spotlights", "spray", "swarm", "sweep",
             "synthgrid", "thunderstorm", "unstable", "vhstape", "waves", "wipe"
         ])
+    }
+
+    @Test func parsesPrintSpeedAfterEffectName() throws {
+        let cli = try TTFXCLI.parse(["print", "--print-speed", "5"])
+        #expect(cli.selectedEffectName == "print")
+        #expect(cli.effectArguments == ["--print-speed", "5"])
+        let settings = try ParsedEffectSettings.parse(effectName: "print", arguments: cli.effectArguments)
+        #expect(settings.int("print-speed") == 5)
+    }
+
+    @Test func parsesRainAndWipeEffectFlagsAfterEffectName() throws {
+        let rain = try TTFXCLI.parse(["rain", "--rain-symbols", "o", ".", "--movement-speed", "0.8-1.2"])
+        #expect(rain.selectedEffectName == "rain")
+        let rainSettings = try ParsedEffectSettings.parse(effectName: "rain", arguments: rain.effectArguments)
+        #expect(rainSettings.strings("rain-symbols") == ["o", "."])
+        #expect(rainSettings.floatRange("movement-speed")!.0 == 0.8)
+        #expect(rainSettings.floatRange("movement-speed")!.1 == 1.2)
+
+        let wipe = try TTFXCLI.parse(["wipe", "--wipe-direction", "column_left_to_right"])
+        #expect(wipe.selectedEffectName == "wipe")
+        let wipeSettings = try ParsedEffectSettings.parse(effectName: "wipe", arguments: wipe.effectArguments)
+        #expect(wipeSettings.string("wipe-direction") == "column_left_to_right")
+    }
+
+    @Test func defaultPrintParseStillWorksWithNoExtraFlags() throws {
+        let cli = try TTFXCLI.parse(["print"])
+        #expect(cli.selectedEffectName == "print")
+        #expect(cli.effectArguments.isEmpty)
+        let settings = try ParsedEffectSettings.parse(effectName: "print", arguments: cli.effectArguments)
+        #expect(settings.values.isEmpty)
+    }
+
+    @Test func rejectsUnknownEffectFlags() throws {
+        #expect(throws: (any Error).self) {
+            _ = try TTFXCLI.parse(["print", "--not-a-print-flag"])
+        }
+    }
+
+    @Test func printHelpListsTTEFlagNames() {
+        let help = TTFXCLI.helpMessage(forEffect: "print")
+        for flag in ["--print-speed", "--print-head-return-speed", "--print-head-easing", "--final-gradient-stops"] {
+            #expect(help.contains(flag), "print help should list \(flag)")
+        }
     }
 }

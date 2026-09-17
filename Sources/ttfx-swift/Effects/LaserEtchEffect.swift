@@ -5,12 +5,53 @@ public struct LaserEtchEffect: Effect {
         public enum EtchPattern: Sendable {
             case algorithm
             case rowTopToBottom
+            case rowBottomToTop
+            case columnLeftToRight
+            case columnRightToLeft
+            case diagonalTopLeftToBottomRight
+            case diagonalBottomLeftToTopRight
+            case diagonalTopRightToBottomLeft
+            case diagonalBottomRightToTopLeft
+            case centerToOutside
+            case outsideToCenter
         }
 
         public var etchPattern: EtchPattern
+        public var etchSpeed: Int
+        public var etchDelay: Int
+        public var coolGradientStops: [Color]
+        public var laserGradientStops: [Color]
+        public var sparkGradientStops: [Color]
+        public var sparkCoolingFrames: Int
+        public var finalGradientStops: [Color]
+        public var finalGradientSteps: [Int]
+        public var finalGradientFrames: Int
+        public var finalGradientDirection: GradientDirection
 
-        public init(etchPattern: EtchPattern = .algorithm) {
+        public init(
+            etchPattern: EtchPattern = .algorithm,
+            etchSpeed: Int = 1,
+            etchDelay: Int = 1,
+            coolGradientStops: [Color] = [Color(hex: "ffe680"), Color(hex: "ff7b00")],
+            laserGradientStops: [Color] = [Color(hex: "ffffff"), Color(hex: "376cff")],
+            sparkGradientStops: [Color] = [Color(hex: "ffffff"), Color(hex: "ffe680"), Color(hex: "ff7b00"), Color(hex: "1a0900")],
+            sparkCoolingFrames: Int = 7,
+            finalGradientStops: [Color] = [Color(hex: "8A008A"), Color(hex: "00D1FF"), Color(hex: "ffffff")],
+            finalGradientSteps: [Int] = [8],
+            finalGradientFrames: Int = 4,
+            finalGradientDirection: GradientDirection = .vertical
+        ) {
             self.etchPattern = etchPattern
+            self.etchSpeed = etchSpeed
+            self.etchDelay = etchDelay
+            self.coolGradientStops = coolGradientStops
+            self.laserGradientStops = laserGradientStops
+            self.sparkGradientStops = sparkGradientStops
+            self.sparkCoolingFrames = sparkCoolingFrames
+            self.finalGradientStops = finalGradientStops
+            self.finalGradientSteps = finalGradientSteps
+            self.finalGradientFrames = finalGradientFrames
+            self.finalGradientDirection = finalGradientDirection
         }
     }
 
@@ -73,7 +114,10 @@ public struct LaserEtchEffect: Effect {
             guard !emittedGroupedDeadBranchFrame else { return .complete }
             emittedGroupedDeadBranchFrame = true
             return .complete
-        case .algorithm:
+        case .algorithm, .rowBottomToTop, .columnLeftToRight, .columnRightToLeft,
+             .diagonalTopLeftToBottomRight, .diagonalBottomLeftToTopRight,
+             .diagonalTopRightToBottomLeft, .diagonalBottomRightToTopLeft,
+             .centerToOutside, .outsideToCenter:
             if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
                 renderOneCellDefault(into: &frame)
                 tickIndex += 1

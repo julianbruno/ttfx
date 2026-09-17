@@ -2855,4 +2855,114 @@ struct EffectFrameParityTests {
     #expect(status.firstCompletionTick == expectedFrames.count)
 }
 
+@Test func printSpeedSettingChangesSerializedFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let text = "Swift\nTTE"
+    let input = canvas.ingest(text)
+    let defaultFrames = try serializedFrames(
+        PrintEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            printConfiguration: .init()
+        ),
+        canvas: canvas
+    )
+    let changedFrames = try serializedFrames(
+        PrintEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            printConfiguration: .init(printSpeed: 5)
+        ),
+        canvas: canvas
+    )
+    #expect(!defaultFrames.isEmpty)
+    #expect(!changedFrames.isEmpty)
+    #expect(defaultFrames != changedFrames)
+}
+
+@Test func rainColorsAndMovementSpeedSettingsChangeSerializedFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let text = "Swift\nTTE"
+    let input = canvas.ingest(text)
+    let defaultFrames = try serializedFrames(
+        RainEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            rainConfiguration: .init()
+        ),
+        canvas: canvas
+    )
+    let colorChanged = try serializedFrames(
+        RainEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            rainConfiguration: .init(rainColors: [Color(hex: "ff0000")])
+        ),
+        canvas: canvas
+    )
+    let speedChanged = try serializedFrames(
+        RainEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            rainConfiguration: .init(movementSpeed: (1.2, 1.8))
+        ),
+        canvas: canvas
+    )
+    #expect(!defaultFrames.isEmpty)
+    #expect(defaultFrames != colorChanged)
+    #expect(defaultFrames != speedChanged)
+}
+
+@Test func wipeDirectionSettingChangesSerializedFrames() throws {
+    let canvas = try Canvas(columns: 12, rows: 6)
+    let text = "Swift\nTTE"
+    let input = canvas.ingest(text)
+    let defaultFrames = try serializedFrames(
+        WipeEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            wipeConfiguration: .init()
+        ),
+        canvas: canvas,
+        limit: 200
+    )
+    let changedFrames = try serializedFrames(
+        WipeEffect(
+            configuration: .init(text: text, seed: 42),
+            canvas: canvas,
+            input: input,
+            seed: 42,
+            wipeConfiguration: .init(direction: .columnLeftToRight)
+        ),
+        canvas: canvas,
+        limit: 200
+    )
+    #expect(!defaultFrames.isEmpty)
+    #expect(defaultFrames != changedFrames)
+}
+
+}
+
+private func serializedFrames<E: Effect>(_ effect: E, canvas: Canvas, limit: Int = 24) throws -> [Data] {
+    var effect = effect
+    var frames: [Data] = []
+    for _ in 0..<limit {
+        var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
+        let status = effect.tick(into: &frame)
+        frames.append(terminalBytes(for: frame))
+        if status == .complete { break }
+    }
+    return frames
 }
