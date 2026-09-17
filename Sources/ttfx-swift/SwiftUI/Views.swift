@@ -20,12 +20,17 @@ public struct TTFXFrameView: View {
                     width: cellSize.width,
                     height: cellSize.height
                 )
-                context.fill(Path(rect), with: .color(Self.color(cell.background)))
+                // The native engine stores explicit-black foreground metadata in
+                // the background word; it is not a visible RGB background.
+                let explicitBlack = cell.background == 0xffff_fffe
+                let background = explicitBlack ? 0 : cell.background
+                let foreground = cell.foreground == 0 && !explicitBlack ? 0xffffff : cell.foreground
+                context.fill(Path(rect), with: .color(Self.color(background)))
                 guard cell.codepoint != 32 else { continue }
                 let text = context.resolve(
                     Text(cell.glyph)
                         .font(.custom("Menlo", fixedSize: fontSize))
-                        .foregroundColor(Self.color(cell.foreground))
+                        .foregroundColor(Self.color(foreground))
                 )
                 let size = text.measure(in: CGSize(width: CGFloat.infinity, height: CGFloat.infinity))
                 // Rust's terminal replay places Menlo at x + 1 and baseline y + 5

@@ -65,3 +65,13 @@ import TTFXSwiftUI
     }
     #expect(differing < 100)
 }
+
+@Test @MainActor func swiftUIReplayDistinguishesDefaultWhiteFromExplicitBlackSentinel() throws {
+    var frame = try Frame(columns: 3, rows: 1)
+    frame[column: 1, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0)
+    frame[column: 2, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0xffff_fffe)
+    frame[column: 3, row: 1] = Cell(codepoint: 32, foreground: 0, background: 0xffff_fffe)
+    let actual = try TTFXVideoCapture.renderSwiftUIBGRA(snapshot: .init(frame: frame), width: 48, height: 24)
+    let expected = try ANSIRasterizer(columns: 3, rows: 1).pixels("F\u{1b}[38;2;0;0;0mF \u{1b}[0m")
+    #expect(actual == expected)
+}

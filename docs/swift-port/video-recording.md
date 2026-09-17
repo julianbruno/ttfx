@@ -125,7 +125,7 @@ For each tick:
 1. Swift creates or advances the selected `EffectRegistry` effect.
 2. The effect writes into a Swift `Frame`.
 3. `TTFXFrameSnapshot` converts the frame into a stable snapshot.
-4. `renderSwiftUIBGRA` draws the snapshot using the same production SwiftUI `TTFXFrameView` used by the gallery fallback. The renderer draws each snapshot cell with its foreground/background colors, including colored spaces, on a fixed 16 × 24 grid with Menlo 20. Glyph origins and baselines match the Rust replay; SwiftUI/CoreText antialiasing may differ.
+4. `renderSwiftUIBGRA` draws the snapshot using the same production SwiftUI `TTFXFrameView` used by the gallery fallback. The renderer draws each snapshot cell with its foreground/background colors, including colored spaces, on a fixed 16 × 24 grid with Menlo 20. Glyph origins and baselines match the Rust replay; SwiftUI/CoreText antialiasing may differ. Uncolored foregrounds use terminal-default white; the native engine’s explicit-black sentinel is resolved as black foreground metadata, never as a visible background.
 5. The BGRA frame is encoded to `<effect>/swiftui.mp4`.
 
 The SwiftUI pane is useful because it separates effect behavior from the Metal renderer. If Rust and SwiftUI disagree, compare the underlying frame cells before deciding whether the cause is effect logic or rendering. If SwiftUI and Metal disagree with identical cells, inspect rendering. Existing recordings must be regenerated after renderer changes.
