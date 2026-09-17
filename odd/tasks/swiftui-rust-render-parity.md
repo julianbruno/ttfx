@@ -38,7 +38,7 @@ Exploration confirmed plain Text lines drop colors and ignore export cell metric
 - GREEN: sentinel/default-white regression matches independent ANSI/CoreText BGRA bytes exactly; focused required suite passed 44 tests.
 - REFACTOR: kept resolution local to SwiftUI cell drawing without changing effect storage or Metal.
 - `swift test --no-parallel`: 198 tests in 5 suites passed (112.920 seconds).
-- Runtime: T02 initial regeneration exposed white rectangles in beams frame 50; fix addresses the exact sentinel cause. Final regenerated proof pending.
+- Runtime: T02 initial regeneration exposed white rectangles in beams frame 50; fix addresses the exact sentinel cause. Final regenerated proof passed; see T02.
 - Rollback: revert terminal color resolution, its regression test and recording-doc sentence only.
 - Work-unit commit: `f097908`.
 
@@ -50,15 +50,15 @@ Exploration confirmed plain Text lines drop colors and ignore export cell metric
 - Screenshot effect: errorcorrect frame 60 matched placement/colors/glyph scale (initial RGB MAE 0.097); beams sentinel regression now visually matches Rust with no white rectangles.
 - Local ignored evidence: `artifacts/video-comparison/swiftui-parity-check.json`, `swiftui-parity-errorcorrect.png` (Rust/Metal/SwiftUI), `swiftui-parity-beams.png` (Rust/SwiftUI).
 - Rollback: generated library can be regenerated from previous renderer; tracked evidence doc can be reverted without touching code.
-- Work-unit commit: pending evidence commit.
+- Work-unit commit: `c310f96`.
 - RDD off (global), no native review executed. No remote, push or PR operations.
 
 ## Next step
-Parent final independent check/readback and Engram synchronization. No implementation work remains; Metal sentinel discrepancy is preexisting and outside SwiftUI scope.
+Independent verification passed 4 pixel tests; parent inspected errorcorrect and beams contact sheets. No implementation work remains; Metal sentinel discrepancy is preexisting and outside SwiftUI scope.
 
 
 
 
 
 ### Accepted T03 discovery
-13 effects encode explicit-black foreground with background sentinel 0xFFFF_FFFE. Raw RGB rendering incorrectly painted white backgrounds; ordinary foreground zero must resolve to terminal default white. Fix SwiftUI only; Metal discrepancy is a separate limitation. T02 remains pending until regenerated after correction.
+13 effects encode explicit-black foreground with background sentinel 0xFFFF_FFFE. Raw RGB rendering incorrectly painted white backgrounds; ordinary foreground zero must resolve to terminal default white. Fix SwiftUI only; Metal discrepancy is a separate limitation. T02 completed after regeneration with the correction.
