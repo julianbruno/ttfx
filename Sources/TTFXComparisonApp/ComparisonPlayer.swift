@@ -5,6 +5,7 @@ import TTFXComparisonKit
 
 @MainActor @Observable final class ComparisonPlayer {
     let rust = AVPlayer()
+    let swiftCLI = AVPlayer()
     let swiftUI = AVPlayer()
     let metal = AVPlayer()
     var effect: ComparisonEffect?
@@ -19,6 +20,7 @@ import TTFXComparisonKit
         // Scheduled host-clock playback requires disabling AVPlayer's automatic stall waits.
         // Otherwise setRate(time:atHostTime:) raises an Objective-C exception mid-action.
         rust.automaticallyWaitsToMinimizeStalling = false
+        swiftCLI.automaticallyWaitsToMinimizeStalling = false
         swiftUI.automaticallyWaitsToMinimizeStalling = false
         metal.automaticallyWaitsToMinimizeStalling = false
     }
@@ -29,22 +31,24 @@ import TTFXComparisonKit
     func load(_ effect: ComparisonEffect, directory: URL, fps: Int) throws {
         pause()
         let rustURL = try ComparisonManifest.videoURL(effect.rust, directory: directory)
+        let cliURL = try effect.swiftCLI.map { try ComparisonManifest.videoURL($0, directory: directory) }
         let swiftUIURL = try effect.swiftUI.map { try ComparisonManifest.videoURL($0, directory: directory) }
         let metalURL = try ComparisonManifest.videoURL(effect.metal, directory: directory)
         self.effect = effect; self.fps = fps; self.position = 0; self.error = nil
         rust.replaceCurrentItem(with: AVPlayerItem(url: rustURL))
+        swiftCLI.replaceCurrentItem(with: cliURL.map(AVPlayerItem.init(url:)))
         swiftUI.replaceCurrentItem(with: swiftUIURL.map(AVPlayerItem.init(url:)))
         metal.replaceCurrentItem(with: AVPlayerItem(url: metalURL))
-        rust.actionAtItemEnd = .pause; swiftUI.actionAtItemEnd = .pause; metal.actionAtItemEnd = .pause
-        rust.isMuted = true; swiftUI.isMuted = true; metal.isMuted = true
+        rust.actionAtItemEnd = .pause; swiftCLI.actionAtItemEnd = .pause; swiftUI.actionAtItemEnd = .pause; metal.actionAtItemEnd = .pause
+        rust.isMuted = true; swiftCLI.isMuted = true; swiftUI.isMuted = true; metal.isMuted = true
         seek(0)
     }
     func pause() {
-        rust.pause(); swiftUI.pause(); metal.pause(); timer?.invalidate(); timer = nil; isPlaying = false
+        rust.pause(); swiftCLI.pause(); swiftUI.pause(); metal.pause(); timer?.invalidate(); timer = nil; isPlaying = false
     }
     func clear() {
         pause(); effect = nil; position = 0; error = nil
-        rust.replaceCurrentItem(with: nil); swiftUI.replaceCurrentItem(with: nil); metal.replaceCurrentItem(with: nil)
+        rust.replaceCurrentItem(with: nil); swiftCLI.replaceCurrentItem(with: nil); swiftUI.replaceCurrentItem(with: nil); metal.replaceCurrentItem(with: nil)
     }
     func play() {
         guard effect != nil else { return }
@@ -54,10 +58,11 @@ import TTFXComparisonKit
         }
         error = nil
         isPlaying = true; startPosition = position
-        // Both players use the same host-clock deadline.
+        // All present players use the same host-clock deadline.
         let hostTime = CMClockGetTime(CMClockGetHostTimeClock()) + CMTime(seconds: 0.1, preferredTimescale: 600)
         startedAt = ProcessInfo.processInfo.systemUptime + 0.1
         start(rust, video: effect!.rust, hostTime: hostTime)
+        if let video = effect!.swiftCLI { start(swiftCLI, video: video, hostTime: hostTime) }
         if let video = effect!.swiftUI { start(swiftUI, video: video, hostTime: hostTime) }
         start(metal, video: effect!.metal, hostTime: hostTime)
         timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
@@ -81,12 +86,15 @@ import TTFXComparisonKit
         position = min(max(0, value), duration)
         guard let effect else { return }
         rust.seek(to: CMTime(seconds: ComparisonTimeline.time(position, frames: effect.rust.frames, fps: fps), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        if let video = effect.swiftCLI {
+            swiftCLI.seek(to: CMTime(seconds: ComparisonTimeline.time(position, frames: video.frames, fps: fps), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+        }
         if let video = effect.swiftUI {
             swiftUI.seek(to: CMTime(seconds: ComparisonTimeline.time(position, frames: video.frames, fps: fps), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
         }
         metal.seek(to: CMTime(seconds: ComparisonTimeline.time(position, frames: effect.metal.frames, fps: fps), preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
     }
     private var loadedPlayers: [AVPlayer] {
-        effect?.swiftUI == nil ? [rust, metal] : [rust, swiftUI, metal]
+        [rust, metal] + (effect?.swiftUI == nil ? [] : [swiftUI]) + (effect?.swiftCLI == nil ? [] : [swiftCLI])
     }
 }

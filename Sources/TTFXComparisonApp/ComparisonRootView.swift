@@ -11,6 +11,7 @@ struct ComparisonRootView: View {
     @State private var selection: String? = "print"
     @State private var search = ""
     @State private var error: String?
+    @State private var showSwiftCLI = true
     @State private var showSwiftUI = true
     @State private var player = ComparisonPlayer()
     private var names: [String] { EffectRegistry.names.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) } }
@@ -48,22 +49,32 @@ struct ComparisonRootView: View {
                         Text("\(manifest.columns) × \(manifest.rows) · \(manifest.fps) fps · seed \(manifest.seed)")
                             .foregroundStyle(.secondary)
                     }
+                    Toggle("Show Swift CLI", isOn: $showSwiftCLI)
+                        .toggleStyle(.switch)
+                        .help("Show or hide the pure-Swift CLI ANSI replay pane.")
                     Toggle("Show SwiftUI", isOn: $showSwiftUI)
                         .toggleStyle(.switch)
                         .help("Show or hide the right SwiftUI comparison pane.")
                     HStack(alignment: .top, spacing: 18) {
                         videoPane("Rust terminal", video: effect.rust, avPlayer: player.rust, manifest: manifest)
                         videoPane("Swift Metal", video: effect.metal, avPlayer: player.metal, manifest: manifest)
+                        if showSwiftCLI {
+                            if let cli = effect.swiftCLI {
+                                videoPane("Swift CLI", video: cli, avPlayer: player.swiftCLI, manifest: manifest)
+                            } else {
+                                missingRecordingPane(title: "Swift CLI", filename: "swift-cli.mp4")
+                            }
+                        }
                         if showSwiftUI {
                             if let swiftUI = effect.swiftUI {
                                 videoPane("SwiftUI", video: swiftUI, avPlayer: player.swiftUI, manifest: manifest)
                             } else {
-                                missingSwiftUIPane()
+                                missingRecordingPane(title: "SwiftUI", filename: "swiftui.mp4")
                             }
                         }
                     }
                     HStack {
-                        Button { player.seek(0) } label: { Image(systemName: "backward.end.fill") }.help("Restart both videos")
+                        Button { player.seek(0) } label: { Image(systemName: "backward.end.fill") }.help("Restart all videos")
                         Button { player.isPlaying ? player.pause() : player.play() } label: {
                             Label(player.isPlaying ? "Pause" : "Play", systemImage: player.isPlaying ? "pause.fill" : "play.fill")
                         }.keyboardShortcut(.space, modifiers: [])
@@ -71,7 +82,7 @@ struct ComparisonRootView: View {
                         Text(String(format: "%.2f / %.2f s", player.position, player.duration))
                             .monospacedDigit().frame(width: 130, alignment: .trailing)
                     }
-                    Text("All visible videos use the same timeline. Shorter videos hold their final frame; durations are never stretched.")
+                    Text("All present videos use the same timeline. Shorter videos hold their final frame; durations are never stretched.")
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
                     HStack(alignment: .top) {
@@ -84,7 +95,7 @@ struct ComparisonRootView: View {
                     }
                     Spacer(minLength: 0)
                 } else {
-                    ContentUnavailableView("Choose a video library", systemImage: "film.stack", description: Text("Open the generated video-comparison folder to compare Rust, SwiftUI, and Swift Metal effect by effect."))
+                    ContentUnavailableView("Choose a video library", systemImage: "film.stack", description: Text("Open the generated video-comparison folder to compare Rust, Swift CLI, SwiftUI, and Swift Metal effect by effect."))
                 }
                 if let message = error ?? player.error {
                     Text(message).foregroundStyle(.red).textSelection(.enabled)
@@ -120,10 +131,10 @@ struct ComparisonRootView: View {
         }.frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
-    private func missingSwiftUIPane() -> some View {
+    private func missingRecordingPane(title: String, filename: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("SwiftUI").font(.headline)
+                Text(title).font(.headline)
                 Spacer()
                 Text("Missing recording").font(.caption).foregroundStyle(.orange)
             }
@@ -132,9 +143,9 @@ struct ComparisonRootView: View {
                 VStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.title2)
-                    Text("No SwiftUI video in this library")
+                    Text("No \(title) video in this library")
                         .font(.headline)
-                    Text("Regenerate with ./tools/video-comparison/capture.sh to add swiftui.mp4 entries.")
+                    Text("Regenerate with ./tools/video-comparison/capture.sh to add \(filename) entries.")
                         .font(.caption)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)
@@ -142,7 +153,7 @@ struct ComparisonRootView: View {
                 .padding()
             }
             .aspectRatio(2, contentMode: .fit)
-            Text("Older two-track libraries only contain Rust and Metal videos.")
+            Text("Older libraries may not include this optional track.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }.frame(maxWidth: .infinity, alignment: .topLeading)

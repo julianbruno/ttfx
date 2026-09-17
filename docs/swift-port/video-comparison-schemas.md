@@ -214,7 +214,7 @@ Swift shape:
 {
   "rustBinary": "/Users/julian/miscodigos/ttfx/target/release/ttfx",
   "ffmpegBinary": "/opt/homebrew/bin/ffmpeg",
-  "rustCommand": "--parity-dump --seed 42 --frame-rate 25 --max-frames 3001 --ignore-terminal-dimensions --canvas-width 24 --canvas-height 8 --anchor-text sw --anchor-canvas sw EFFECT",
+  "rustCommand": "--parity-dump --virtual-clock --seed 42 --frame-rate 25 --max-frames 3001 --ignore-terminal-dimensions --canvas-width 24 --canvas-height 8 --anchor-text sw --anchor-canvas sw EFFECT",
   "workingTreeStatus": " M README.md\n",
   "captureMethod": "Rust ANSI replay through CoreText; Swift native effect frames through production Metal shaders; one encoded frame per engine tick. No frame sampling or duration normalization."
 }
@@ -345,8 +345,8 @@ After generating or editing a library:
 
 1. Open it with **TTFX Video Comparison**.
 2. Confirm the effect count in the sidebar footer.
-3. Select an effect and check Rust, SwiftUI, and Metal panes.
-4. Toggle **Show SwiftUI** off and on.
+3. Select an effect and check Rust, Swift CLI, SwiftUI, and Metal panes.
+4. Toggle **Show Swift CLI** and **Show SwiftUI** independently off and on.
 5. Scrub the timeline to the end; shorter videos should hold their final frame.
 6. If debugging Rust, inspect `<effect>/rust.frames` before inspecting `rust.mp4`.
 

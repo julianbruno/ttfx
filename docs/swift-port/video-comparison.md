@@ -35,17 +35,18 @@ The recordings and their manifest live in `artifacts/video-comparison/`. That di
 
 The comparison app opens `artifacts/video-comparison/` automatically when launched through `./script/build_and_run.sh --compare`. **Open Library…** can load another generated folder.
 
-For each selected effect, the app shows three synchronized panes:
+For each selected effect, the app shows four synchronized panes:
 
 | Position | Pane | Source |
 |---|---|---|
 | Left | Rust terminal | Rust `ttfx --parity-dump` ANSI output replayed by Swift/CoreText. |
 | Middle | Swift Metal | Native Swift effect frames rendered by the production Metal renderer. |
-| Right | SwiftUI | Native Swift effect frames rendered by the SwiftUI fallback view. |
+| Optional | Swift CLI | Actual pure-Swift `ttfx --parity-dump --virtual-clock` ANSI output replayed by CoreText. |
+| Optional | SwiftUI | Native Swift effect frames rendered by the SwiftUI fallback view. |
 
-Use **Play** or Space to play/pause, and scrub the shared timeline. All visible videos use the same host clock. If one visible video ends earlier, it holds its final frame while the others continue.
+Use **Play** or Space to play/pause, and scrub the shared timeline. All present videos use the same host clock. If one video ends earlier, it holds its final frame while the others continue.
 
-The right SwiftUI pane is optional: **Show SwiftUI** hides or shows it. If an old two-track library has no `swiftui.mp4` or `swiftUI` manifest entries, the app keeps the right pane as a missing-recording notice until the library is regenerated.
+The Swift CLI and SwiftUI panes are independently optional: **Show Swift CLI** and **Show SwiftUI** hide or show them. Older libraries missing `swiftCLI` show a CLI missing-recording notice. If an old two-track library has no `swiftui.mp4` or `swiftUI` manifest entries, the app keeps the right pane as a missing-recording notice until the library is regenerated.
 
 ## What gets generated
 
@@ -58,6 +59,8 @@ artifacts/video-comparison/
 └── <effect>/
     ├── rust.frames
     ├── rust.mp4
+    ├── swift-cli.frames
+    ├── swift-cli.mp4
     ├── swiftui.mp4
     └── metal.mp4
 ```
@@ -144,19 +147,20 @@ grep '"swiftUI"' artifacts/video-comparison/manifest.json | head
 
 ## Current local capture
 
-The current local library was regenerated at **2026-09-17T17:01:22Z**.
+The current local library was regenerated at **2026-09-17T20:39:38Z**.
 
 | Metric | Value |
 |---|---:|
 | Effects | 37 |
-| Videos | 111 |
+| Videos | 148 |
 | Effects with SwiftUI track | 37 |
+| Effects with Swift CLI track | 37 |
 | Incomplete recordings | 0 |
-| Total encoded frames | 37,848 |
+| Total encoded frames | 50,464 |
 
-`rings` currently has 1,398 frames in all three panes: Rust terminal, Swift Metal, and SwiftUI.
+`rings` currently has 1,398 frames in all four panes: Rust terminal, Swift CLI, Swift Metal, and SwiftUI.
 
-`artifacts/video-comparison/validation.json` may be stale after regeneration unless you rerun the validation helper that produced it. Treat `manifest.json` as the app's source of truth for the loaded library.
+All 148 videos passed ffprobe frame-count, dimensions, and FPS checks plus full ffmpeg decode. All 74 executable dump streams passed UTF-8 framing and completion/cap checks. `artifacts/video-comparison/validation.json` stores the local results and Swift CLI binary SHA-256; it becomes stale on the next regeneration. Treat `manifest.json` as the app's source of truth. These checks validate recordings, not effect parity.
 
 ## Related docs
 
