@@ -8,7 +8,7 @@ Metal cell upload/color semantics, regression tests, local video regeneration, v
 
 ## Tasks
 - [x] M01 Reproduce sentinel/default-white Metal bug with failing tests, fix color upload semantics, verify focused SwiftUI/comparison tests and full serial suite; conventional work-unit commit.
-- [ ] M02 Regenerate affected local Metal videos (all library if practical); verify overflow and sentinel-affected effects against Rust. Record proof and conventional work-unit commit.
+- [x] M02 Regenerate affected local Metal videos (all library if practical); verify overflow and sentinel-affected effects against Rust. Record proof and conventional work-unit commit.
 
 ## Acceptance / Checks
 Sentinel 0xFFFF_FFFE is metadata, never visible RGB. Default fg0 white; explicit black fg0 stays black; genuine background RGB preserved. Production Metal GPU output black empty regions and correct glyphs. Commands swift test --filter 'TTFXSwiftUITests|TTFXComparisonTests'; swift test --no-parallel; local capture+ffprobe+representative decoded frame comparison.
@@ -21,9 +21,19 @@ Sentinel 0xFFFF_FFFE is metadata, never visible RGB. Default fg0 white; explicit
 - `swift test --no-parallel` passed 200 tests in 5 suites (120.130 seconds), including mandatory genuine-GPU regression.
 - Runtime coverage: explicit black glyph+space regions all black; default-white glyph coverage >25 pixels; genuine #112233 background exact BGRA preserved.
 - Rollback: remove scoped upload color resolution and 2 regression tests; effect engine unchanged.
-- M01 work-unit commit: pending creation.
+- M01 work-unit commit: `0874fc6`. Independent verifier: 2 focused regressions passed, including genuine GPU; no blocker.
+
+### M02 evidence
+- `.build/debug/TTFXVideoCapture` regenerated all 37 effects/111 videos with genuine GPU; all effects complete.
+- Every video's ffprobe metadata matched manifest: 384 × 192, 25 FPS, exact frame count.
+- Decoded first/middle/final Rust/Metal RGB frames for all 37 effects (111 samples). Maximum mean absolute RGB error 8.75/255 (synthgrid frame 192); overflow final frame 18 error 2.3609/255.
+- Metal atlas rasterization differs intentionally from terminal replay: Menlo 44 in 40 × 56 slots rescaled/bilinear-sampled versus Rust Menlo 20 CoreText. These glyph-coverage residuals are not a byte-identical-video claim; atlas changes outside white-background bug scope.
+- Black-cell verification across all samples: 18530 Rust-black grid cells checked; 0 bright Metal background mismatches (Rust mean RGB <1; Metal mismatch threshold >20).
+- Parent and worker inspected final overflow contact sheet; white backgrounds gone, placement/colors retained.
+- Local ignored proof: `artifacts/video-comparison/metal-parity-overflow.png` (Rust/Metal/SwiftUI), `metal-parity-check.json` (metadata/sample/background metrics).
+- Rollback: regeneration from previous renderer replaces ignored videos; tracked proof can be reverted independently.
+- M02 work-unit commit: pending evidence commit.
+- RDD off globally; no review lifecycle/remote/push/PR operations. Unrelated `docs/swift-port/cross-platform-cli-spec.md` untouched.
 
 ## Next step
-M02 regenerate all 37 effects/111 local videos, then check metadata and sampled Rust/Metal output. Unrelated cross-platform CLI spec remains untouched.
-
-
+Parent final task mirror synchronization and verification readback; implementation complete.
