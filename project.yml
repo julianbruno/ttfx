@@ -2,6 +2,7 @@ name: TTFXGalleryApp
 options:
   bundleIdPrefix: codes.suscodigos.ttfx
   deploymentTarget:
+    iOS: "17.0"
     macOS: "14.0"
 packages:
   ttfx-swift:
@@ -9,10 +10,22 @@ packages:
 targets:
   TTFXGalleryApp:
     type: application
-    platform: macOS
-    deploymentTarget: "14.0"
+    supportedDestinations: [iOS, macOS]
+    deploymentTarget:
+      iOS: "17.0"
+      macOS: "14.0"
     sources:
       - path: Sources/ttfx-swift/SwiftUI/TTFXGalleryApp
+        excludes:
+          - Info.plist
+    info:
+      path: Sources/ttfx-swift/SwiftUI/TTFXGalleryApp/Info.plist
+      properties:
+        CFBundleDisplayName: TTFX Gallery
+        CFBundleIdentifier: codes.suscodigos.ttfx.gallery
+        CFBundleName: TTFXGalleryApp
+        CFBundlePackageType: APPL
+        LSApplicationCategoryType: public.app-category.developer-tools
     dependencies:
       - package: ttfx-swift
         product: ttfx-swift
@@ -21,13 +34,26 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: codes.suscodigos.ttfx.gallery
+        PRODUCT_BUNDLE_PACKAGE_TYPE: APPL
         PRODUCT_NAME: TTFXGalleryApp
-        INFOPLIST_KEY_CFBundleName: TTFXGalleryApp
-        INFOPLIST_KEY_CFBundleDisplayName: TTFX Gallery
-        INFOPLIST_KEY_CFBundleIdentifier: codes.suscodigos.ttfx.gallery
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
         GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_FILE: Sources/ttfx-swift/SwiftUI/TTFXGalleryApp/Info.plist
+        INFOPLIST_KEY_CFBundleDisplayName: TTFX Gallery
+        INFOPLIST_KEY_CFBundleName: TTFXGalleryApp
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.developer-tools
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        SUPPORTS_MACCATALYST: NO
+        SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
         SWIFT_VERSION: 6.0
-        MACOSX_DEPLOYMENT_TARGET: 14.0
+        LD_RUNPATH_SEARCH_PATHS: "$(inherited) @executable_path/Frameworks @executable_path/../Frameworks"
 schemes:
   TTFXGalleryApp:
     build:

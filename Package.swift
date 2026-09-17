@@ -55,7 +55,8 @@ let package = Package(
                 "TTFXEffects",
                 "TTFXSwiftUI"
             ],
-            path: "Sources/ttfx-swift/SwiftUI/TTFXGalleryApp"
+            path: "Sources/ttfx-swift/SwiftUI/TTFXGalleryApp",
+            exclude: ["Info.plist"]
         ),
         .executableTarget(
             name: "TTFXCLI",

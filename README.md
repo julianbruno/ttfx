@@ -4,8 +4,8 @@ Terminal text effects as a single static binary. Pipe text in, pick an effect:
 
 > [!NOTE]
 > **Swift port work in progress.** This repository now includes an experimental native Swift port
-> beside the Rust CLI: `TTFXCore`, `TTFXEffects`, `TTFXSwiftUI`, and a macOS-first
-> `TTFXGalleryApp` for previewing effects from Xcode. The Swift code is being built as a parity
+> beside the Rust CLI: `TTFXCore`, `TTFXEffects`, `TTFXSwiftUI`, and `TTFXGalleryApp` (macOS and
+> iOS Simulator) for previewing effects from Xcode. The Swift code is being built as a parity
 > port of the existing implementation, not as a replacement for the production Rust binary yet.
 > Start with [`docs/swift-port/swift-port-architecture.md`](docs/swift-port/swift-port-architecture.md)
 > if you want to understand how the Swift modules map back to the original Rust code.
@@ -151,51 +151,57 @@ Upstream is not vendored here — the harness fetches it, because it's their cod
 
 ## Native Swift port
 
-A macOS-first native Swift port is being developed alongside the Rust binary. It lives in the
+A native Swift port is being developed alongside the Rust binary. It lives in the
 root Swift package and does **not** replace the Rust `ttfx` product or change the Rust parity
-claims above.
+claims above. Status and architecture: [`docs/swift-port/README.md`](docs/swift-port/README.md).
 
 ```sh
 swift package resolve
 swift build --product ttfx
-printf 'Swift\nTTE' | swift run ttfx --canvas-width 12 --canvas-height 6 print
-swift run ttfx --help
-swift run ttfx --print-completion bash
-swift run ttfx --print-completion zsh
+printf 'Swift\nTTE' | swift run ttfx -- --canvas-width 12 --canvas-height 6 print
+printf 'Swift\nTTE' | swift run ttfx -- --canvas-width 12 --canvas-height 6 print --print-speed 5
+swift run ttfx -- print --help
+swift run ttfx -- --print-completion bash
 ```
 
-The package also includes a macOS-first SwiftUI gallery app for native effect previewing:
+This toolchain’s `swift run` takes the executable name, not `--product`. Per-effect TTE flags
+go after the effect name (`ttfx print --print-speed 5`, `ttfx rain --rain-symbols o .`).
+Unknown effect flags are rejected. `ttfx <effect> --help` lists that effect’s flags.
+
+### Gallery app
+
+Open the Xcode **app** project, not the SwiftPM executable:
 
 ```sh
-swift build --product TTFXGalleryApp
 xcodegen generate
-open TTFXGalleryApp.xcodeproj   # select the TTFXGalleryApp scheme and My Mac, then Run
+open TTFXGalleryApp.xcodeproj
 ```
 
-The SwiftPM executable is kept for package build/test coverage. The XcodeGen project is the
-standalone macOS `.app` launch path because it provides the required bundle identifier
+Select scheme **TTFXGalleryApp** (product `TTFXGalleryApp.app`) and a destination
+(**My Mac** or **iPhone Simulator**), then Run. The app bundle id is
 `codes.suscodigos.ttfx.gallery`.
 
-`TTFXGalleryApp` lists `EffectRegistry.names` in registry order, lets you edit text, seed,
-canvas bounds, effect selection, and playback, and renders through the native SwiftUI snapshot
-path with deterministic fallback status for headless environments. iOS Simulator launch support
-is deferred until it can share the lifecycle without extra project wiring.
+Do not Run the SwiftPM `TTFXGalleryApp` executable. That path is a bare binary with no
+bundle id: on iPhone UIKit traps in `BKSHIDEvent`; on Mac you get `missing main bundle
+identifier` and `linkd.autoShortcut` XPC errors.
 
-The Swift package currently exposes:
+The SwiftPM executable remains for `swift build --product TTFXGalleryApp` / tests. `TTFXGalleryApp`
+lists `EffectRegistry.names` in registry order and lets you edit text, seed, canvas, effect, and
+playback through the native SwiftUI snapshot path.
 
 | Area | Current status |
 |---|---|
-| Core/effects | Native Swift core plus all 37 effect counterparts. Effect parity is covered by the Swift test suite's Rust-backed effect matrix. |
-| CLI | Native `ttfx` executable with Rust-style terminal options, random-effect filtering, completions, and hidden parity-dump support. Focused byte parity is documented for `print`, `wipe`, and `expand`; all 37 effects have CLI parity-dump smoke coverage. |
-| SwiftUI/Metal | Optional `TTFXSwiftUI` library with deterministic gallery, snapshots, scheduling, and Metal upload/command-plan tests. Headless CI proves command planning only; visual drawable-backed Metal presentation still needs an interactive app/device check. |
-| Product scope | The Rust binary remains the production authority in this README. The Swift port is for SwiftPM/macOS ecosystem integration and is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
-
-Swift validation entry points:
+| Core/effects | Native Swift core plus all 37 effect counterparts, each with a TTE-shaped configuration. Effect parity is covered by the Swift test suite's Rust-backed effect matrix. |
+| CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. Focused byte parity is documented for `print`, `wipe`, and `expand`; all 37 effects have CLI parity-dump smoke coverage. |
+| SwiftUI/Metal | Optional `TTFXSwiftUI` library plus `TTFXGalleryApp.xcodeproj` for macOS and iOS Simulator. Headless CI proves command planning; visual Metal presentation still needs an interactive check. |
+| Product scope | The Rust binary remains the production authority in this README. The Swift port is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
 
 ```sh
 swift test --filter EffectFrameParityTests
 swift test --filter CLIParityDumpTests
+swift test --filter CLIParsingTests
 swift test --filter TTFXSwiftUITests
+swift test --filter galleryXcodeAppDeclaresBundleIdentifierAndIOSDestinations
 swift test
 ```
 

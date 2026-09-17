@@ -172,7 +172,7 @@ import TTFXEffects
 @Test func rendererStatusAndAccessibilityLabelsAreHeadlessInspectable() throws {
     let model = try TTFXGalleryViewModel(metalAvailability: .init(isAvailable: false, message: "headless disabled"))
 
-    #expect(model.rendererStatus == "Fallback renderer: headless disabled")
+    #expect(model.rendererStatus == "SwiftUI preview — headless disabled")
     #expect(TTFXGalleryRootView.accessibilityLabels == [
         "TTFX Gallery App",
         "Effect picker",
@@ -216,7 +216,7 @@ import TTFXEffects
     #expect(TTFXGalleryPreviewRendererSelection.statusText(
         availability: .init(isAvailable: false, message: "headless"),
         platformSupportsMetalView: true
-    ) == "Fallback renderer: headless")
+    ) == "SwiftUI preview — headless")
 
     let unsupported = TTFXGalleryPreviewRendererSelection.resolve(
         availability: .init(isAvailable: true, message: "Metal renderer available"),
@@ -226,7 +226,7 @@ import TTFXEffects
     #expect(TTFXGalleryPreviewRendererSelection.statusText(
         availability: .init(isAvailable: true, message: "Metal renderer available"),
         platformSupportsMetalView: false
-    ) == "Fallback renderer: platform Metal view unavailable")
+    ) == "SwiftUI preview — Metal view not available on this platform")
 
     let visibleFallback = TTFXGalleryPreviewRendererSelection.resolve(
         availability: .init(isAvailable: true, message: "Metal renderer available"),
@@ -236,7 +236,7 @@ import TTFXEffects
     #expect(TTFXGalleryPreviewRendererSelection.statusText(
         availability: .init(isAvailable: true, message: "Metal renderer available"),
         platformSupportsMetalView: true
-    ) == "Fallback renderer: drawable-backed Metal preview deferred")
+    ) == "SwiftUI preview — Metal GPU view not connected yet")
 }
 
 @Test func productionAppSourceDoesNotUseSubprocessesFixturesOrFrameDumpFallbacks() throws {
@@ -258,4 +258,30 @@ import TTFXEffects
             #expect(!text.localizedCaseInsensitiveContains(token), "Forbidden token '\(token)' found in \(file.lastPathComponent)")
         }
     }
+}
+
+@Test func galleryXcodeAppDeclaresBundleIdentifierAndIOSDestinations() throws {
+    let root = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+        .deletingLastPathComponent()
+    let pbx = try String(
+        contentsOf: root.appendingPathComponent("TTFXGalleryApp.xcodeproj/project.pbxproj"),
+        encoding: .utf8
+    )
+    let infoPlist = try String(
+        contentsOf: root.appendingPathComponent("Sources/ttfx-swift/SwiftUI/TTFXGalleryApp/Info.plist"),
+        encoding: .utf8
+    )
+
+    #expect(pbx.contains("PRODUCT_BUNDLE_IDENTIFIER = codes.suscodigos.ttfx.gallery"))
+    #expect(pbx.contains("Sources/ttfx-swift/SwiftUI/TTFXGalleryApp/Info.plist"))
+    #expect(pbx.contains("GENERATE_INFOPLIST_FILE = YES"))
+    #expect(pbx.contains("SDKROOT = auto"))
+    #expect(pbx.contains("iphoneos"))
+    #expect(pbx.contains("iphonesimulator"))
+    #expect(pbx.contains("SUPPORTED_PLATFORMS = \"iphoneos iphonesimulator macosx\""))
+    #expect(pbx.contains("INFOPLIST_KEY_UILaunchScreen_Generation = YES"))
+    #expect(infoPlist.contains("codes.suscodigos.ttfx.gallery"))
+    #expect(infoPlist.contains("CFBundleIdentifier"))
 }

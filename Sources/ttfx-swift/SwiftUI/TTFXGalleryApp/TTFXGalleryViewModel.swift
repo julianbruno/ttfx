@@ -22,11 +22,11 @@ public enum TTFXGalleryPreviewRendererSelection: Equatable, Sendable {
         case .metalFrameView:
             return availability.message
         case .swiftUIFrameView where availability.isAvailable && platformSupportsMetalView:
-            return "Fallback renderer: drawable-backed Metal preview deferred"
+            return "SwiftUI preview — Metal GPU view not connected yet"
         case .swiftUIFrameView where availability.isAvailable:
-            return "Fallback renderer: platform Metal view unavailable"
+            return "SwiftUI preview — Metal view not available on this platform"
         case .swiftUIFrameView:
-            return "Fallback renderer: \(availability.message)"
+            return "SwiftUI preview — \(availability.message)"
         }
     }
 
@@ -35,7 +35,7 @@ public enum TTFXGalleryPreviewRendererSelection: Equatable, Sendable {
         case .metalFrameView:
             return "Metal renderer available"
         case .swiftUIFrameView:
-            return "Fallback renderer"
+            return "SwiftUI preview"
         }
     }
 }
