@@ -17,6 +17,15 @@ import Testing
     #expect(result.stderr.isEmpty)
 }
 
+@Test func processRunnerCapturesOutputLargerThanAPipeBuffer() throws {
+    let result = try ProcessRunner().run(
+        executable: URL(fileURLWithPath: "/bin/dd"),
+        arguments: ["if=/dev/zero", "bs=1048576", "count=2"], stdin: Data(),
+        environment: [:], currentDirectory: nil, timeout: 5)
+    #expect(result.stdout.count == 2 * 1_048_576)
+    #expect(!result.stderr.isEmpty)
+}
+
 @Test func processRunnerRejectsMissingNonExecutableTimeoutAndNonzeroOracles() throws {
     let runner = ProcessRunner()
     let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

@@ -31,8 +31,19 @@ public struct ProcessRunner: Sendable {
         }
 
         let process = Process()
-        let stdout = Pipe()
-        let stderr = Pipe()
+        // A full effect can emit megabytes. Pipes must be drained concurrently;
+        // temporary files avoid pipe-capacity deadlocks while retaining timeout
+        // handling and both complete diagnostic streams.
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let stdoutURL = directory.appendingPathComponent("stdout")
+        let stderrURL = directory.appendingPathComponent("stderr")
+        FileManager.default.createFile(atPath: stdoutURL.path, contents: nil)
+        FileManager.default.createFile(atPath: stderrURL.path, contents: nil)
+        let stdout = try FileHandle(forWritingTo: stdoutURL)
+        let stderr = try FileHandle(forWritingTo: stderrURL)
+        defer { try? stdout.close(); try? stderr.close() }
         let input = Pipe()
         process.executableURL = executable
         process.arguments = arguments
@@ -63,8 +74,8 @@ public struct ProcessRunner: Sendable {
 
         let result = ProcessResult(
             exitCode: process.terminationStatus,
-            stdout: stdout.fileHandleForReading.readDataToEndOfFile(),
-            stderr: stderr.fileHandleForReading.readDataToEndOfFile()
+            stdout: try Data(contentsOf: stdoutURL),
+            stderr: try Data(contentsOf: stderrURL)
         )
         guard result.exitCode == 0 else {
             throw ProcessRunnerError.nonzeroExit(result.exitCode, stdout: result.stdout, stderr: result.stderr)

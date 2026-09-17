@@ -35,6 +35,7 @@ public struct TTFXGalleryRootView: View {
         "Frames per second",
         "Preview font size",
         "Loop playback",
+        "Use Metal",
         "Play or pause preview",
         "Reset preview",
         "TTFX preview",
@@ -102,7 +103,8 @@ public struct TTFXGalleryRootView: View {
         switch viewModel.previewRendererSelection {
         case .metalFrameView:
             #if canImport(MetalKit) && (os(macOS) || os(iOS) || os(tvOS))
-            TTFXMetalFrameView(snapshot: viewModel.currentSnapshot)
+            TTFXMetalFrameView(snapshot: viewModel.currentSnapshot, cellSize: .init(width: Float(viewModel.previewFontSize * 0.68), height: Float(viewModel.previewFontSize * 1.2)))
+                .frame(width: visiblePreviewMinimumSize.width, height: visiblePreviewMinimumSize.height)
             #else
             TTFXFrameView(snapshot: viewModel.currentSnapshot)
             #endif
@@ -113,6 +115,8 @@ public struct TTFXGalleryRootView: View {
 
     private var controls: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 12) {
+            Toggle("Use Metal", isOn: $viewModel.useMetal)
+                .accessibilityLabel("Use Metal")
             GridRow {
                 Text("Effect")
                 Picker("Effect picker", selection: Binding(get: {

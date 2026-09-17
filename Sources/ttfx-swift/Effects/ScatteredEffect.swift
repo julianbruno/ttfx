@@ -122,9 +122,7 @@ public struct ScatteredEffect: Effect {
             return lhs.characterID < rhs.characterID
         }.map { source in
             let targetColor = finalColorByCoordinate[source.coordinate]!
-            let colors = (try! Gradient(stops: [startColor, targetColor], steps: 10)).spectrum.flatMap { color in
-                Array(repeating: Self.rgb(color), count: options.finalGradientFrames)
-            }
+            let colors = (try! Gradient(stops: [startColor, targetColor], steps: 10)).spectrum.map(Self.rgb)
             let start = startCoordinate()
             let distance = Geometry.lineLength(from: start, to: source.coordinate)
             return Glyph(
@@ -185,7 +183,7 @@ public struct ScatteredEffect: Effect {
 
     private func foreground(for glyph: Glyph) -> UInt32 {
         guard glyph.pathActive else { return glyph.colors[glyph.colors.count - 1] }
-        if glyph.lastDistance == 0 { return glyph.colors[0] }
+        if glyph.currentStep == 0 { return glyph.colors[0] }
         let total = max(glyph.totalDistance, 1)
         let remaining = max(glyph.totalDistance - glyph.lastDistance, 1)
         let reached = max(total - remaining, 1)

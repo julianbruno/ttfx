@@ -49,3 +49,25 @@ private struct ImmediateEffect: Effect {
     #expect(engine.tick() == .complete)
     #expect(engine.frame[column: 1, row: 1].codepoint == 90)
 }
+
+
+private struct MovingGlyphEffect: Effect {
+    private var step = 0
+    init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {}
+    mutating func tick(into frame: inout Frame) -> TickStatus {
+        step += 1
+        frame[column: step, row: 1] = Cell(codepoint: 65, foreground: 0xff0000, background: 0)
+        return step == 2 ? .complete : .running
+    }
+}
+
+@Test func engineClearsMovedGlyphsAndKeepsTheCompletedFrame() throws {
+    var engine = try EffectEngine<MovingGlyphEffect>(configuration: .init(), canvas: .init(columns: 2, rows: 1))
+    #expect(engine.tick() == .running)
+    #expect(engine.frame[column: 1, row: 1].codepoint == 65)
+    #expect(engine.tick() == .complete)
+    #expect(engine.frame[column: 1, row: 1] == .blank)
+    #expect(engine.frame[column: 2, row: 1].codepoint == 65)
+    #expect(engine.tick() == .complete)
+    #expect(engine.frame[column: 2, row: 1].codepoint == 65)
+}

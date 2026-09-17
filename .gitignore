@@ -8,3 +8,7 @@ __pycache__/
 /.atl/
 # Local Pi runtime state
 .atl/
+# Reproducible visual comparison recordings (regenerate with tools/video-comparison/capture.sh)
+/artifacts/video-comparison/
+/artifacts/video-comparison-before-parity/
+/artifacts/effect-parity-baseline/

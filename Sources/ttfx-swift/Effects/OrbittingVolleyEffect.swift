@@ -112,7 +112,6 @@ public struct OrbittingVolleyEffect: Effect {
     private var launchers: [Launcher] = []
     private var launcherColorByCoordinate: [Coordinate: UInt32] = [:]
     private var delay = 0
-    private var emittedSettledFrame = false
     private var emittedFinalFrame = false
     private var isComplete = false
 
@@ -142,17 +141,6 @@ public struct OrbittingVolleyEffect: Effect {
             render(into: &frame)
             return .running
         }
-        if !emittedSettledFrame && delay > 0 {
-            emittedSettledFrame = true
-            restartMainLauncherIfNeeded()
-            updateLauncherAppearances()
-            if launchers[0].path?.active == true {
-                let (coordinate, _) = launchers[0].path!.step()
-                launchers[0].coordinate = coordinate
-            }
-            render(into: &frame)
-            return .running
-        }
         if !emittedFinalFrame {
             emittedFinalFrame = true
             for index in launchers.indices { launchers[index].visible = false }
@@ -167,7 +155,7 @@ public struct OrbittingVolleyEffect: Effect {
         // QUIRK(src/effects/orbittingvolley.rs:315-342): completion is gated by
         // magazines and launched input characters; a still-orbiting launcher alone
         // does not keep the effect running.
-        launchers.contains { !$0.magazine.isEmpty } || glyphs.contains { $0.visible && $0.path != nil && $0.coordinate != $0.target }
+        launchers.contains { !$0.magazine.isEmpty } || glyphs.filter { $0.visible && $0.path != nil }.count + (launchers.first?.path?.active == true ? 1 : 0) > 1
     }
 
     private mutating func build(input: InputText) {

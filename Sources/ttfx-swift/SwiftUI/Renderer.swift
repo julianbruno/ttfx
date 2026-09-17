@@ -147,6 +147,11 @@ public struct TTFXMetalCommandPlan: Equatable, Sendable {
 
 #if canImport(Metal)
 import Metal
+#if canImport(MetalKit)
+import MetalKit
+import Foundation
+private enum TTFXMetalResourceError: Error { case missingShader }
+#endif
 
 public final class TTFXMetalRenderer {
     public static var hasDefaultDevice: Bool {
@@ -157,9 +162,17 @@ public final class TTFXMetalRenderer {
     public private(set) var lastUploadPlan: TTFXMetalFrameUploadPlan?
     public private(set) var lastGlyphCellBufferLength: Int = 0
 
-    private let device: (any MTLDevice)?
+    public let device: (any MTLDevice)?
     private let commandQueue: (any MTLCommandQueue)?
     private var glyphCellBuffer: (any MTLBuffer)?
+    public private(set) var lastPresentedDrawableSize: TTFXMetalDrawableSize?
+    public private(set) var lastEncodedOperationCount = 0
+    public private(set) var lastDrawError: String?
+    private var pipeline: (any MTLRenderPipelineState)?
+    #if canImport(MetalKit)
+    private var atlas: TTFXMetalGlyphAtlas?
+    #endif
+
 
     public var canEncodeGPUCommands: Bool {
         device != nil && commandQueue != nil
@@ -190,14 +203,119 @@ public final class TTFXMetalRenderer {
         guard canEncodeGPUCommands else { return commandPlan }
         glyphCellBuffer = commandPlan.uploadPlan.cells.withUnsafeBufferPointer { cells in
             guard let baseAddress = cells.baseAddress, commandPlan.uploadPlan.byteCount > 0 else {
-                return device?.makeBuffer(length: 0, options: [.storageModeShared])
+                return nil
             }
             return device?.makeBuffer(bytes: baseAddress, length: commandPlan.uploadPlan.byteCount, options: [.storageModeShared])
         }
         lastGlyphCellBufferLength = glyphCellBuffer?.length ?? 0
-        _ = commandQueue?.makeCommandBuffer()
         return commandPlan
     }
+    #if canImport(MetalKit)
+    @MainActor
+    @discardableResult
+    public func draw(snapshot: TTFXFrameSnapshot, cellSize: TTFXMetalCellSize, view: MTKView) -> TTFXMetalCommandPlan {
+        let size = TTFXMetalDrawableSize(width: Float(view.drawableSize.width), height: Float(view.drawableSize.height))
+        guard let drawable = view.currentDrawable, let pass = view.currentRenderPassDescriptor else {
+            resetDrawState()
+            return TTFXMetalCommandPlan(uploadPlan: makeUploadPlan(snapshot: snapshot, cellSize: cellSize), drawableSize: size, canEncodeGPUCommands: false)
+        }
+        // Geometry is expressed in points; the viewport maps it to Retina pixels.
+        let logicalSize = TTFXMetalDrawableSize(width: Float(view.bounds.width), height: Float(view.bounds.height))
+        return draw(snapshot: snapshot, cellSize: cellSize, drawableSize: size, logicalSize: logicalSize, pass: pass) { commandBuffer in
+            commandBuffer.present(drawable)
+        }
+    }
+
+    /// The presentation closure is shared by MTKView and offscreen tests. Metrics
+    /// report submission, never a claim that GPU pixels have appeared on screen.
+    @discardableResult
+    /// Exports pixels using the same atlas, shaders and encoding path as the live Metal view.
+    public func exportBGRA(snapshot: TTFXFrameSnapshot, cellWidth: Int, cellHeight: Int) throws -> Data {
+        guard let device, cellWidth > 0, cellHeight > 0 else {
+            throw NSError(domain: "TTFXMetalExport", code: 1, userInfo: [NSLocalizedDescriptionKey: "Metal device unavailable or invalid cell size"])
+        }
+        let width = snapshot.columns * cellWidth, height = snapshot.rows * cellHeight
+        let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+        descriptor.storageMode = .shared
+        descriptor.usage = .renderTarget
+        guard let texture = device.makeTexture(descriptor: descriptor) else {
+            throw NSError(domain: "TTFXMetalExport", code: 2, userInfo: [NSLocalizedDescriptionKey: "Cannot allocate export texture"])
+        }
+        let pass = MTLRenderPassDescriptor()
+        pass.colorAttachments[0].texture = texture
+        let size = TTFXMetalDrawableSize(width: Float(width), height: Float(height))
+        var submitted: (any MTLCommandBuffer)?
+        _ = draw(snapshot: snapshot, cellSize: .init(width: Float(cellWidth), height: Float(cellHeight)), drawableSize: size, logicalSize: size, pass: pass) { submitted = $0 }
+        guard let submitted else {
+            throw NSError(domain: "TTFXMetalExport", code: 3, userInfo: [NSLocalizedDescriptionKey: lastDrawError ?? "Metal did not submit an export frame"])
+        }
+        submitted.waitUntilCompleted()
+        guard submitted.status == .completed else {
+            throw submitted.error ?? NSError(domain: "TTFXMetalExport", code: 4)
+        }
+        var pixels = Data(count: width * height * 4)
+        pixels.withUnsafeMutableBytes { bytes in
+            texture.getBytes(bytes.baseAddress!, bytesPerRow: width * 4, from: MTLRegionMake2D(0, 0, width, height), mipmapLevel: 0)
+        }
+        return pixels
+    }
+
+    func draw(snapshot: TTFXFrameSnapshot, cellSize: TTFXMetalCellSize, drawableSize: TTFXMetalDrawableSize, logicalSize: TTFXMetalDrawableSize, pass: MTLRenderPassDescriptor, present: (any MTLCommandBuffer) -> Void) -> TTFXMetalCommandPlan {
+        resetDrawState()
+        let plan = prepare(snapshot: snapshot, cellSize: cellSize, drawableSize: drawableSize)
+        func skipped() -> TTFXMetalCommandPlan {
+            TTFXMetalCommandPlan(uploadPlan: plan.uploadPlan, drawableSize: drawableSize, canEncodeGPUCommands: false)
+        }
+        guard let device, let commandQueue, logicalSize.width > 0, logicalSize.height > 0,
+              let target = pass.colorAttachments[0].texture else { return skipped() }
+        do {
+            if pipeline == nil {
+                guard let url = Bundle.module.url(forResource: "GlyphCell", withExtension: "metal", subdirectory: "Shaders") else {
+                    throw TTFXMetalResourceError.missingShader
+                }
+                let library = try device.makeLibrary(source: String(contentsOf: url, encoding: .utf8), options: nil)
+                let descriptor = MTLRenderPipelineDescriptor()
+                descriptor.vertexFunction = library.makeFunction(name: "glyphVertex")
+                descriptor.fragmentFunction = library.makeFunction(name: "glyphFragment")
+                descriptor.colorAttachments[0].pixelFormat = target.pixelFormat
+                pipeline = try device.makeRenderPipelineState(descriptor: descriptor)
+            }
+            let codepoints = Set(snapshot.cells.map(\.codepoint))
+            if atlas == nil || !codepoints.isSubset(of: atlas!.codepoints) {
+                atlas = try TTFXMetalGlyphAtlas(device: device, codepoints: codepoints.union(atlas?.codepoints ?? []))
+            }
+            guard let pipeline, let atlas, let commandBuffer = commandQueue.makeCommandBuffer() else { return skipped() }
+            let vertices = TTFXMetalVertex.makeVertices(plan: plan.uploadPlan, viewport: logicalSize, atlasRects: atlas.rects)
+            guard !vertices.isEmpty, let buffer = vertices.withUnsafeBytes({ bytes in
+                device.makeBuffer(bytes: bytes.baseAddress!, length: bytes.count, options: .storageModeShared)
+            }) else { return skipped() }
+            pass.colorAttachments[0].loadAction = .clear
+            pass.colorAttachments[0].storeAction = .store
+            pass.colorAttachments[0].clearColor = MTLClearColorMake(0, 0, 0, 1)
+            guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass) else { return skipped() }
+            encoder.setRenderPipelineState(pipeline)
+            encoder.setVertexBuffer(buffer, offset: 0, index: 0)
+            encoder.setFragmentTexture(atlas.texture, index: 0)
+            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
+            encoder.endEncoding()
+            present(commandBuffer)
+            commandBuffer.commit()
+            lastEncodedOperationCount = 1
+            lastPresentedDrawableSize = drawableSize
+            return plan
+        } catch {
+            lastDrawError = String(describing: error)
+            return skipped()
+        }
+    }
+
+    private func resetDrawState() {
+        lastEncodedOperationCount = 0
+        lastPresentedDrawableSize = nil
+        lastDrawError = nil
+    }
+    #endif
+
 }
 #else
 public final class TTFXMetalRenderer {

@@ -9,6 +9,8 @@ let package = Package(
         .iOS(.v17)
     ],
     products: [
+        .executable(name: "TTFXVideoCapture", targets: ["TTFXVideoCapture"]),
+        .executable(name: "TTFXComparisonApp", targets: ["TTFXComparisonApp"]),
         .library(
             name: "ttfx-swift",
             targets: ["TTFXCore", "TTFXEffects"]
@@ -30,6 +32,10 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0")
     ],
     targets: [
+        .executableTarget(name: "TTFXVideoCapture", dependencies: ["TTFXCore", "TTFXEffects", "TTFXSwiftUI", "TTFXComparisonKit"], path: "Sources/TTFXVideoCapture"),
+        .target(name: "TTFXComparisonKit", path: "Sources/TTFXComparisonKit"),
+        .executableTarget(name: "TTFXComparisonApp", dependencies: ["TTFXComparisonKit", "TTFXEffects"], path: "Sources/TTFXComparisonApp"),
+        .testTarget(name: "TTFXComparisonTests", dependencies: ["TTFXComparisonKit", "TTFXVideoCapture", "TTFXComparisonApp"], path: "tests/TTFXComparisonTests"),
         .target(
             name: "TTFXCore",
             path: "Sources/ttfx-swift/Core"
@@ -46,7 +52,8 @@ let package = Package(
                 "TTFXEffects"
             ],
             path: "Sources/ttfx-swift/SwiftUI",
-            exclude: ["TTFXGalleryApp"]
+            exclude: ["TTFXGalleryApp"],
+            resources: [.copy("Shaders")]
         ),
         .executableTarget(
             name: "TTFXGalleryApp",

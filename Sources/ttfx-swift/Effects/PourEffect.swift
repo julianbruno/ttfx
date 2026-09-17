@@ -162,8 +162,12 @@ public struct PourEffect: Effect {
         for sourceIndex in created.indices.sorted(by: { lhs, rhs in
             let a = created[lhs].coordinate
             let b = created[rhs].coordinate
-            if a.row != b.row { return a.row > b.row }
-            return a.column < b.column
+            switch options.pourDirection {
+            case .down: return a.row == b.row ? a.column < b.column : a.row < b.row
+            case .up: return a.row == b.row ? a.column < b.column : a.row > b.row
+            case .left: return a.column == b.column ? a.row < b.row : a.column < b.column
+            case .right: return a.column == b.column ? a.row < b.row : a.column > b.column
+            }
         }) {
             let source = created[sourceIndex]
             let finalColor = finalColors[source.coordinate]!
@@ -199,7 +203,7 @@ public struct PourEffect: Effect {
         let sorted = glyphs.indices.sorted {
             let lhs = glyphs[$0].inputCoordinate
             let rhs = glyphs[$1].inputCoordinate
-            if lhs.row != rhs.row { return lhs.row > rhs.row }
+            if lhs.row != rhs.row { return lhs.row < rhs.row }
             return lhs.column < rhs.column
         }
         switch options.pourDirection {

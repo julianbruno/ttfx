@@ -70,16 +70,16 @@ public typealias TTFXPlatformView = MTKView
 public struct TTFXMetalFrameView: TTFXPlatformViewRepresentable {
     public let snapshot: TTFXFrameSnapshot
     public let cellSize: TTFXMetalCellSize
-    public let renderer: TTFXMetalRenderer
+    public let renderer: TTFXMetalRenderer?
 
-    public init(snapshot: TTFXFrameSnapshot, cellSize: TTFXMetalCellSize = TTFXMetalCellSize(width: 10, height: 18), renderer: TTFXMetalRenderer = TTFXMetalRenderer()) {
+    public init(snapshot: TTFXFrameSnapshot, cellSize: TTFXMetalCellSize = TTFXMetalCellSize(width: 10, height: 18), renderer: TTFXMetalRenderer? = nil) {
         self.snapshot = snapshot
         self.cellSize = cellSize
         self.renderer = renderer
     }
 
     public func makeCoordinator() -> Coordinator {
-        Coordinator(renderer: renderer, cellSize: cellSize)
+        Coordinator(renderer: renderer ?? TTFXMetalRenderer(), cellSize: cellSize)
     }
 
     #if os(macOS)
@@ -101,7 +101,9 @@ public struct TTFXMetalFrameView: TTFXPlatformViewRepresentable {
     #endif
 
     private func makeMetalView(context: Context) -> MTKView {
-        let view = MTKView(frame: .zero, device: MTLCreateSystemDefaultDevice())
+        let view = MTKView(frame: .zero, device: context.coordinator.renderer.device)
+        view.colorPixelFormat = .bgra8Unorm
+        view.clearColor = MTLClearColorMake(0, 0, 0, 1)
         view.delegate = context.coordinator
         view.enableSetNeedsDisplay = true
         view.isPaused = true
@@ -110,6 +112,7 @@ public struct TTFXMetalFrameView: TTFXPlatformViewRepresentable {
 
     private func updateMetalView(_ view: MTKView, context: Context) {
         context.coordinator.snapshot = snapshot
+        context.coordinator.cellSize = cellSize
         context.coordinator.drawableSize = TTFXMetalDrawableSize(width: Float(view.drawableSize.width), height: Float(view.drawableSize.height))
         #if os(macOS)
         view.setNeedsDisplay(view.bounds)
@@ -121,8 +124,8 @@ public struct TTFXMetalFrameView: TTFXPlatformViewRepresentable {
     public final class Coordinator: NSObject, MTKViewDelegate {
         fileprivate var snapshot: TTFXFrameSnapshot?
         fileprivate var drawableSize = TTFXMetalDrawableSize(width: 0, height: 0)
-        private let renderer: TTFXMetalRenderer
-        private let cellSize: TTFXMetalCellSize
+        fileprivate let renderer: TTFXMetalRenderer
+        fileprivate var cellSize: TTFXMetalCellSize
 
         init(renderer: TTFXMetalRenderer, cellSize: TTFXMetalCellSize) {
             self.renderer = renderer
@@ -135,7 +138,7 @@ public struct TTFXMetalFrameView: TTFXPlatformViewRepresentable {
 
         public func draw(in view: MTKView) {
             guard let snapshot else { return }
-            _ = renderer.prepare(snapshot: snapshot, cellSize: cellSize, drawableSize: drawableSize)
+            _ = renderer.draw(snapshot: snapshot, cellSize: cellSize, view: view)
         }
     }
 }

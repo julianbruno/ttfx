@@ -300,11 +300,11 @@ public struct SwarmEffect: Effect {
         guard let pathIndex = glyphs[index].paths.firstIndex(where: { $0.id == id }) else { return }
         glyphs[index].paths[pathIndex].activate(from: glyphs[index].coordinate)
         glyphs[index].activePathIndex = pathIndex
-        glyphs[index].scene = .flash
         glyphs[index].layer = id == glyphs[index].paths.last?.id ? glyphs[index].layer : 1
         glyphs[index].inputSceneIndex = 0
         glyphs[index].inputSceneTicks = 0
-        if !glyphs[index].flashColors.isEmpty {
+        if (id.contains("swarm_area") || id == glyphs[index].paths.last?.id), !glyphs[index].flashColors.isEmpty {
+            glyphs[index].scene = .flash
             glyphs[index].foreground = glyphs[index].flashColors[0]
         }
     }
@@ -314,14 +314,6 @@ public struct SwarmEffect: Effect {
             let before = glyphs[index].coordinate
             let result = glyphs[index].paths[activePath].step()
             glyphs[index].coordinate = result.coordinate
-            if !result.complete, glyphs[index].scene == .flash {
-                let path = glyphs[index].paths[activePath]
-                let total = max(path.totalDistance, 1)
-                let remaining = max(path.totalDistance - path.lastDistance, 1)
-                let reached = max(total - remaining, 1)
-                let frameIndex = min(PyCompat.roundHalfEven((reached / total) * Double(glyphs[index].flashColors.count - 1)), glyphs[index].flashColors.count - 1)
-                glyphs[index].foreground = glyphs[index].flashColors[frameIndex]
-            }
             if result.complete {
                 let completedID = glyphs[index].paths[activePath].id
                 glyphs[index].activePathIndex = nil
@@ -336,6 +328,14 @@ public struct SwarmEffect: Effect {
                 }
             }
             _ = before
+        }
+        if glyphs[index].scene == .flash, let activePath = glyphs[index].activePathIndex {
+            let path = glyphs[index].paths[activePath]
+            let total = max(path.totalDistance, 1)
+            let remaining = max(path.totalDistance - path.lastDistance, 1)
+            let reached = max(total - remaining, 1)
+            let frameIndex = min(PyCompat.roundHalfEven((reached / total) * Double(glyphs[index].flashColors.count - 1)), glyphs[index].flashColors.count - 1)
+            glyphs[index].foreground = glyphs[index].flashColors[frameIndex]
         }
         if glyphs[index].scene == .input {
             let colorIndex = min(glyphs[index].inputSceneIndex, glyphs[index].finalColors.count - 1)

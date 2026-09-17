@@ -303,7 +303,7 @@ public struct TTFXCLI: ParsableCommand {
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: selected, configuration: configuration, canvas: canvas, input: input)
         var output = Data()
@@ -347,12 +347,12 @@ private extension TTFXCLI {
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
-        var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
         var status = TickStatus.running
         while true {
+            var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
             status = effect.tick(into: &frame)
             FileHandle.standardOutput.write(terminalBytes(for: frame))
             if !terminalOptions.noEOL {
@@ -367,7 +367,7 @@ private extension TTFXCLI {
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0)
+        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
         var emitted: UInt64 = 0

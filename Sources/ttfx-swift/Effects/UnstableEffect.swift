@@ -206,7 +206,7 @@ public struct UnstableEffect: Effect {
             let jumbledIndex = rng.integer(in: 0..<remainingCoordinates.count)
             let jumbled = remainingCoordinates.remove(at: jumbledIndex)
             let final = finalColors[source.coordinate] ?? finalGradient.spectrum.last!
-            let mappedFinal = finalGradient.spectrum.count == 1 ? final : finalGradient.spectrum.last!
+            let mappedFinal = final
             let rumble = try! Gradient(stops: [mappedFinal, options.unstableColor], steps: 12).spectrum.map(Self.rgb)
             var finalScene = try! Gradient(stops: [options.unstableColor, mappedFinal], steps: 12).spectrum.map(Self.rgb)
             finalScene.append(finalScene[finalScene.count - 1])

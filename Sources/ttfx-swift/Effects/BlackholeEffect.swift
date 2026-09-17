@@ -28,222 +28,206 @@ public struct BlackholeEffect: Effect {
         }
     }
 
-    private let input: InputText
+    private enum Phase { case forming, consuming, collapsing, exploding, complete }
+    private enum Kind { case formation, rotation, consume, expand, collapse, nearby, home }
+    private struct Motion {
+        let kind: Kind
+        let points: [Coordinate]
+        let distances: [Double]
+        let total: Double
+        let steps: Int
+        let easing: Easing
+        var step = 0
+        var reached = 0.0
+        init(kind: Kind, origin: Coordinate, targets: [Coordinate], speed: Double, easing: Easing = .linear) {
+            self.kind = kind; self.points = [origin] + targets
+            self.distances = zip(points, points.dropFirst()).map { Geometry.lineLength(from: $0, to: $1) }
+            self.total = distances.reduce(0, +); self.steps = PyCompat.roundHalfEven(total / speed); self.easing = easing
+        }
+        mutating func advance() -> Coordinate {
+            guard steps > 0, total > 0 else { return points.last! }
+            step += 1
+            reached = easing.value(at: Double(step) / Double(steps)) * total
+            var remaining = reached
+            for index in distances.indices {
+                if remaining <= distances[index] {
+                    return Geometry.coordinateOnLine(from: points[index], to: points[index + 1],
+                        t: distances[index] == 0 ? 0 : remaining / distances[index])
+                }
+                remaining -= distances[index]
+            }
+            return points.last!
+        }
+        var complete: Bool { step >= steps || total == 0 }
+    }
+    private struct Glyph {
+        let source: Coordinate
+        let symbol: UInt32
+        let final: Color
+        var coordinate: Coordinate
+        var visual: Cell
+        var layer = 0
+        var motion: Motion?
+        var scene: [Cell] = []
+        var age = 0
+        var consumed: [Cell] = []
+        var cooling: [Cell] = []
+        var speed = 0.0
+        var homeSpeed = 0.0
+        var rotation: [Coordinate] = []
+        var active: Bool { motion != nil || age < scene.count }
+    }
+    private let canvas: Canvas
     private let options: Configuration
-    private var tickIndex = 0
-    private var scriptedFrames: [[Cell]] = []
-    private var nativeFrameCount = 0
-    private var isComplete = false
+    private var rng: Xoshiro256PlusPlus
+    private var glyphs: [Glyph] = []
+    private var ring: [Int] = []
+    private var pendingRing: [Int] = []
+    private var pendingConsume: [Int] = []
+    private var phase = Phase.forming
+    private var radius = 3
+    private var formationDelay = 0
+    private var delay = 0
+    private var pointScene: [Cell] = []
+    private var center: Coordinate { .init(column: max(1, (canvas.columns + 1) / 2), row: max(1, (canvas.rows + 1) / 2)) }
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, blackholeConfiguration: .init())
     }
-
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        blackholeConfiguration: Configuration
-    ) {
-        self.input = input
-        self.options = blackholeConfiguration
-        self.nativeFrameCount = Self.nativeFrameCount(inputCount: input.scalars.count)
-        if seed == 1, canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
-            self.scriptedFrames = Self.makeOneCellFrames(inputSymbol: input.scalars[0], options: blackholeConfiguration).map { [$0] }
-        } else if seed == 1, canvas.columns == 2, canvas.rows == 1, input.scalars == [65, 66] {
-            self.scriptedFrames = Self.makeTwoCellRowFrames()
-        }
-    }
-
-    public mutating func tick(into frame: inout Frame) -> TickStatus {
-        guard !isComplete else { return .complete }
-        if !scriptedFrames.isEmpty {
-            let cells = scriptedFrames[min(tickIndex, scriptedFrames.count - 1)]
-            for (offset, cell) in cells.enumerated() {
-                frame[column: offset + 1, row: 1] = cell
-            }
-            tickIndex += 1
-            if tickIndex >= scriptedFrames.count {
-                isComplete = true
-                return .complete
-            }
-            return .running
-        }
-
-        renderNative(into: &frame)
-        tickIndex += 1
-        if tickIndex >= nativeFrameCount {
-            isComplete = true
-            return .complete
-        }
-        return .running
-    }
-
-    private mutating func renderNative(into frame: inout Frame) {
-        guard !input.scalars.isEmpty else { return }
-        switch tickIndex {
-        case 0..<90:
-            renderStarfield(into: &frame)
-        case 90..<278:
-            return
-        case 278..<453:
-            renderCoolingPreview(into: &frame)
-        default:
-            renderFinal(into: &frame)
-        }
-    }
-
-    private func renderStarfield(into frame: inout Frame) {
-        let symbols = ["*", "'", "`", "¤", "•", "°", "·"].map { $0.unicodeScalars.first!.value }
-        let colors: [UInt32] = [0x4a4a4d, 0x68686a, 0x858587, 0xa3a3a3, 0xc2c2c1, 0xe0e0df]
-        for index in input.scalars.indices {
-            let position = input.positions[index]
-            let symbol = symbols[(index + tickIndex / 11) % symbols.count]
-            let color = colors[(index + tickIndex / 17) % colors.count]
-            frame[column: position.column, row: position.row] = Cell(codepoint: symbol, foreground: color, background: 0)
-        }
-    }
-
-    private func renderCoolingPreview(into frame: inout Frame) {
-        let final = finalCells()
-        let visibleCount = min(input.scalars.count, max(0, (tickIndex - 278) / 18 + 1))
-        for offset in 0..<visibleCount {
-            let index = (offset * 3) % final.count
-            let item = final[index]
-            let color = offset % 2 == 0 ? blackholeRGB(options.starColors[0]) : item.cell.foreground
-            frame[column: item.coordinate.column, row: item.coordinate.row] = Cell(
-                codepoint: item.cell.codepoint,
-                foreground: color,
-                background: 0
-            )
-        }
-    }
-
-    private func renderFinal(into frame: inout Frame) {
-        for item in finalCells() {
-            frame[column: item.coordinate.column, row: item.coordinate.row] = item.cell
-        }
-    }
-
-    private struct PlacedCell {
-        let coordinate: Coordinate
-        let cell: Cell
-    }
-
-    private func finalCells() -> [PlacedCell] {
-        guard !input.scalars.isEmpty else { return [] }
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, blackholeConfiguration: Configuration) {
+        self.canvas = canvas; self.options = blackholeConfiguration; self.rng = .init(seed: seed)
+        guard !input.scalars.isEmpty else { phase = .complete; return }
+        radius = max(min(PyCompat.roundHalfEven(Double(canvas.columns) * 0.3), PyCompat.roundHalfEven(Double(canvas.rows) * 0.2)), 3)
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
-        let minRow = coordinates.map(\.row).min()!
-        let maxRow = coordinates.map(\.row).max()!
-        let minColumn = coordinates.map(\.column).min()!
-        let maxColumn = coordinates.map(\.column).max()!
         let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
         let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
-            minRow: minRow,
-            maxRow: maxRow,
-            minColumn: minColumn,
-            maxColumn: maxColumn,
-            direction: options.finalGradientDirection
-        )).entries.map { ($0.coordinate, blackholeRGB($0.color)) })
-        return input.scalars.indices.map { index in
-            let position = input.positions[index]
-            let coordinate = Coordinate(column: position.column, row: position.row)
-            return PlacedCell(
-                coordinate: coordinate,
-                cell: Cell(codepoint: input.scalars[index], foreground: mapping[coordinate] ?? 0, background: 0)
-            )
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        glyphs = coordinates.indices.map { .init(source: coordinates[$0], symbol: input.scalars[$0], final: mapping[coordinates[$0]]!,
+            coordinate: coordinates[$0], visual: .blank) }
+        var available = Array(glyphs.indices)
+        while ring.count < radius * 3 && !available.isEmpty { ring.append(available.remove(at: rng.integer(in: available.indices))) }
+        let positions = Geometry.coordinatesOnCircle(origin: center, radius: radius, limit: ring.count)
+        for (index, id) in ring.enumerated() { glyphs[id].rotation = Array(positions[index...]) + Array(positions[..<index]) }
+        let symbols = "*'`¤•°·".unicodeScalars.map(\.value)
+        let colors = (try! Gradient(stops: [Color(hex: "4a4a4d"), Color(hex: "ffffff")], steps: 6)).spectrum
+        for id in glyphs.indices {
+            let symbol = symbols[rng.integer(in: symbols.indices)]
+            let color = colors[rng.integer(in: colors.indices)]
+            glyphs[id].visual = Self.cell(symbol, color)
+            if !ring.contains(id) {
+                glyphs[id].coordinate = .init(column: rng.integer(in: 1...canvas.columns), row: rng.integer(in: 1...canvas.rows))
+                glyphs[id].speed = rng.uniform(0.17, 0.30)
+                glyphs[id].consumed = (try! Gradient(stops: [color, Color(hex: "000000")], steps: 10)).spectrum.map { Self.cell(symbol, $0) } + [.blank]
+                pendingConsume.append(id)
+            }
         }
+        rng.shuffle(&pendingConsume)
+        pendingRing = ring
+        formationDelay = max(100 / ring.count, 6); delay = formationDelay
     }
-
-    private static func nativeFrameCount(inputCount: Int) -> Int {
-        guard inputCount > 0 else { return 1 }
-        return 441 + inputCount * 8
+    private mutating func move(_ id: Int, _ kind: Kind, _ targets: [Coordinate], _ speed: Double, _ easing: Easing = .linear) {
+        glyphs[id].motion = .init(kind: kind, origin: glyphs[id].coordinate, targets: targets, speed: speed, easing: easing)
     }
-
-    private static func makeOneCellFrames(inputSymbol: UInt32, options: Configuration) -> [Cell] {
-        var frames: [Cell] = []
-        let starfieldColor = Color(hex: "68686a")
-        let collapseColor = options.starColors[0]
-        append(&frames, count: 100, codepoint: "°", foreground: starfieldColor)
-        append(&frames, count: 1, codepoint: "*", foreground: options.blackholeColor)
-        appendBlank(&frames, count: 79)
-
-        for (symbol, count) in [
-            ("◦", 3), ("◎", 3), ("◉", 3), ("●", 3), ("◉", 3), ("◎", 3), ("◦", 6),
-            ("◎", 3), ("◉", 3), ("●", 3), ("◉", 3), ("◎", 3), ("◦", 6),
-            ("◎", 3), ("◉", 3), ("●", 3), ("◉", 3), ("◎", 3), ("◦", 3),
-        ] {
-            append(&frames, count: count, codepoint: symbol, foreground: collapseColor)
+    private mutating func scene(_ id: Int, _ frames: [Cell]) {
+        glyphs[id].scene = frames; glyphs[id].age = 0
+        if let first = frames.first { glyphs[id].visual = first }
+    }
+    public mutating func tick(into frame: inout Frame) -> TickStatus {
+        guard phase != .complete || glyphs.contains(where: \.active) else { return .complete }
+        switch phase {
+        case .forming:
+            if !pendingRing.isEmpty {
+                if delay == 0 {
+                    let id = pendingRing.removeFirst()
+                    move(id, .formation, [glyphs[id].rotation[0]], 0.7, .inOutSine)
+                    glyphs[id].layer = 1
+                    scene(id, [Self.cell(42, options.blackholeColor)])
+                    delay = formationDelay
+                } else { delay -= 1 }
+            } else if !glyphs.contains(where: \.active) {
+                for id in ring { move(id, .rotation, glyphs[id].rotation, 0.45) }
+                phase = .consuming
+            }
+        case .consuming:
+            if !pendingConsume.isEmpty {
+                for id in pendingConsume {
+                    move(id, .consume, [center], glyphs[id].speed, .inExpo)
+                    glyphs[id].layer = 2
+                }
+                pendingConsume.removeAll()
+            } else if glyphs.indices.allSatisfy({ !glyphs[$0].active || ring.contains($0) }) { phase = .collapsing }
+        case .collapsing:
+            let positions = Geometry.coordinatesOnCircle(origin: center, radius: radius + 3, limit: ring.count)
+            for (index, id) in ring.enumerated() {
+                if index == 0 {
+                    for _ in 0..<3 { for symbol in "◦◎◉●◉◎◦".unicodeScalars {
+                        let color = options.starColors[rng.integer(in: options.starColors.indices)]
+                        pointScene += Array(repeating: Self.cell(symbol.value, color), count: 3)
+                    } }
+                }
+                move(id, .expand, [positions[index]], 0.2, .inExpo)
+            }
+            phase = .exploding
+        case .exploding:
+            if ring.allSatisfy({ !glyphs[$0].active }) {
+                let colors = ["ffcc0d", "ff7326", "ff194d", "bf2669", "702a8c", "049dbf"].map { Color(hex: $0) }
+                for id in glyphs.indices {
+                    let nearby = Geometry.coordinatesOnCircle(origin: glyphs[id].source, radius: 3, limit: 5)[rng.integer(in: 0...4)]
+                    let speed = Double(rng.integer(in: 3...4)) / 10
+                    glyphs[id].homeSpeed = Double(rng.integer(in: 4...6)) / 100
+                    let color = colors[rng.integer(in: colors.indices)]
+                    glyphs[id].cooling = (try! Gradient(stops: [color, glyphs[id].final], steps: 10)).spectrum.flatMap {
+                        Array(repeating: Self.cell(glyphs[id].symbol, $0), count: 20)
+                    }
+                    scene(id, [Self.cell(glyphs[id].symbol, color)])
+                    move(id, .nearby, [nearby], speed, .outExpo)
+                }
+                phase = .complete
+            }
+        case .complete: break
         }
-        appendBlank(&frames, count: 169)
-
-        for (hex, count) in [("644262", 11), ("574661", 20), ("4a4a60", 20), ("445566", 20)] {
-            append(&frames, count: count, codepointValue: inputSymbol, foreground: Color(hex: hex))
+        for id in glyphs.indices {
+            if var motion = glyphs[id].motion {
+                glyphs[id].coordinate = motion.advance()
+                glyphs[id].motion = motion.complete ? nil : motion
+                if motion.kind == .consume {
+                    if motion.complete { glyphs[id].visual = .blank }
+                    else {
+                        let progress = max(max(motion.total, 1) - max(motion.total - motion.reached, 1), 1) / max(motion.total, 1)
+                        let index = min(glyphs[id].consumed.count - 1, max(0, PyCompat.roundHalfEven(Double(glyphs[id].consumed.count - 1) * progress)))
+                        glyphs[id].visual = glyphs[id].consumed[index]
+                    }
+                }
+                if motion.complete {
+                    switch motion.kind {
+                    case .rotation: move(id, .rotation, glyphs[id].rotation, 0.45)
+                    case .expand: move(id, .collapse, [center], 0.3, .inExpo)
+                    case .collapse:
+                        if id == ring.first { scene(id, pointScene); glyphs[id].layer = 3 }
+                    case .nearby:
+                        move(id, .home, [glyphs[id].source], glyphs[id].homeSpeed, .inCubic)
+                        scene(id, glyphs[id].cooling)
+                    default: break
+                    }
+                }
+            }
+            if glyphs[id].age < glyphs[id].scene.count {
+                glyphs[id].visual = glyphs[id].scene[glyphs[id].age]; glyphs[id].age += 1
+            }
         }
-        return frames
-    }
-
-    private static func makeTwoCellRowFrames() -> [[Cell]] {
-        func c(_ symbol: String, _ foreground: UInt32) -> Cell {
-            Cell(codepoint: symbol.unicodeScalars.first!.value, foreground: foreground, background: 0)
+        let ordered = glyphs.indices.sorted { glyphs[$0].layer == glyphs[$1].layer ? $0 < $1 : glyphs[$0].layer < glyphs[$1].layer }
+        for id in ordered {
+            let glyph = glyphs[id]
+            if (1...canvas.columns).contains(glyph.coordinate.column), (1...canvas.rows).contains(glyph.coordinate.row) {
+                frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = glyph.visual
+            }
         }
-        let runs: [(count: Int, cells: [Cell])] = [
-            (count: 50, cells: [c("°", 0x68686a), c("•", 0xc2c2c1)]),
-            (count: 1, cells: [c("°", 0x68686a), c("*", 0xffffff)]),
-            (count: 50, cells: [c("°", 0x68686a), c(" ", 0x000000)]),
-            (count: 1, cells: [c("*", 0xffffff), c(" ", 0x000000)]),
-            (count: 84, cells: [c(" ", 0x000000), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 6, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 6, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("●", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◉", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◎", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 3, cells: [c("◦", 0xffcc0d), c(" ", 0x000000)]),
-            (count: 135, cells: [c(" ", 0x000000), c(" ", 0x000000)]),
-            (count: 3, cells: [c("B", 0x7e3a64), c(" ", 0x000000)]),
-            (count: 4, cells: [c("B", 0x713e63), c(" ", 0x000000)]),
-            (count: 16, cells: [c(" ", 0x000000), c("B", 0x713e63)]),
-            (count: 11, cells: [c(" ", 0x000000), c("B", 0x644262)]),
-            (count: 9, cells: [c("A", 0x563454), c("B", 0x644262)]),
-            (count: 2, cells: [c("A", 0x563454), c("B", 0x574661)]),
-            (count: 18, cells: [c("A", 0x473651), c("B", 0x574661)]),
-            (count: 2, cells: [c("A", 0x473651), c("B", 0x4a4a60)]),
-            (count: 18, cells: [c("A", 0x38384e), c("B", 0x4a4a60)]),
-            (count: 2, cells: [c("A", 0x38384e), c("B", 0x445566)]),
-            (count: 20, cells: [c("A", 0x2a3b4c), c("B", 0x445566)]),
-        ]
-        return runs.flatMap { run in Array(repeating: run.cells, count: run.count) }
+        return phase == .complete && !glyphs.contains(where: \.active) ? .complete : .running
     }
-
-    private static func append(_ frames: inout [Cell], count: Int, codepoint symbol: String, foreground: Color) {
-        append(&frames, count: count, codepointValue: symbol.unicodeScalars.first!.value, foreground: foreground)
+    private static func cell(_ symbol: UInt32, _ color: Color) -> Cell {
+        let rgb = UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue)
+        return .init(codepoint: symbol, foreground: rgb, background: rgb == 0 ? 0xFFFF_FFFE : 0)
     }
-
-    private static func append(_ frames: inout [Cell], count: Int, codepointValue: UInt32, foreground: Color) {
-        for _ in 0..<count {
-            frames.append(Cell(codepoint: codepointValue, foreground: blackholeRGB(foreground), background: 0))
-        }
-    }
-
-    private static func appendBlank(_ frames: inout [Cell], count: Int) {
-        for _ in 0..<count { frames.append(.blank) }
-    }
-}
-
-private func blackholeRGB(_ color: Color) -> UInt32 {
-    (UInt32(color.red) << 16) | (UInt32(color.green) << 8) | UInt32(color.blue)
 }

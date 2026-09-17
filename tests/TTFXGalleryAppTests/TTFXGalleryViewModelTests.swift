@@ -1,6 +1,8 @@
 import Foundation
 import Testing
 import TTFXEffects
+import TTFXCore
+import TTFXSwiftUI
 @testable import TTFXGalleryApp
 
 @Test func galleryViewModelUsesRegistryOrderAndDefaultSelection() throws {
@@ -183,6 +185,7 @@ import TTFXEffects
         "Frames per second",
         "Preview font size",
         "Loop playback",
+        "Use Metal",
         "Play or pause preview",
         "Reset preview",
         "TTFX preview",
@@ -207,7 +210,7 @@ import TTFXEffects
     #expect(model.framesPerSecond == TTFXGalleryViewModel.maximumFramesPerSecond)
 }
 
-@Test func previewRendererSelectionUsesVisibleSwiftUIFallbackUntilDrawableRenderingIsImplemented() throws {
+@Test func previewRendererSelectionUsesMetalWhenAvailable() throws {
     let fallback = TTFXGalleryPreviewRendererSelection.resolve(
         availability: .init(isAvailable: false, message: "headless"),
         platformSupportsMetalView: true
@@ -232,11 +235,11 @@ import TTFXEffects
         availability: .init(isAvailable: true, message: "Metal renderer available"),
         platformSupportsMetalView: true
     )
-    #expect(visibleFallback == .swiftUIFrameView)
+    #expect(visibleFallback == .metalFrameView)
     #expect(TTFXGalleryPreviewRendererSelection.statusText(
         availability: .init(isAvailable: true, message: "Metal renderer available"),
         platformSupportsMetalView: true
-    ) == "SwiftUI preview — Metal GPU view not connected yet")
+    ) == "Metal renderer available")
 }
 
 @Test func productionAppSourceDoesNotUseSubprocessesFixturesOrFrameDumpFallbacks() throws {
@@ -284,4 +287,40 @@ import TTFXEffects
     #expect(pbx.contains("INFOPLIST_KEY_UILaunchScreen_Generation = YES"))
     #expect(infoPlist.contains("codes.suscodigos.ttfx.gallery"))
     #expect(infoPlist.contains("CFBundleIdentifier"))
+}
+
+@Test func previewRendererSelectionRespectsDefaultOnUserSwitch() throws {
+    var model = try TTFXGalleryViewModel(metalAvailability: .init(isAvailable: true, message: "Metal renderer available"))
+    #expect(model.useMetal)
+    #expect(model.previewRendererSelection == .metalFrameView)
+    let snapshot = model.currentSnapshot
+    model.useMetal = false
+    #expect(model.previewRendererSelection == .swiftUIFrameView)
+    #expect(model.rendererStatus == "SwiftUI preview — Metal disabled")
+    #expect(model.currentSnapshot == snapshot)
+    model.useMetal = true
+    #expect(model.previewRendererSelection == .metalFrameView)
+    #expect(model.rendererStatus == "Metal renderer available")
+    var headless = try TTFXGalleryViewModel(metalAvailability: .init(isAvailable: false, message: "headless"))
+    headless.useMetal = false
+    headless.useMetal = true
+    #expect(headless.previewRendererSelection == .swiftUIFrameView)
+}
+
+
+@Test func galleryRingsFramesClearMovedGlyphsAndMatchTheNativeEngine() throws {
+    let text = "TTFX\nRust + Swift\nVisual comparison"
+    let canvas = try Canvas(columns: 24, rows: 8)
+    var model = try TTFXGalleryViewModel(sampleText: text, seed: 42, canvasWidth: 24, canvasHeight: 8,
+        metalAvailability: .init(isAvailable: false, message: "headless"), framesPerSecond: 25, loopFrameBudget: 2000)
+    model.selectEffect("rings")
+    model.play()
+    var effect = RingsEffect(configuration: .init(text: text, seed: 42, frameRate: 25),
+        canvas: canvas, input: canvas.ingest(text), seed: 42)
+    for tick in 0..<250 {
+        var expected = try Frame(columns: 24, rows: 8)
+        _ = effect.tick(into: &expected)
+        #expect(model.currentSnapshot == TTFXFrameSnapshot(frame: expected), "Gallery must clear stale glyphs at tick \(tick)")
+        model.advanceFrame()
+    }
 }

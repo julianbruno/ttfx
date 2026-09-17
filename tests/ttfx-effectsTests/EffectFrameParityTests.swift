@@ -1798,7 +1798,7 @@ struct EffectFrameParityTests {
     let result = try ProcessRunner().run(
         executable: URL(fileURLWithPath: "/usr/bin/env"),
         arguments: [
-            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "220",
+            "cargo", "run", "--quiet", "--", "--parity-dump", "--max-frames", "2000",
             "--seed", "1", "--ignore-terminal-dimensions", "--canvas-width", "1",
             "--canvas-height", "1", "decrypt", "--typing-speed", "1",
             "--ciphertext-colors", "00ff00", "--final-gradient-stops", "112233",

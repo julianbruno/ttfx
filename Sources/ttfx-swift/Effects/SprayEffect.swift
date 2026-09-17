@@ -266,15 +266,15 @@ public struct SprayEffect: Effect {
         case .center:
             return Coordinate(column: centered(canvas.columns), row: centered(canvas.rows))
         case .n:
-            return Coordinate(column: PyCompat.floorDivide(canvas.columns + 1, 2), row: canvas.rows)
+            return Coordinate(column: PyCompat.floorDivide(canvas.columns, 2), row: canvas.rows)
         case .ne:
-            return Coordinate(column: canvas.columns, row: canvas.rows)
+            return Coordinate(column: canvas.columns - 1, row: canvas.rows)
         case .e:
-            return Coordinate(column: canvas.columns, row: PyCompat.floorDivide(canvas.rows, 2))
+            return Coordinate(column: canvas.columns - 1, row: PyCompat.floorDivide(canvas.rows, 2))
         case .se:
-            return Coordinate(column: canvas.columns, row: 1)
+            return Coordinate(column: canvas.columns - 1, row: 1)
         case .s:
-            return Coordinate(column: PyCompat.floorDivide(canvas.columns + 1, 2), row: 1)
+            return Coordinate(column: PyCompat.floorDivide(canvas.columns, 2), row: 1)
         case .sw:
             return Coordinate(column: 1, row: 1)
         case .w:

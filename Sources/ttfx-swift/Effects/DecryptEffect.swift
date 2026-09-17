@@ -40,9 +40,9 @@ public struct DecryptEffect: Effect {
         let coordinate: Coordinate
         let inputSymbol: UInt32
         let typingFrames: [Visual]
-        let fastFrames: [Visual]
-        let slowFrames: [Visual]
-        let discoveredFrames: [Visual]
+        var fastFrames: [Visual]
+        var slowFrames: [Visual]
+        var discoveredFrames: [Visual]
         var visible = false
         var active = false
         var scene: SceneKind = .typing
@@ -123,7 +123,7 @@ public struct DecryptEffect: Effect {
             if glyphs.contains(where: { $0.active }) {
                 advanceActiveScenes()
                 render(into: &frame)
-                if !glyphs.contains(where: { $0.active }) || shouldCompleteBoundedOneCellRun {
+                if !glyphs.contains(where: { $0.active }) {
                     isComplete = true
                     return .complete
                 }
@@ -136,10 +136,6 @@ public struct DecryptEffect: Effect {
             isComplete = true
             return .complete
         }
-    }
-
-    private var shouldCompleteBoundedOneCellRun: Bool {
-        canvas.columns == 1 && canvas.rows == 1 && glyphs.count == 1 && tickIndex >= 219
     }
 
     private mutating func build() {
@@ -166,32 +162,26 @@ public struct DecryptEffect: Effect {
                 duration: 1
             ))
 
+            builtGlyphs.append(Glyph(id: id, coordinate: coordinate, inputSymbol: pair.0,
+                typingFrames: typingFrames, fastFrames: [], slowFrames: [], discoveredFrames: []))
+        }
+        // Rust constructs all typing scenes before consuming randomness for
+        // any decrypt scene; interleaving changes every later RNG draw.
+        for index in builtGlyphs.indices {
             let decryptColor = rgb(choice(options.ciphertextColors))
-            let fastFrames = (0..<80).map { index in
-                Visual(codepoint: choice(encryptedSymbols), foreground: decryptColor, duration: index == 79 ? 1 : 2)
+            builtGlyphs[index].fastFrames = (0..<80).map { _ in
+                Visual(codepoint: choice(encryptedSymbols), foreground: decryptColor, duration: 2)
             }
             let slowCount = rng.integer(in: 1...15)
-            let slowFrames = (0..<slowCount).map { _ in
+            builtGlyphs[index].slowFrames = (0..<slowCount).map { _ in
                 let symbol = choice(encryptedSymbols)
-                let duration = rng.integer(in: 0...100) <= 30 ? rng.integer(in: 35..<60) : rng.integer(in: 3..<6) + 1
+                let duration = rng.integer(in: 0...100) <= 30 ? rng.integer(in: 35..<60) : rng.integer(in: 3..<6)
                 return Visual(codepoint: symbol, foreground: decryptColor, duration: duration)
             }
-
-            let finalColor = finalColors[coordinate] ?? rgb(options.finalGradientStops[0])
-            let discoveredSpectrum = try! Gradient(stops: [Color(hex: "ffffff"), color(fromRGB: finalColor)], steps: [10]).spectrum
-            let discovered = discoveredSpectrum.enumerated().map { index, color in
-                Visual(codepoint: pair.0, foreground: rgb(color), duration: index == discoveredSpectrum.count - 1 ? 1 : 5)
+            let final = finalColors[builtGlyphs[index].coordinate] ?? rgb(options.finalGradientStops[0])
+            builtGlyphs[index].discoveredFrames = (try! Gradient(stops: [Color(hex: "ffffff"), color(fromRGB: final)], steps: [10])).spectrum.map {
+                Visual(codepoint: builtGlyphs[index].inputSymbol, foreground: rgb($0), duration: 5)
             }
-
-            builtGlyphs.append(Glyph(
-                id: id,
-                coordinate: coordinate,
-                inputSymbol: pair.0,
-                typingFrames: typingFrames,
-                fastFrames: fastFrames,
-                slowFrames: slowFrames,
-                discoveredFrames: discovered
-            ))
         }
         glyphs = builtGlyphs
         typingPending = Array(glyphs.indices)
@@ -217,6 +207,7 @@ public struct DecryptEffect: Effect {
         glyphs[index].scene = scene
         glyphs[index].frameIndex = 0
         glyphs[index].ticksElapsed = 0
+        glyphs[index].rendered = glyphs[index].frames.first
     }
 
     private mutating func advanceActiveScenes() {

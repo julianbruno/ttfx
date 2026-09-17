@@ -19,8 +19,8 @@ import Testing
     let overflowing = oneCellCanvas.ingest("AB")
 
     #expect(empty.scalars.isEmpty)
-    #expect(overflowing.scalars == [65, 66])
-    #expect(overflowing.positions == [.init(column: 1, row: 1), .init(column: 2, row: 1)])
+    #expect(overflowing.scalars == [65])
+    #expect(overflowing.positions == [.init(column: 1, row: 1)])
     #expect(throws: CoreError.self) { try Canvas(columns: 0, rows: 1) }
 }
 

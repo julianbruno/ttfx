@@ -73,7 +73,8 @@ public struct SlideEffect: Effect {
         var sceneTicksRemaining: Int
         var sceneActive = false
 
-        var foreground: UInt32 { colors[sceneIndex] }
+        var displayedForeground: UInt32?
+        var foreground: UInt32 { displayedForeground ?? colors[sceneIndex] }
     }
 
     private let canvas: Canvas
@@ -147,7 +148,7 @@ public struct SlideEffect: Effect {
                 colors: colors,
                 coordinate: coordinate,
                 pathOrigin: coordinate,
-                sceneTicksRemaining: options.finalGradientFrames + 1,
+                sceneTicksRemaining: options.finalGradientFrames,
                 sceneActive: false
             )
         }
@@ -294,15 +295,12 @@ public struct SlideEffect: Effect {
 
     private mutating func updateScene(for index: Int) {
         guard glyphs[index].sceneActive else { return }
+        glyphs[index].displayedForeground = glyphs[index].colors[glyphs[index].sceneIndex]
         glyphs[index].sceneTicksRemaining -= 1
         guard glyphs[index].sceneTicksRemaining == 0 else { return }
         if glyphs[index].sceneIndex + 1 < glyphs[index].colors.count {
             glyphs[index].sceneIndex += 1
-            if glyphs[index].sceneIndex + 1 == glyphs[index].colors.count {
-                glyphs[index].sceneTicksRemaining = 1
-            } else {
-                glyphs[index].sceneTicksRemaining = options.finalGradientFrames
-            }
+            glyphs[index].sceneTicksRemaining = options.finalGradientFrames
         } else {
             glyphs[index].sceneActive = false
         }

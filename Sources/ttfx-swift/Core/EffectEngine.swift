@@ -24,6 +24,9 @@ public struct EffectEngine<Animation: Effect> {
     @discardableResult
     public mutating func tick() -> TickStatus {
         guard status == .running else { return .complete }
+        frame.withMutableCells { cells in
+            cells.withUnsafeMutableBufferPointer { $0.update(repeating: .blank) }
+        }
         status = effect.tick(into: &frame)
         return status
     }

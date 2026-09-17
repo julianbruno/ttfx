@@ -68,7 +68,7 @@ public struct SynthGridEffect: Effect {
 
     private struct CharacterScene {
         let coordinate: Coordinate
-        let generationCells: [(codepoint: UInt32, color: UInt32)]
+        var generationCells: [(codepoint: UInt32, color: UInt32)]
         let finalCodepoint: UInt32
         let finalColor: UInt32
         var age: Int = 0
@@ -91,6 +91,7 @@ public struct SynthGridEffect: Effect {
     private var phase: Phase = .gridExpand
     private var gridLines: [GridLine] = []
     private var pendingGroups: [[Int]] = []
+    private var allGroups: [[Int]] = []
     private var characterScenes: [CharacterScene] = []
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -119,26 +120,6 @@ public struct SynthGridEffect: Effect {
     public mutating func tick(into frame: inout Frame) -> TickStatus {
         guard !isComplete else { return .complete }
 
-        if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
-            renderOneCell(into: &frame)
-            tickIndex += 1
-            if tickIndex >= 60 {
-                isComplete = true
-                return .complete
-            }
-            return .running
-        }
-
-        if isSmallConfiguredParityRun {
-            renderSmallConfiguredParityRun(into: &frame)
-            tickIndex += 1
-            if tickIndex >= 68 {
-                isComplete = true
-                return .complete
-            }
-            return .running
-        }
-
         if !built { build() }
         advancePhase()
         advanceActiveScenes()
@@ -150,65 +131,6 @@ public struct SynthGridEffect: Effect {
             return .complete
         }
         return .running
-    }
-
-    private var isSmallConfiguredParityRun: Bool {
-        canvas.columns == 4 && canvas.rows == 3 && input.scalars.count == 4
-            && options.gridGradientStops.map(synthGridRGB) == [0xFFFFFF, 0xFFFFFF]
-            && options.gridGradientSteps == [1]
-            && options.textGradientStops.map(synthGridRGB) == [0x112233, 0x112233]
-            && options.textGradientSteps == [1]
-            && options.textGenerationSymbols == ["x"]
-            && options.maxActiveBlocks == 1
-    }
-
-    private func renderSmallConfiguredParityRun(into frame: inout Frame) {
-        func put(_ column: Int, _ row: Int, _ scalar: UInt32, _ color: UInt32) {
-            frame[column: column, row: row] = Cell(codepoint: scalar, foreground: color, background: 0)
-        }
-        let row = options.gridRowSymbol.unicodeScalars.first?.value ?? Cell.blank.codepoint
-        let column = options.gridColumnSymbol.unicodeScalars.first?.value ?? Cell.blank.codepoint
-        let generated = options.textGenerationSymbols[0].unicodeScalars.first?.value ?? Cell.blank.codepoint
-        let gridColor: UInt32 = 0xFFFFFF
-        let textColor: UInt32 = 0x112233
-
-        switch tickIndex {
-        case 0:
-            put(1, 3, row, gridColor); put(2, 3, row, gridColor); put(3, 3, row, gridColor)
-            put(1, 1, column, gridColor); put(2, 1, row, gridColor); put(3, 1, row, gridColor); put(4, 1, column, gridColor)
-        case 1, 2:
-            renderFullSmallGrid(into: &frame)
-        case 3...36:
-            renderFullSmallGrid(into: &frame)
-            put(2, 2, generated, textColor); put(3, 2, generated, textColor)
-        case 37...62:
-            renderFullSmallGrid(into: &frame)
-            put(2, 2, generated, textColor)
-        case 63...64:
-            renderFullSmallGrid(into: &frame)
-            put(2, 2, input.scalars[1], textColor)
-        case 65:
-            put(1, 3, row, gridColor)
-            put(1, 2, input.scalars[0], textColor); put(2, 2, input.scalars[1], textColor)
-            put(1, 1, column, gridColor); put(2, 1, input.scalars[3], textColor); put(4, 1, column, gridColor)
-        default:
-            put(1, 2, input.scalars[0], textColor); put(2, 2, input.scalars[1], textColor)
-            put(1, 1, input.scalars[2], textColor); put(2, 1, input.scalars[3], textColor)
-        }
-    }
-
-    private func renderFullSmallGrid(into frame: inout Frame) {
-        let row = options.gridRowSymbol.unicodeScalars.first?.value ?? Cell.blank.codepoint
-        let column = options.gridColumnSymbol.unicodeScalars.first?.value ?? Cell.blank.codepoint
-        for gridColumn in 1...4 {
-            frame[column: gridColumn, row: 3] = Cell(codepoint: row, foreground: 0xFFFFFF, background: 0)
-        }
-        frame[column: 1, row: 2] = Cell(codepoint: column, foreground: 0xFFFFFF, background: 0)
-        frame[column: 4, row: 2] = Cell(codepoint: column, foreground: 0xFFFFFF, background: 0)
-        frame[column: 1, row: 1] = Cell(codepoint: column, foreground: 0xFFFFFF, background: 0)
-        frame[column: 2, row: 1] = Cell(codepoint: row, foreground: 0xFFFFFF, background: 0)
-        frame[column: 3, row: 1] = Cell(codepoint: row, foreground: 0xFFFFFF, background: 0)
-        frame[column: 4, row: 1] = Cell(codepoint: column, foreground: 0xFFFFFF, background: 0)
     }
 
     private mutating func build() {
@@ -240,24 +162,27 @@ public struct SynthGridEffect: Effect {
         for row in 1...canvas.rows {
             for column in 1...canvas.columns {
                 let coordinate = Coordinate(column: column, row: row)
-                let frameCount = rng.integer(in: 15...30)
-                var generationCells: [(codepoint: UInt32, color: UInt32)] = []
-                generationCells.reserveCapacity(frameCount)
-                for _ in 0..<frameCount {
-                    let symbol = options.textGenerationSymbols[rng.integer(in: 0..<options.textGenerationSymbols.count)]
-                    let color = synthGridRGB(textGradient.spectrum[rng.integer(in: 0..<textGradient.spectrum.count)])
-                    generationCells.append((symbol.unicodeScalars.first?.value ?? Cell.blank.codepoint, color))
-                }
                 let final = inputByCoordinate[coordinate]
                 characterScenes.append(CharacterScene(
                     coordinate: coordinate,
-                    generationCells: generationCells,
+                    generationCells: [],
                     finalCodepoint: final?.codepoint ?? Cell.blank.codepoint,
                     finalColor: final?.color ?? 0
                 ))
             }
         }
         pendingGroups = makeGroups()
+        allGroups = pendingGroups
+        for group in pendingGroups {
+            for index in group {
+                let count = rng.integer(in: 15...30)
+                for _ in 0..<count {
+                    let symbol = options.textGenerationSymbols[rng.integer(in: options.textGenerationSymbols.indices)]
+                    let color = synthGridRGB(textGradient.spectrum[rng.integer(in: textGradient.spectrum.indices)])
+                    characterScenes[index].generationCells.append((symbol.unicodeScalars.first!.value, color))
+                }
+            }
+        }
         rng.shuffle(&pendingGroups)
         if pendingGroups.isEmpty {
             for index in characterScenes.indices { characterScenes[index].active = true }
@@ -273,8 +198,8 @@ public struct SynthGridEffect: Effect {
                 for index in gridLines.indices where !gridLines[index].isExtended { gridLines[index].extend() }
             }
         case .addChars:
-            let activeGroupCount = characterScenes.contains { $0.active && !$0.complete } ? 1 : 0
-            let totalGroupCount = activeGroupCount + pendingGroups.count
+            let activeGroupCount = allGroups.filter { group in group.contains { characterScenes[$0].active && !characterScenes[$0].complete } }.count
+            let totalGroupCount = allGroups.count
             if !pendingGroups.isEmpty && Double(activeGroupCount) < Double(totalGroupCount) * options.maxActiveBlocks {
                 let group = pendingGroups.removeFirst()
                 for index in group { characterScenes[index].active = true }
@@ -430,17 +355,7 @@ public struct SynthGridEffect: Effect {
         return mapping[coordinate] ?? 0xFFFFFF
     }
 
-    private func renderOneCell(into frame: inout Frame) {
-        if tickIndex < 58 {
-            frame[column: 1, row: 1] = Cell(
-                codepoint: options.gridRowSymbol.unicodeScalars.first?.value ?? Cell.blank.codepoint,
-                foreground: 0xFFFFFF,
-                background: 0
-            )
-        } else {
-            frame[column: 1, row: 1] = Cell(codepoint: input.scalars[0], foreground: 0xFFFFFF, background: 0)
-        }
-    }
+
 }
 
 private func synthGridRGB(_ color: Color) -> UInt32 {

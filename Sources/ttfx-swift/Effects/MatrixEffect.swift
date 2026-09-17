@@ -56,112 +56,208 @@ public struct MatrixEffect: Effect {
         }
     }
 
+    private enum Phase { case rain, fill, resolve }
+    private struct Glyph {
+        let input: Coordinate
+        let source: UInt32
+        let resolve: [UInt32]
+        var coordinate: Coordinate
+        var symbol: UInt32 = 32
+        var foreground: UInt32 = 0
+        var visible = false
+        var sceneStep: Int?
+    }
+    private struct Column {
+        let characters: [Int]
+        var pending: [Int] = []
+        var visible: [Int] = []
+        var filling = false
+        var baseDelay = 0
+        var delay = 0
+        var length = 0
+        var hold = 0
+        var dropChance = 0.08
+    }
     private let canvas: Canvas
-    private let input: InputText
     private let options: Configuration
-    private var tickIndex = 0
+    private let stepDuration: Double
+    private var elapsed = 0.0
+    private var rng: Xoshiro256PlusPlus
+    private var glyphs: [Glyph] = []
+    private var columns: [Column] = []
+    private var pending: [Int] = []
+    private var active: [Int] = []
+    private var full: [Int] = []
+    private var colors: [Color] = []
+    private var phase = Phase.rain
+    private var columnDelay = 0
+    private var resolveDelay = 0
     private var complete = false
-    private let finalColors: [UInt32]
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, matrixConfiguration: .init())
     }
 
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        matrixConfiguration: Configuration
-    ) {
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
+                matrixConfiguration: Configuration) {
         self.canvas = canvas
-        self.input = input
         self.options = matrixConfiguration
-        self.finalColors = Self.resolveColors(input: input, options: matrixConfiguration)
+        self.resolveDelay = matrixConfiguration.resolveDelay
+        self.stepDuration = 1 / Double(configuration.frameRate)
+        self.rng = .init(seed: seed)
+        guard !input.scalars.isEmpty else { complete = true; return }
+        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        let sources = Dictionary(uniqueKeysWithValues: zip(coordinates, input.scalars))
+        let final = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let mapping = Dictionary(uniqueKeysWithValues: (try! final.coordinateColorMapping(
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        colors = (try! Gradient(stops: options.rainColorGradient, steps: 6)).spectrum
+        for column in 1...canvas.columns {
+            var characters: [Int] = []
+            for row in stride(from: canvas.rows, through: 1, by: -1) {
+                let coordinate = Coordinate(column: column, row: row)
+                let resolution = (try! Gradient(stops: [options.highlightColor, mapping[coordinate] ?? Color(hex: "000000")], steps: 8)).spectrum
+                    .flatMap { Array(repeating: Self.rgb($0), count: options.finalGradientFrames) }
+                characters.append(glyphs.count)
+                glyphs.append(.init(input: coordinate, source: sources[coordinate] ?? 32,
+                    resolve: resolution, coordinate: coordinate))
+            }
+            columns.append(.init(characters: characters))
+            setup(columns.count - 1, filling: false)
+        }
+        pending = Array(columns.indices)
+        rng.shuffle(&pending)
+    }
+
+    private mutating func setup(_ index: Int, filling: Bool) {
+        columns[index].filling = filling
+        columns[index].pending = columns[index].characters
+        columns[index].visible = []
+        for id in columns[index].characters {
+            glyphs[id].visible = false
+            glyphs[id].coordinate = glyphs[id].input
+        }
+        columns[index].baseDelay = filling
+            ? rng.integer(in: max(options.rainFallDelayRange.lowerBound / 3, 1)...max(options.rainFallDelayRange.upperBound / 3, 1))
+            : rng.integer(in: options.rainFallDelayRange)
+        columns[index].delay = 0
+        columns[index].length = filling ? canvas.rows : rng.integer(in: max(1, Int(Double(canvas.rows) * 0.1))...canvas.rows)
+        columns[index].hold = columns[index].length == canvas.rows ? rng.integer(in: 20...45) : 0
+    }
+
+    private mutating func trim(_ index: Int) {
+        guard !columns[index].visible.isEmpty else { return }
+        glyphs[columns[index].visible.removeFirst()].visible = false
+        if columns[index].visible.count > 1 {
+            let color = colors[rng.integer(in: max(0, colors.count - 3)..<colors.count)]
+            glyphs[columns[index].visible[0]].foreground = Self.rgb(rustAdjustedBrightness(color, factor: 0.65))
+        }
+    }
+
+    private mutating func tickColumn(_ index: Int) {
+        if columns[index].delay == 0 {
+            if !columns[index].pending.isEmpty {
+                let next = columns[index].pending.removeFirst()
+                glyphs[next].symbol = randomSymbol()
+                glyphs[next].foreground = Self.rgb(options.highlightColor)
+                if let previous = columns[index].visible.last { glyphs[previous].foreground = randomColor() }
+                glyphs[next].visible = true
+                columns[index].visible.append(next)
+            } else if !columns[index].visible.isEmpty {
+                let last = columns[index].visible.last!
+                if glyphs[last].foreground == Self.rgb(options.highlightColor) { glyphs[last].foreground = randomColor() }
+                if columns[index].hold != 0 { columns[index].hold -= 1 }
+                else if !columns[index].filling {
+                    if rng.random() < columns[index].dropChance {
+                        for id in columns[index].visible {
+                            glyphs[id].coordinate = .init(column: glyphs[id].coordinate.column, row: glyphs[id].coordinate.row - 1)
+                            if glyphs[id].coordinate.row < 1 { glyphs[id].visible = false }
+                        }
+                        columns[index].visible.removeAll { !glyphs[$0].visible }
+                    }
+                    trim(index)
+                }
+            }
+            if columns[index].visible.count > columns[index].length { trim(index) }
+            columns[index].delay = columns[index].baseDelay
+        } else { columns[index].delay -= 1 }
+        for id in columns[index].visible {
+            if rng.random() < options.symbolSwapChance { glyphs[id].symbol = randomSymbol() }
+            if rng.random() < options.colorSwapChance { glyphs[id].foreground = randomColor() }
+        }
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
         guard !complete else { return .complete }
-        if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
-            renderOneCell(into: &frame)
-            tickIndex += 1
-            if tickIndex >= 76 {
-                complete = true
-                return .complete
+        defer { elapsed += stepDuration }
+        if phase != .resolve {
+            if columnDelay == 0 {
+                if phase == .rain {
+                    for _ in 0..<rng.integer(in: 1...3) {
+                        if !pending.isEmpty { active.append(pending.removeFirst()) }
+                    }
+                } else { active += pending; pending.removeAll() }
+                columnDelay = phase == .rain ? rng.integer(in: options.rainColumnDelayRange) : 1
+            } else { columnDelay -= 1 }
+            for index in active {
+                tickColumn(index)
+                if columns[index].pending.isEmpty {
+                    if columns[index].filling && !full.contains(index) { full.append(index) }
+                    else if columns[index].visible.isEmpty {
+                        setup(index, filling: phase == .fill)
+                        pending.append(index)
+                    }
+                }
             }
-            return .running
+            active.removeAll { columns[$0].visible.isEmpty }
+            if phase == .fill && pending.isEmpty && active.allSatisfy({ columns[$0].pending.isEmpty && columns[$0].filling }) {
+                phase = .resolve
+                active.removeAll()
+            }
+            if phase == .rain && elapsed > Double(options.rainTime) {
+                phase = .fill
+                for index in active { columns[index].hold = 0; columns[index].dropChance = 1 }
+                for index in pending { setup(index, filling: true) }
+            }
+        } else {
+            for index in full {
+                tickColumn(index)
+                if !columns[index].visible.isEmpty {
+                    if resolveDelay == 0 {
+                        for _ in 0..<rng.integer(in: 1...4) where !columns[index].visible.isEmpty {
+                            let position = rng.integer(in: columns[index].visible.indices)
+                            let id = columns[index].visible.remove(at: position)
+                            if glyphs[id].source != 32 { glyphs[id].sceneStep = 0 }
+                            else { glyphs[id].visible = false }
+                        }
+                        resolveDelay = options.resolveDelay
+                    } else { resolveDelay -= 1 }
+                }
+            }
+            full.removeAll { columns[$0].visible.isEmpty }
         }
-
-        renderFallback(into: &frame)
-        tickIndex += 1
-        if tickIndex > max(1, options.rainTime * 60) + 16 {
-            complete = true
-            return .complete
+        let work = !full.isEmpty || !active.isEmpty || !pending.isEmpty || phase == .rain || glyphs.contains { $0.sceneStep != nil }
+        for index in glyphs.indices {
+            if let step = glyphs[index].sceneStep {
+                glyphs[index].symbol = glyphs[index].source
+                glyphs[index].foreground = glyphs[index].resolve[step]
+                glyphs[index].sceneStep = step + 1 < glyphs[index].resolve.count ? step + 1 : nil
+            }
+            let glyph = glyphs[index]
+            if glyph.visible && (1...canvas.rows).contains(glyph.coordinate.row) {
+                frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = .init(codepoint: glyph.symbol,
+                    foreground: glyph.foreground, background: glyph.foreground == 0 ? 0xFFFF_FFFE : 0)
+            }
         }
-        return .running
+        complete = !work
+        return complete ? .complete : .running
     }
 
-    private mutating func renderOneCell(into frame: inout Frame) {
-        let rainSymbol = options.rainSymbols[0].unicodeScalars.first?.value ?? 120
-        switch tickIndex {
-        case 0...1:
-            frame[column: 1, row: 1] = Cell(codepoint: rainSymbol, foreground: rgb(options.highlightColor), background: 0)
-        case 2...61:
-            frame[column: 1, row: 1] = Cell(codepoint: rainSymbol, foreground: rainRGB(), background: 0)
-        case 62...63:
-            frame[column: 1, row: 1] = .blank
-        case 64...65:
-            frame[column: 1, row: 1] = Cell(codepoint: rainSymbol, foreground: rgb(options.highlightColor), background: 0)
-        default:
-            let colors = resolveGradient(start: options.highlightColor, end: color(finalColors.first ?? rgb(options.finalGradientStops.last ?? options.highlightColor)))
-            let colorIndex = min(tickIndex - 66, colors.count - 1)
-            frame[column: 1, row: 1] = Cell(codepoint: input.scalars[0], foreground: colors[colorIndex], background: 0)
-        }
+    private mutating func randomSymbol() -> UInt32 {
+        options.rainSymbols[rng.integer(in: options.rainSymbols.indices)].unicodeScalars.first!.value
     }
-
-    private mutating func renderFallback(into frame: inout Frame) {
-        frame.withMutableCells { cells in
-            for index in cells.indices { cells[index] = .blank }
-        }
-        let showFinal = tickIndex > max(1, options.rainTime * 60)
-        for (index, scalar) in input.scalars.enumerated() {
-            let position = input.positions[index]
-            let foreground = showFinal ? finalColors[index] : rainRGB()
-            let symbol = showFinal ? scalar : (options.rainSymbols[0].unicodeScalars.first?.value ?? scalar)
-            frame[column: position.column, row: position.row] = Cell(codepoint: symbol, foreground: foreground, background: 0)
-        }
-    }
-
-    private func rainRGB() -> UInt32 {
-        let gradient = try! Gradient(stops: options.rainColorGradient, steps: 6)
-        return rgb(gradient.spectrum[0])
-    }
-
-    private func resolveGradient(start: Color, end: Color) -> [UInt32] {
-        let gradient = try! Gradient(stops: [start, end], steps: 8)
-        return gradient.spectrum.map(rgb) + [rgb(end)]
-    }
-
-    private static func resolveColors(input: InputText, options: Configuration) -> [UInt32] {
-        guard !input.positions.isEmpty else { return [] }
-        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
-        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
-        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
-            minRow: coordinates.map(\.row).min()!,
-            maxRow: coordinates.map(\.row).max()!,
-            minColumn: coordinates.map(\.column).min()!,
-            maxColumn: coordinates.map(\.column).max()!,
-            direction: options.finalGradientDirection
-        )).entries.map { ($0.coordinate, rgb($0.color)) })
-        return coordinates.map { mapping[$0] ?? rgb(options.finalGradientStops.last ?? options.highlightColor) }
-    }
-
-    private func rgb(_ color: Color) -> UInt32 { Self.rgb(color) }
-    private static func rgb(_ color: Color) -> UInt32 {
-        (UInt32(color.red) << 16) | (UInt32(color.green) << 8) | UInt32(color.blue)
-    }
-
-    private func color(_ word: UInt32) -> Color {
-        Color(hex: String(format: "%06x", word & 0xFF_FFFF))
-    }
+    private mutating func randomColor() -> UInt32 { Self.rgb(colors[rng.integer(in: colors.indices)]) }
+    private static func rgb(_ color: Color) -> UInt32 { UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue) }
 }

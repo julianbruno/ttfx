@@ -32,7 +32,7 @@ public struct SmokeEffect: Effect {
         }
     }
 
-    private enum Phase { case smoke, paint, done }
+    private enum Phase { case idle, smoke, paint, done }
 
     private struct Visual {
         let symbol: UInt32
@@ -46,16 +46,17 @@ public struct SmokeEffect: Effect {
         let inputSymbol: UInt32
         let smokeFrames: [Visual]
         let paintFrames: [Visual]
-        var visible = false
-        var phase: Phase = .smoke
+        var visible = true
+        var phase: Phase = .idle
         var frameIndex = 0
         var ticksElapsed = 0
         var renderedVisual: Visual?
 
-        var active: Bool { visible && phase != .done }
+        var active: Bool { visible && phase != .done && phase != .idle }
 
         var visual: Visual? {
             switch phase {
+            case .idle: renderedVisual
             case .smoke: smokeFrames[frameIndex]
             case .paint: paintFrames[frameIndex]
             case .done: paintFrames.last
@@ -66,7 +67,7 @@ public struct SmokeEffect: Effect {
     private let canvas: Canvas
     private let options: Configuration
     private var glyphs: [Glyph] = []
-    private var releaseOrder: [Int] = []
+    private var releaseOrder: [[Int]] = []
     private var isComplete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
@@ -92,7 +93,9 @@ public struct SmokeEffect: Effect {
             return .complete
         }
 
-        if let next = nextRelease() { glyphs[next].visible = true }
+        if !releaseOrder.isEmpty {
+            for next in releaseOrder.removeFirst() { glyphs[next].phase = .smoke }
+        }
         advanceScenes()
         render(into: &frame)
 
@@ -131,18 +134,27 @@ public struct SmokeEffect: Effect {
         let smokeGradient = try! Gradient(stops: smokeStops, steps: [3, 4])
         let smokeSymbols = options.smokeSymbols.map { $0.unicodeScalars.first?.value ?? Cell.blank.codepoint }
 
+        let occupied = Dictionary(uniqueKeysWithValues: sources.map { ($0.coordinate, $0) })
+        sources = []
+        for row in stride(from: canvas.rows, through: 1, by: -1) {
+            for column in 1...canvas.columns {
+                let coordinate = Coordinate(column: column, row: row)
+                sources.append(occupied[coordinate] ?? (sources.count + input.scalars.count, 32, coordinate))
+            }
+        }
         glyphs = sources.map { source in
-            let finalColor = finalColors[source.coordinate] ?? finalGradient.spectrum.last!
+            let finalColor = finalColors[source.coordinate] ?? Color(hex: "000000")
             let paintGradient = try! Gradient(stops: options.finalGradientStops + [finalColor], steps: 5)
             return Glyph(
                 characterID: source.characterID,
                 coordinate: source.coordinate,
                 inputSymbol: source.symbol,
                 smokeFrames: distributedSmokeFrames(symbols: smokeSymbols, colors: smokeGradient.spectrum),
-                paintFrames: paintGradient.spectrum.map { Visual(symbol: source.symbol, foreground: rgb($0), duration: 5) }
+                paintFrames: paintGradient.spectrum.map { Visual(symbol: source.symbol, foreground: rgb($0), duration: 5) },
+                renderedVisual: Visual(symbol: source.symbol, foreground: rgb(options.startingColor), duration: 1)
             )
         }
-        releaseOrder = breadthFirstOrder(seed: seed)
+        releaseOrder = breadthFirstGroups(seed: seed, bounds: (left, right, bottom, top))
     }
 
     private func distributedSmokeFrames(symbols: [UInt32], colors: [Color]) -> [Visual] {
@@ -155,61 +167,52 @@ public struct SmokeEffect: Effect {
         return pairs.map { Visual(symbol: $0.0, foreground: rgb($0.1), duration: 3) }
     }
 
-    private func breadthFirstOrder(seed: UInt64) -> [Int] {
-        guard !glyphs.isEmpty else { return [] }
-        if glyphs.count == 1 { return [0] }
+    private func breadthFirstGroups(seed: UInt64, bounds: (Int, Int, Int, Int)) -> [[Int]] {
         var rng = Xoshiro256PlusPlus(seed: seed)
-        _ = randomCanvasCoordinate(rng: &rng, limitToTextBoundary: !options.useWholeCanvas)
-        for _ in glyphs { _ = rng.integer(in: 0...99) }
-        let startCoordinate = randomCanvasCoordinate(rng: &rng, limitToTextBoundary: !options.useWholeCanvas)
-        let start = glyphs.indices.min {
-            distance(glyphs[$0].coordinate, startCoordinate) < distance(glyphs[$1].coordinate, startCoordinate)
-        }!
-        var remaining = Set(glyphs.indices)
-        var order = [start]
-        remaining.remove(start)
-        var frontier = [start]
+        let left = options.useWholeCanvas ? 1 : bounds.0
+        let right = options.useWholeCanvas ? canvas.columns : bounds.1
+        let bottom = options.useWholeCanvas ? 1 : bounds.2
+        let top = options.useWholeCanvas ? canvas.rows : bounds.3
+        let ids = Dictionary(uniqueKeysWithValues: glyphs.indices.map { (glyphs[$0].coordinate, $0) })
+        let start = ids[Coordinate(column: rng.integer(in: left...right), row: rng.integer(in: bottom...top))]!
+        let weights = glyphs.map { _ in rng.integer(in: 0...99) }
+        let fillStart = ids[Coordinate(column: rng.integer(in: left...right), row: rng.integer(in: bottom...top))]!
+        var links = Array(repeating: Set<Int>(), count: glyphs.count)
+        var pending: [Int: [(Int, Int)]] = [:]
+        func addNeighbors(_ index: Int) {
+            let coordinate = glyphs[index].coordinate
+            for (dx, dy) in [(0, 1), (1, 0), (0, -1), (-1, 0)] {
+                let neighbor = Coordinate(column: coordinate.column + dx, row: coordinate.row + dy)
+                guard (left...right).contains(neighbor.column), (bottom...top).contains(neighbor.row),
+                      let id = ids[neighbor], links[id].isEmpty else { continue }
+                pending[weights[id], default: []].append((index, id))
+            }
+        }
+        addNeighbors(start)
+        while let weight = pending.keys.min() {
+            let index = rng.integer(in: pending[weight]!.indices)
+            let (source, target) = pending[weight]!.remove(at: index)
+            if pending[weight]!.isEmpty { pending.removeValue(forKey: weight) }
+            guard links[target].isEmpty else { continue }
+            links[source].insert(target)
+            links[target].insert(source)
+            addNeighbors(target)
+        }
+        var frontier = [fillStart]
+        var explored: Set<Int> = [fillStart]
+        var groups: [[Int]] = []
         while !frontier.isEmpty {
-            let current = frontier.removeFirst()
-            let neighbors = remaining.sorted { lhs, rhs in
-                let ld = distance(glyphs[lhs].coordinate, glyphs[current].coordinate)
-                let rd = distance(glyphs[rhs].coordinate, glyphs[current].coordinate)
-                if ld != rd { return ld < rd }
-                return glyphs[lhs].characterID < glyphs[rhs].characterID
+            var next: [Int] = []
+            for current in frontier {
+                for neighbor in links[current].sorted() where !explored.contains(neighbor) {
+                    explored.insert(neighbor)
+                    next.append(neighbor)
+                }
             }
-            for next in neighbors.prefix(4) where distance(glyphs[next].coordinate, glyphs[current].coordinate) <= 1 {
-                remaining.remove(next)
-                order.append(next)
-                frontier.append(next)
-            }
+            groups.append(groups.isEmpty ? [fillStart] + next : next)
+            frontier = next
         }
-        order.append(contentsOf: remaining.sorted { glyphs[$0].characterID < glyphs[$1].characterID })
-        return order
-    }
-
-    private func randomCanvasCoordinate(rng: inout Xoshiro256PlusPlus, limitToTextBoundary: Bool) -> Coordinate {
-        let columns: ClosedRange<Int>
-        let rows: ClosedRange<Int>
-        if limitToTextBoundary, !glyphs.isEmpty {
-            columns = glyphs.map(\.coordinate.column).min()!...glyphs.map(\.coordinate.column).max()!
-            rows = glyphs.map(\.coordinate.row).min()!...glyphs.map(\.coordinate.row).max()!
-        } else {
-            columns = 1...canvas.columns
-            rows = 1...canvas.rows
-        }
-        return Coordinate(column: rng.integer(in: columns), row: rng.integer(in: rows))
-    }
-
-    private func distance(_ lhs: Coordinate, _ rhs: Coordinate) -> Int {
-        abs(lhs.column - rhs.column) + abs(lhs.row - rhs.row)
-    }
-
-    private mutating func nextRelease() -> Int? {
-        while !releaseOrder.isEmpty {
-            let index = releaseOrder.removeFirst()
-            if !glyphs[index].visible { return index }
-        }
-        return nil
+        return groups
     }
 
     private mutating func advanceScenes() {
@@ -220,6 +223,7 @@ public struct SmokeEffect: Effect {
             guard glyphs[index].ticksElapsed >= displayed.duration else { continue }
             glyphs[index].ticksElapsed = 0
             switch glyphs[index].phase {
+            case .idle: break
             case .smoke:
                 if glyphs[index].frameIndex + 1 < glyphs[index].smokeFrames.count {
                     glyphs[index].frameIndex += 1
@@ -254,7 +258,7 @@ public struct SmokeEffect: Effect {
                 winners[cellIndex] = (glyph.characterID, visual)
             }
             for (index, winner) in winners {
-                cells[index] = .init(codepoint: winner.visual.symbol, foreground: winner.visual.foreground, background: 0)
+                cells[index] = .init(codepoint: winner.visual.symbol, foreground: winner.visual.foreground, background: winner.visual.foreground == 0 ? 0xFFFF_FFFE : 0)
             }
         }
     }

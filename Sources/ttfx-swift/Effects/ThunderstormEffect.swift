@@ -52,171 +52,293 @@ public struct ThunderstormEffect: Effect {
         }
     }
 
-    private struct Glyph {
-        let id: Int
-        let symbol: UInt32
-        let coordinate: Coordinate
-        let visibleColor: UInt32
-        let stormColor: UInt32
+    private enum Phase { case preStorm, waiting, storm, complete }
+    private enum Kind { case text, rain, spark, strike }
+    private struct Scene {
+        var colors: [UInt32]
+        var age = 0
+        var easing: Easing?
     }
-
+    private struct Motion {
+        let origin: Coordinate
+        let target: Coordinate
+        let control: Coordinate?
+        let distance: Double
+        let steps: Int
+        let easing: Easing
+        var step = 0
+        var hold: Int
+        init(origin: Coordinate, target: Coordinate, control: Coordinate? = nil, speed: Double, easing: Easing = .linear, hold: Int = 0) {
+            self.origin = origin; self.target = target; self.control = control
+            self.distance = control.map { Geometry.bezierLength(from: origin, controls: [$0], to: target) }
+                ?? Geometry.lineLength(from: origin, to: target)
+            self.steps = PyCompat.roundHalfEven(distance / speed); self.easing = easing; self.hold = hold
+        }
+        mutating func advance() -> (Coordinate, Bool) {
+            var coordinate = target
+            if steps > 0, step < steps, distance > 0 {
+                step += 1
+                let t = (easing.value(at: Double(step) / Double(steps)) * distance) / distance
+                coordinate = control.map { Geometry.coordinateOnBezier(from: origin, controls: [$0], to: target, t: t) }
+                    ?? Geometry.coordinateOnLine(from: origin, to: target, t: t)
+            }
+            if step == steps {
+                if hold != 0 { hold -= 1; return (coordinate, false) }
+                return (coordinate, true)
+            }
+            return (coordinate, false)
+        }
+    }
+    private struct Glyph {
+        let kind: Kind
+        let symbol: UInt32
+        var displaySymbol: UInt32
+        var coordinate: Coordinate
+        var foreground: UInt32
+        var layer: Int
+        var visible = false
+        var active = false
+        var motion: Motion?
+        var scenes: [String: Scene] = [:]
+        var scene: String?
+        var lastStrike = false
+    }
     private let canvas: Canvas
     private let options: Configuration
-    private let seed: UInt64
+    private let frameDuration: Double
+    private var rng: Xoshiro256PlusPlus
     private var glyphs: [Glyph] = []
-    private var tickIndex = 0
-    private var isComplete = false
-    private var fadeColors: [UInt32] = []
+    private var inputCount = 0
+    private var rainPool: [Int] = []
+    private var sparkPool: [Int] = []
+    private var strikePool: [Int] = []
+    private var sparkCount = 0
+    private var pendingStrikes: [Int] = []
+    private var revealedStrikes: [Int] = []
+    private var pendingGlow: [Int] = []
+    private var strikeInProgress = false
+    private var branchChance = 0.05
+    private var strikeDelay = 0
+    private var rainDelay = 0
+    private var phase = Phase.preStorm
+    private var elapsed = 0.0
+    private var stormStart = 0.0
+    private var sparkColors: [UInt32] = []
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, thunderstormConfiguration: .init())
     }
-
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        thunderstormConfiguration: Configuration
-    ) {
-        self.canvas = canvas
-        self.options = thunderstormConfiguration
-        self.seed = seed
-        build(input: input)
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, thunderstormConfiguration: Configuration) {
+        self.canvas = canvas; self.options = thunderstormConfiguration; self.rng = .init(seed: seed)
+        self.frameDuration = 1 / Double(configuration.frameRate)
+        guard !input.scalars.isEmpty else { phase = .complete; return }
+        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        inputCount = input.scalars.count
+        glyphs = coordinates.indices.map { .init(kind: .text, symbol: input.scalars[$0], displaySymbol: input.scalars[$0],
+            coordinate: coordinates[$0], foreground: 0, layer: 0, visible: true) }
+        for _ in 0..<50 { rainPool.append(makeParticle(.rain)) }
+        sparkColors = Self.gradient(options.sparkGlowColor, Color(hex: "000000"), steps: 7, duration: options.sparkGlowTime)
+        for _ in 0..<200 { sparkPool.append(makeParticle(.spark)) }
+        for _ in 0..<200 { strikePool.append(makeParticle(.strike)) }
+        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        for id in 0..<inputCount {
+            let visible = mapping[coordinates[id]]!
+            let storm = rustAdjustedBrightness(visible, factor: 0.5)
+            let fade = Self.gradient(visible, storm, steps: 7, duration: 12)
+            glyphs[id].scenes = [
+                "fade": .init(colors: fade), "unfade": .init(colors: Array(fade.reversed())),
+                "glow": .init(colors: Self.gradient(options.glowingTextColor, storm, steps: 7, duration: options.textGlowTime)),
+                "flash": .init(colors: Self.gradient(storm, rustAdjustedBrightness(visible, factor: 1.7), steps: 7, duration: 6, loop: true))]
+        }
     }
-
+    private mutating func makeParticle(_ kind: Kind) -> Int {
+        let symbols: [String]
+        let layer: Int
+        switch kind {
+        case .rain: symbols = options.raindropSymbols; layer = 1
+        case .spark: symbols = options.sparkSymbols; layer = 2
+        default: symbols = ["|"]; layer = 0
+        }
+        let symbol = kind == .strike ? UInt32(124) : symbols[rng.integer(in: symbols.indices)].unicodeScalars.first!.value
+        let id = glyphs.count
+        var glyph = Glyph(kind: kind, symbol: symbol, displaySymbol: symbol, coordinate: .init(column: 0, row: 0),
+            foreground: kind == .rain ? 0xaaaaff : 0, layer: layer)
+        if kind == .spark { glyph.scenes["glow"] = .init(colors: sparkColors, easing: .inCirc); sparkCount += 1 }
+        glyphs.append(glyph)
+        return id
+    }
+    private mutating func activateScene(_ id: Int, _ name: String) {
+        glyphs[id].scene = name
+        let scene = glyphs[id].scenes[name]!
+        // Eased scenes retain their source frames; activation shows the first one.
+        glyphs[id].foreground = scene.colors[scene.easing == nil ? scene.age : 0]
+    }
+    private mutating func rain() {
+        if rainDelay != 0 { rainDelay -= 1; return }
+        let count = rng.integer(in: 1...6)
+        for _ in 0..<count {
+            let column = rng.integer(in: (1 - canvas.rows)...canvas.columns)
+            let origin = Coordinate(column: column - 1, row: canvas.rows + 1)
+            let id = rainPool.popLast() ?? makeParticle(.rain)
+            let speed = rng.uniform(0.5, 1.5)
+            glyphs[id].coordinate = origin; glyphs[id].visible = true; glyphs[id].active = true
+            glyphs[id].motion = .init(origin: origin, target: .init(column: origin.column + canvas.rows + 1, row: 0), speed: speed)
+            glyphs[id].scene = nil
+        }
+        rainDelay = rng.integer(in: 1...7)
+    }
+    private mutating func setupStrike(neighbor: Int? = nil) {
+        var neighbor = neighbor
+        var column = neighbor.map { glyphs[$0].coordinate.column } ?? rng.integer(in: 1...canvas.columns)
+        var row = neighbor.map { glyphs[$0].coordinate.row } ?? canvas.rows
+        while row >= 1 {
+            let symbol: UInt32
+            if neighbor != nil {
+                let delta = [-1, 1][rng.integer(in: 0...1)]
+                column += delta; symbol = delta == 1 ? 92 : 47
+            } else { symbol = [UInt32(92), 47, 124][rng.integer(in: 0...2)] }
+            if strikePool.isEmpty { for _ in 0..<20 { strikePool.append(makeParticle(.strike)) } }
+            let id = strikePool.removeLast()
+            glyphs[id].scenes.removeAll(); glyphs[id].scene = nil; glyphs[id].lastStrike = false
+            glyphs[id].coordinate = .init(column: column, row: row)
+            glyphs[id].displaySymbol = symbol; glyphs[id].foreground = Self.rgb(options.lightningColor)
+            row -= 1
+            if symbol == 92 { column += 1 } else if symbol == 47 { column -= 1 }
+            pendingStrikes.append(id)
+            if rng.random() < branchChance, neighbor == nil {
+                branchChance -= 0.01; setupStrike(neighbor: id)
+            }
+            neighbor = nil
+        }
+        branchChance = 0.05
+    }
+    private mutating func lightning() {
+        setupStrike()
+        let flash = Self.gradient(options.lightningColor, rustAdjustedBrightness(options.lightningColor, factor: 1.7),
+            steps: 7, duration: 6, loop: true)
+        let fade = Self.gradient(options.lightningColor, Color(hex: "000000"), steps: 6, duration: 2)
+        let easing = Easing.cubicBezier(0, 1.6, 1, rng.uniform(-0.6, 0.4))
+        for id in pendingStrikes {
+            glyphs[id].scenes["flash"] = .init(colors: flash, easing: easing)
+            glyphs[id].scenes["fade"] = .init(colors: fade)
+            glyphs[id].layer = 1
+        }
+        for id in 0..<inputCount { glyphs[id].scenes["flash"]!.easing = easing }
+    }
+    private mutating func emitSparks(at origin: Coordinate) {
+        let count = rng.integer(in: 12...18)
+        for _ in 0..<count {
+            if sparkPool.isEmpty, sparkCount >= 2000 { continue }
+            let id = sparkPool.popLast() ?? makeParticle(.spark)
+            let speed = rng.uniform(0.1, 0.25)
+            let offset = rng.integer(in: 4...20) * [1, -1][rng.integer(in: 0...1)]
+            let target = Coordinate(column: origin.column + offset, row: 1)
+            let control = Coordinate(column: origin.column - Int(floor(Double(origin.column - target.column) / 2)),
+                row: rng.integer(in: 1...canvas.rows))
+            glyphs[id].coordinate = origin
+            glyphs[id].motion = .init(origin: origin, target: target, control: control, speed: speed, easing: .outQuint, hold: 30)
+            activateScene(id, "glow")
+            glyphs[id].visible = true; glyphs[id].active = true
+        }
+    }
+    private mutating func stepStrike() {
+        if strikeDelay != 0 { strikeDelay -= 1; return }
+        if !pendingStrikes.isEmpty {
+            let count = rng.integer(in: 1...3)
+            for _ in 0..<count where !pendingStrikes.isEmpty {
+                let id = pendingStrikes.removeFirst()
+                revealedStrikes.append(id); glyphs[id].visible = true; strikeDelay = 1
+                if pendingStrikes.isEmpty {
+                    emitSparks(at: glyphs[id].coordinate)
+                    glyphs[id].lastStrike = true
+                    for strike in revealedStrikes { activateScene(strike, "flash"); glyphs[strike].active = true }
+                    revealedStrikes.removeAll()
+                    for text in 0..<inputCount { activateScene(text, "flash"); glyphs[text].active = true }
+                }
+            }
+        }
+    }
+    private mutating func sceneComplete(_ id: Int, _ name: String) {
+        switch glyphs[id].kind {
+        case .text:
+            if id == 0, name == "fade" { phase = .storm; stormStart = elapsed }
+        case .rain: break
+        case .spark:
+            glyphs[id].visible = false; glyphs[id].motion = nil; glyphs[id].scene = nil; glyphs[id].active = false
+            sparkPool.append(id)
+        case .strike:
+            if name == "flash" { activateScene(id, "fade") }
+            else if name == "fade" {
+                glyphs[id].visible = false
+                if let text = (0..<inputCount).first(where: { glyphs[$0].coordinate == glyphs[id].coordinate }) {
+                    activateScene(text, "glow"); pendingGlow.append(text)
+                }
+                strikePool.append(id)
+                if glyphs[id].lastStrike { strikeInProgress = false }
+            }
+        }
+    }
     public mutating func tick(into frame: inout Frame) -> TickStatus {
-        guard !isComplete else { return .complete }
-        guard !glyphs.isEmpty else {
-            isComplete = true
-            return .complete
-        }
-
-        tickIndex += 1
-        render(into: &frame)
-        if tickIndex >= completionTick {
-            isComplete = true
-            return .complete
-        }
-        return .running
-    }
-
-    private mutating func build(input: InputText) {
-        var sources: [(id: Int, symbol: UInt32, coordinate: Coordinate)] = []
-        for (index, pair) in zip(input.scalars, input.positions).enumerated() where pair.0 != 32 {
-            sources.append((index, pair.0, Coordinate(column: pair.1.column, row: pair.1.row)))
-        }
-        guard !sources.isEmpty else {
-            isComplete = true
-            return
-        }
-
-        let bottom = sources.map(\.coordinate.row).min()!
-        let top = sources.map(\.coordinate.row).max()!
-        let left = sources.map(\.coordinate.column).min()!
-        let right = sources.map(\.coordinate.column).max()!
-        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
-        let mapping = try! finalGradient.coordinateColorMapping(
-            minRow: bottom,
-            maxRow: top,
-            minColumn: left,
-            maxColumn: right,
-            direction: options.finalGradientDirection
-        )
-        let colorByCoordinate = Dictionary(uniqueKeysWithValues: mapping.entries.map { ($0.coordinate, $0.color) })
-        glyphs = sources.map { source in
-            let visible = colorByCoordinate[source.coordinate] ?? finalGradient.spectrum.last!
-            let storm = dim(visible, by: 0.5)
-            return Glyph(
-                id: source.id,
-                symbol: source.symbol,
-                coordinate: source.coordinate,
-                visibleColor: rgb(visible),
-                stormColor: rgb(storm)
-            )
-        }
-
-        if let first = glyphs.first {
-            let visible = Color(rgb: first.visibleColor)
-            let storm = Color(rgb: first.stormColor)
-            fadeColors = (try! Gradient(stops: [visible, storm], steps: 7)).spectrum.map(Self.rgb)
-        }
-    }
-
-    private var completionTick: Int {
-        if isOneCellSeedOneStormFixture { return 252 }
-        return 96 + max(1, options.stormTime * 30) + 84
-    }
-
-    private var isOneCellSeedOneStormFixture: Bool {
-        seed == 1 && canvas.columns == 1 && canvas.rows == 1 && glyphs.count == 1 && options.stormTime == 1
-    }
-
-    private func render(into frame: inout Frame) {
-        frame.withMutableCells { cells in
-            for index in cells.indices { cells[index] = .blank }
-            guard let glyph = glyphs.first else { return }
-            let visual = visualForCurrentTick(glyph: glyph)
-            let index = (canvas.rows - glyph.coordinate.row) * canvas.columns + glyph.coordinate.column - 1
-            guard cells.indices.contains(index) else { return }
-            cells[index] = Cell(codepoint: visual.symbol, foreground: visual.foreground, background: 0)
-        }
-    }
-
-    private func visualForCurrentTick(glyph: Glyph) -> (symbol: UInt32, foreground: UInt32) {
-        if isOneCellSeedOneStormFixture {
-            if tickIndex <= 96 {
-                return (glyph.symbol, fadeColors[min((tickIndex - 1) / 12, fadeColors.count - 1)])
+        guard phase != .complete || glyphs.contains(where: \.active) else { return .complete }
+        switch phase {
+        case .preStorm:
+            for id in 0..<inputCount { activateScene(id, "fade"); glyphs[id].active = true }
+            phase = .waiting
+        case .storm:
+            rain()
+            if !strikeInProgress, rng.random() < 0.008 { strikeInProgress = true; lightning() }
+            if strikeInProgress { stepStrike() }
+            for id in pendingGlow { glyphs[id].active = true }; pendingGlow.removeAll()
+            if elapsed - stormStart >= Double(options.stormTime), !strikeInProgress {
+                for id in 0..<inputCount { activateScene(id, "unfade"); glyphs[id].active = true }
+                phase = .complete
             }
-            if tickIndex <= 168 {
-                if let rain = oneCellRainVisual(at: tickIndex) { return rain }
-                return (glyph.symbol, glyph.stormColor)
+        case .waiting, .complete: break
+        }
+        let active = glyphs.indices.filter { glyphs[$0].active }
+        for id in active {
+            if var motion = glyphs[id].motion {
+                let (coordinate, complete) = motion.advance()
+                glyphs[id].coordinate = coordinate; glyphs[id].motion = complete ? nil : motion
+                if complete, glyphs[id].kind == .rain {
+                    glyphs[id].visible = false; glyphs[id].active = false; rainPool.append(id)
+                }
             }
-            let unfade = Array(fadeColors.dropLast().reversed())
-            return (glyph.symbol, unfade[min((tickIndex - 169) / 12, unfade.count - 1)])
+            if let name = glyphs[id].scene {
+                var scene = glyphs[id].scenes[name]!
+                let index: Int
+                if let easing = scene.easing {
+                    index = min(scene.colors.count - 1, max(0, PyCompat.roundHalfEven(
+                        easing.value(at: Double(scene.age) / Double(scene.colors.count)) * Double(scene.colors.count - 1))))
+                } else { index = scene.age }
+                glyphs[id].foreground = scene.colors[index]
+                scene.age += 1
+                let complete = scene.age == scene.colors.count
+                if complete { scene.age = 0; glyphs[id].scene = nil }
+                glyphs[id].scenes[name] = scene
+                if complete { sceneComplete(id, name) }
+            }
+            glyphs[id].active = glyphs[id].motion != nil || glyphs[id].scene != nil
         }
-
-        if tickIndex <= 96 {
-            return (glyph.symbol, fadeColors[min((tickIndex - 1) / 12, fadeColors.count - 1)])
+        let ordered = glyphs.indices.filter { glyphs[$0].visible }.sorted {
+            glyphs[$0].layer == glyphs[$1].layer ? $0 < $1 : glyphs[$0].layer < glyphs[$1].layer
         }
-        let stormEnd = 96 + max(1, options.stormTime * 30)
-        if tickIndex <= stormEnd { return (glyph.symbol, glyph.stormColor) }
-        let unfade = Array(fadeColors.dropLast().reversed())
-        return (glyph.symbol, unfade[min((tickIndex - stormEnd - 1) / 12, unfade.count - 1)])
-    }
-
-    private func oneCellRainVisual(at tick: Int) -> (symbol: UInt32, foreground: UInt32)? {
-        let dot = Character(".").unicodeScalars.first!.value
-        let slash = Character("\\").unicodeScalars.first!.value
-        let rain = rgb(Color(hex: "aaaaff"))
-        switch tick {
-        case 97...98, 104...110, 116, 122...124, 127...130, 136...138, 143...146:
-            return (dot, rain)
-        case 102...103:
-            return (slash, rain)
-        default:
-            return nil
+        for id in ordered {
+            let glyph = glyphs[id]
+            if (1...canvas.columns).contains(glyph.coordinate.column), (1...canvas.rows).contains(glyph.coordinate.row) {
+                frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = .init(codepoint: glyph.displaySymbol,
+                    foreground: glyph.foreground, background: glyph.foreground == 0 ? 0xFFFF_FFFE : 0)
+            }
         }
+        elapsed += frameDuration
+        return phase == .complete && !glyphs.contains(where: \.active) ? .complete : .running
     }
-
-    private static func dim(_ color: Color, by brightness: Double) -> Color {
-        let red = max(0, min(255, Int(Double(color.red) * brightness)))
-        let green = max(0, min(255, Int(Double(color.green) * brightness)))
-        let blue = max(0, min(255, Int(Double(color.blue) * brightness)))
-        return Color(hex: String(format: "%02x%02x%02x", red, green, blue))
-    }
-
-    private func dim(_ color: Color, by brightness: Double) -> Color { Self.dim(color, by: brightness) }
-
-    private static func rgb(_ color: Color) -> UInt32 {
-        UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue)
-    }
-
-    private func rgb(_ color: Color) -> UInt32 { Self.rgb(color) }
-}
-
-private extension Color {
-    init(rgb: UInt32) {
-        self.init(hex: String(format: "%02x%02x%02x", (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF))
+    private static func rgb(_ color: Color) -> UInt32 { UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue) }
+    private static func gradient(_ from: Color, _ to: Color, steps: Int, duration: Int, loop: Bool = false) -> [UInt32] {
+        (try! Gradient(stops: [from, to], steps: steps, loop: loop)).spectrum.flatMap { Array(repeating: rgb($0), count: duration) }
     }
 }

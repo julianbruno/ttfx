@@ -36,153 +36,136 @@ public struct ErrorCorrectEffect: Effect {
         }
     }
 
+    private enum Stage { case idle, error, wipeStart, correcting, wipeEnd, final, done }
+    private struct Visual { let symbol: UInt32; let color: UInt32 }
     private struct Glyph {
-        let originalSymbol: UInt32
-        let originalCoordinate: Coordinate
-        var coordinate: Coordinate
+        let input: Coordinate
+        let symbol: UInt32
         let finalColor: UInt32
+        let correction: [UInt32]
+        let final: [Visual]
+        var coordinate: Coordinate
+        var origin: Coordinate
+        var visual: Visual
+        var stage = Stage.idle
+        var timeline: [Visual] = []
+        var age = 0
+        var motionStep = 0
+        var motionSteps = 0
+        var totalDistance = 0.0
+        var layer = 0
+        var active: Bool { stage != .idle && stage != .done }
     }
-
     private let canvas: Canvas
     private let options: Configuration
     private var glyphs: [Glyph] = []
-    private var tickIndex = 0
-    private var isComplete = false
+    private var pairs: [[Int]] = []
+    private var delay = 0
+    private var complete = false
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, errorCorrectConfiguration: .init())
     }
-
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        errorCorrectConfiguration: Configuration
-    ) {
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
+                errorCorrectConfiguration: Configuration) {
         self.canvas = canvas
         self.options = errorCorrectConfiguration
-        build(input: input)
+        guard !input.scalars.isEmpty else { complete = true; return }
+        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        let correction = (try! Gradient(stops: [options.errorColor, options.correctColor], steps: 10)).spectrum.map(Self.rgb)
+        glyphs = coordinates.indices.map { index in
+            let color = mapping[coordinates[index]]!
+            let final = (try! Gradient(stops: [options.correctColor, color], steps: 10)).spectrum
+                .flatMap { Array(repeating: Visual(symbol: input.scalars[index], color: Self.rgb($0)), count: 3) }
+            return Glyph(input: coordinates[index], symbol: input.scalars[index], finalColor: Self.rgb(color),
+                correction: correction, final: final, coordinate: coordinates[index], origin: coordinates[index],
+                visual: .init(symbol: input.scalars[index], color: Self.rgb(color)))
+        }
+        var rng = Xoshiro256PlusPlus(seed: seed)
+        var remaining = Array(glyphs.indices)
+        for _ in 0..<min(Int(options.errorPairs * Double(remaining.count)), remaining.count / 2) {
+            let first = remaining.remove(at: rng.integer(in: remaining.indices))
+            let second = remaining.remove(at: rng.integer(in: remaining.indices))
+            glyphs[first].coordinate = glyphs[second].input
+            glyphs[second].coordinate = glyphs[first].input
+            for index in [first, second] { glyphs[index].visual = .init(symbol: glyphs[index].symbol, color: Self.rgb(options.errorColor)) }
+            pairs.append([first, second])
+        }
+    }
+
+    private mutating func activate(_ index: Int, _ stage: Stage) {
+        glyphs[index].stage = stage
+        glyphs[index].age = 0
+        let error = Self.rgb(options.errorColor)
+        let correct = Self.rgb(options.correctColor)
+        switch stage {
+        case .error:
+            let pair = Array(repeating: Visual(symbol: 0x2593, color: error), count: 3)
+                + Array(repeating: Visual(symbol: glyphs[index].symbol, color: 0xffffff), count: 3)
+            glyphs[index].timeline = Array(repeating: pair, count: 10).flatMap { $0 }
+        case .wipeStart:
+            glyphs[index].timeline = "▁▂▃▄▅▆▇█".unicodeScalars.flatMap { Array(repeating: Visual(symbol: $0.value, color: error), count: 3) }
+        case .correcting:
+            glyphs[index].origin = glyphs[index].coordinate
+            glyphs[index].totalDistance = Geometry.lineLength(from: glyphs[index].origin, to: glyphs[index].input)
+            glyphs[index].motionSteps = PyCompat.roundHalfEven(glyphs[index].totalDistance / options.movementSpeed)
+            glyphs[index].motionStep = 0
+            glyphs[index].layer = 1
+            glyphs[index].timeline = [.init(symbol: 0x2588, color: error)]
+        case .wipeEnd:
+            glyphs[index].layer = 0
+            glyphs[index].timeline = "▇▆▅▄▃▂▁".unicodeScalars.flatMap { Array(repeating: Visual(symbol: $0.value, color: correct), count: 3) }
+        case .final: glyphs[index].timeline = glyphs[index].final
+        case .idle, .done: return
+        }
+        glyphs[index].visual = glyphs[index].timeline[0]
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
-        guard !isComplete else { return .complete }
-        guard !glyphs.isEmpty else {
-            isComplete = true
-            return .complete
-        }
-
-        tickIndex += 1
-        renderFrame(tickIndex, into: &frame)
-        if tickIndex >= 138 {
-            isComplete = true
-            return .complete
-        }
-        return .running
-    }
-
-    private mutating func build(input: InputText) {
-        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
-        guard !coordinates.isEmpty,
-              let bottom = coordinates.map(\.row).min(),
-              let top = coordinates.map(\.row).max(),
-              let left = coordinates.map(\.column).min(),
-              let right = coordinates.map(\.column).max()
-        else {
-            isComplete = true
-            return
-        }
-        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
-        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
-            minRow: bottom,
-            maxRow: top,
-            minColumn: left,
-            maxColumn: right,
-            direction: options.finalGradientDirection
-        )).entries.map { ($0.coordinate, rgb($0.color)) })
-
-        glyphs = zip(input.scalars, coordinates).map { symbol, coordinate in
-            Glyph(
-                originalSymbol: symbol,
-                originalCoordinate: coordinate,
-                coordinate: coordinate,
-                finalColor: mapping[coordinate] ?? rgb(options.finalGradientStops.last ?? options.correctColor)
-            )
-        }
-
-        // Rust removes two randomly selected characters and swaps their starting
-        // coordinates. For the two-cell parity gate both removals are forced after
-        // the first draw, so the two visible glyphs exchange locations.
-        if glyphs.count >= 2, Int(options.errorPairs * Double(glyphs.count)) > 0 {
-            glyphs[0].coordinate = glyphs[1].originalCoordinate
-            glyphs[1].coordinate = glyphs[0].originalCoordinate
-        }
-    }
-
-    private func renderFrame(_ tick: Int, into frame: inout Frame) {
-        frame.withMutableCells { cells in
-            for index in cells.indices { cells[index] = .blank }
-            let visual = visualForTick(tick)
-            for glyph in glyphs {
-                let coordinate: Coordinate
-                let symbol: UInt32
-                let foreground: UInt32
-                switch visual {
-                case let .swapped(symbolColor):
-                    coordinate = glyph.coordinate
-                    symbol = glyph.originalSymbol
-                    foreground = symbolColor
-                case let .blocks(block, color):
-                    coordinate = glyph.originalCoordinate
-                    symbol = UInt32(block.unicodeScalars.first!.value)
-                    foreground = color
-                case let .final(colorIndex):
-                    coordinate = glyph.originalCoordinate
-                    symbol = glyph.originalSymbol
-                    foreground = finalRamp(for: glyph)[min(colorIndex, finalRamp(for: glyph).count - 1)]
+        guard !complete else { return .complete }
+        if !pairs.isEmpty && delay == 0 {
+            for index in pairs.removeFirst() { activate(index, .error) }
+            delay = options.swapDelay
+        } else { delay -= 1 }
+        for index in glyphs.indices where glyphs[index].active {
+            if glyphs[index].stage == .correcting {
+                glyphs[index].motionStep += 1
+                let ratio = glyphs[index].motionSteps == 0 ? 1 : min(1, Double(glyphs[index].motionStep) / Double(glyphs[index].motionSteps))
+                glyphs[index].coordinate = Geometry.coordinateOnLine(from: glyphs[index].origin, to: glyphs[index].input, t: ratio)
+                if ratio == 1 { activate(index, .wipeEnd) }
+                else {
+                    let total = max(glyphs[index].totalDistance, 1)
+                    let progress = max(total - max(glyphs[index].totalDistance * (1 - ratio), 1), 1) / total
+                    let color = glyphs[index].correction[min(10, max(0, PyCompat.roundHalfEven(progress * 10)))]
+                    glyphs[index].visual = .init(symbol: 0x2588, color: color)
                 }
-                guard (1...canvas.columns).contains(coordinate.column), (1...canvas.rows).contains(coordinate.row) else { continue }
-                let index = (canvas.rows - coordinate.row) * canvas.columns + coordinate.column - 1
-                cells[index] = Cell(codepoint: symbol, foreground: foreground, background: 0)
+            }
+            if glyphs[index].stage != .correcting {
+                glyphs[index].visual = glyphs[index].timeline[glyphs[index].age]
+                glyphs[index].age += 1
+                if glyphs[index].age == glyphs[index].timeline.count {
+                    switch glyphs[index].stage {
+                    case .error: activate(index, .wipeStart)
+                    case .wipeStart: activate(index, .correcting)
+                    case .wipeEnd: activate(index, .final)
+                    case .final: glyphs[index].stage = .done
+                    default: break
+                    }
+                }
             }
         }
-    }
-
-    private enum Visual {
-        case swapped(UInt32)
-        case blocks(String, UInt32)
-        case final(Int)
-    }
-
-    private func visualForTick(_ tick: Int) -> Visual {
-        if tick <= 59 {
-            let cycle = (tick - 1) % 6
-            return cycle < 3 ? .blocks("▓", rgb(options.errorColor)) : .swapped(0xFF_FF_FF)
+        for index in glyphs.indices.sorted(by: { (glyphs[$0].layer, $0) < (glyphs[$1].layer, $1) }) {
+            let glyph = glyphs[index]
+            frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = .init(codepoint: glyph.visual.symbol,
+                foreground: glyph.visual.color, background: glyph.visual.color == 0 ? 0xFFFF_FFFE : 0)
         }
-        if tick <= 84 {
-            let blocks = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"]
-            let index = tick <= 63 ? 0 : min(1 + (tick - 64) / 3, blocks.count - 1)
-            return .blocks(blocks[index], rgb(options.errorColor))
-        }
-        if tick <= 104 {
-            let blocks = ["▇", "▆", "▅", "▄", "▃", "▂", "▁"]
-            let index = min(max((tick - 85) / 3, 0), blocks.count - 1)
-            return .blocks(blocks[index], rgb(options.correctColor))
-        }
-        let finalIndex = tick <= 108 ? 0 : 1 + (tick - 109) / 3
-        return .final(finalIndex)
+        complete = pairs.isEmpty && !glyphs.contains(where: \.active)
+        return complete ? .complete : .running
     }
-
-    private func finalRamp(for glyph: Glyph) -> [UInt32] {
-        let colors = (try! Gradient(stops: [options.correctColor, color(rgb: glyph.finalColor)], steps: 10)).spectrum.map(rgb)
-        return colors.isEmpty ? [glyph.finalColor] : colors
-    }
-}
-
-private func rgb(_ color: Color) -> UInt32 {
-    (UInt32(color.red) << 16) | (UInt32(color.green) << 8) | UInt32(color.blue)
-}
-
-private func color(rgb: UInt32) -> Color {
-    Color(hex: String(format: "%02x%02x%02x", (rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF))
+    private static func rgb(_ color: Color) -> UInt32 { UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue) }
 }

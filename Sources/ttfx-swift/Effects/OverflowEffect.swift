@@ -135,10 +135,9 @@ public struct OverflowEffect: Effect {
         )
         let finalColors = Dictionary(uniqueKeysWithValues: finalMapping.entries.map { ($0.coordinate, rgb($0.color)) })
 
-        let sortedRows = groupedRows(from: sources)
+        var rows = groupedRows(from: sources)
         let cycles = rng.integer(in: options.overflowCyclesRange)
         for _ in 0..<cycles {
-            var rows = sortedRows
             rng.shuffle(&rows)
             for row in rows {
                 var copied: [Int] = []
@@ -158,7 +157,17 @@ public struct OverflowEffect: Effect {
             }
         }
 
-        for row in sortedRows {
+        // Rust's final pass scrolls the entire canvas, including blank rows
+        // above the text and fill cells inside its bounding rectangle.
+        let occupied = Dictionary(uniqueKeysWithValues: sources.map { ($0.coordinate, $0) })
+        var finalSources: [(characterID: Int, symbol: UInt32, coordinate: Coordinate)] = []
+        for row in 1...canvas.rows {
+            for column in 1...canvas.columns {
+                let coordinate = Coordinate(column: column, row: row)
+                finalSources.append(occupied[coordinate] ?? (finalSources.count + input.scalars.count, 32, coordinate))
+            }
+        }
+        for row in groupedRows(from: finalSources) {
             var originals: [Int] = []
             for source in row {
                 let index = glyphs.count
@@ -220,7 +229,8 @@ public struct OverflowEffect: Effect {
                       (1...canvas.rows).contains(glyph.coordinate.row)
                 else { continue }
                 let cellIndex = (canvas.rows - glyph.coordinate.row) * canvas.columns + glyph.coordinate.column - 1
-                cells[cellIndex] = Cell(codepoint: glyph.symbol, foreground: glyph.foreground, background: 0)
+                cells[cellIndex] = Cell(codepoint: glyph.symbol, foreground: glyph.foreground,
+                    background: glyph.foreground == 0 ? 0xFFFF_FFFE : 0)
             }
         }
     }

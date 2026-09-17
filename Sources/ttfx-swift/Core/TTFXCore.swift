@@ -67,10 +67,13 @@ public struct InputPosition: Equatable, Sendable {
 public struct InputText: Equatable, Sendable {
     public let scalars: ContiguousArray<UInt32>
     public let positions: ContiguousArray<InputPosition>
+    /// Original terminal arena IDs, including gaps left by unstyled spaces.
+    public let characterIDs: ContiguousArray<Int>
 
-    init(scalars: ContiguousArray<UInt32>, positions: ContiguousArray<InputPosition>) {
+    init(scalars: ContiguousArray<UInt32>, positions: ContiguousArray<InputPosition>, characterIDs: ContiguousArray<Int>? = nil) {
         self.scalars = scalars
         self.positions = positions
+        self.characterIDs = characterIDs ?? ContiguousArray(scalars.indices)
     }
 }
 
@@ -90,27 +93,38 @@ public struct Canvas: Equatable, Sendable {
         let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
         var scalars = ContiguousArray<UInt32>()
         var positions = ContiguousArray<InputPosition>()
+        var characterIDs = ContiguousArray<Int>()
+        var arenaID = 0
         scalars.reserveCapacity(text.unicodeScalars.count)
         positions.reserveCapacity(text.unicodeScalars.count)
 
         for (lineIndex, line) in lines.enumerated() {
             let row = lines.count - lineIndex
             for (columnIndex, scalar) in line.unicodeScalars.enumerated() {
+                defer { arenaID += 1 }
+                // Rust keeps plain spaces in its arena, but animates them only
+                // when an effect explicitly requests fill characters.
+                guard scalar.value != 32,
+                      columnIndex < columns, (1...rows).contains(row) else { continue }
                 scalars.append(scalar.value)
                 positions.append(InputPosition(column: columnIndex + 1, row: row))
+                characterIDs.append(arenaID)
             }
         }
-        return InputText(scalars: scalars, positions: positions)
+        return InputText(scalars: scalars, positions: positions, characterIDs: characterIDs)
     }
 }
 
 public struct EffectConfiguration: Equatable, Sendable {
     public let text: String
     public let seed: UInt64
+    public let frameRate: Int
 
-    public init(text: String = "", seed: UInt64 = 0) {
+    public init(text: String = "", seed: UInt64 = 0, frameRate: Int = 60) {
+        precondition(frameRate >= 0, "frame rate must not be negative")
         self.text = text
         self.seed = seed
+        self.frameRate = frameRate == 0 ? 60 : frameRate
     }
 }
 

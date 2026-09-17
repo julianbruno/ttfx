@@ -9,20 +9,22 @@ public enum TTFXGalleryPreviewRendererSelection: Equatable, Sendable {
 
     public static func resolve(
         availability: TTFXMetalRendererAvailability,
-        platformSupportsMetalView: Bool
+        platformSupportsMetalView: Bool,
+        useMetal: Bool = true
     ) -> TTFXGalleryPreviewRendererSelection {
-        .swiftUIFrameView
+        availability.isAvailable && platformSupportsMetalView && useMetal ? .metalFrameView : .swiftUIFrameView
     }
 
     public static func statusText(
         availability: TTFXMetalRendererAvailability,
-        platformSupportsMetalView: Bool
+        platformSupportsMetalView: Bool,
+        useMetal: Bool = true
     ) -> String {
-        switch resolve(availability: availability, platformSupportsMetalView: platformSupportsMetalView) {
+        switch resolve(availability: availability, platformSupportsMetalView: platformSupportsMetalView, useMetal: useMetal) {
         case .metalFrameView:
             return availability.message
-        case .swiftUIFrameView where availability.isAvailable && platformSupportsMetalView:
-            return "SwiftUI preview — Metal GPU view not connected yet"
+        case .swiftUIFrameView where !useMetal:
+            return "SwiftUI preview — Metal disabled"
         case .swiftUIFrameView where availability.isAvailable:
             return "SwiftUI preview — Metal view not available on this platform"
         case .swiftUIFrameView:
@@ -58,14 +60,18 @@ public struct TTFXGalleryViewModel {
     public private(set) var isLooping = false
     public private(set) var frameIndex = 0
     public private(set) var currentSnapshot: TTFXFrameSnapshot
-    public private(set) var rendererStatus: String
+    public var useMetal = true
+    public var rendererStatus: String {
+        TTFXGalleryPreviewRendererSelection.statusText(availability: metalAvailability, platformSupportsMetalView: Self.platformSupportsMetalFrameView, useMetal: useMetal)
+    }
     public private(set) var framesPerSecond: Int
     public private(set) var previewFontSize: Double
     public private(set) var loopFrameBudget: Int
     public var previewRendererSelection: TTFXGalleryPreviewRendererSelection {
         TTFXGalleryPreviewRendererSelection.resolve(
             availability: metalAvailability,
-            platformSupportsMetalView: Self.platformSupportsMetalFrameView
+            platformSupportsMetalView: Self.platformSupportsMetalFrameView,
+            useMetal: useMetal
         )
     }
     public var frameIntervalMilliseconds: Int {
@@ -110,8 +116,7 @@ public struct TTFXGalleryViewModel {
         self.framesPerSecond = Self.clamp(framesPerSecond, lower: Self.minimumFramesPerSecond, upper: Self.maximumFramesPerSecond)
         self.previewFontSize = Self.clamp(previewFontSize, lower: Self.minimumPreviewFontSize, upper: Self.maximumPreviewFontSize)
         self.loopFrameBudget = max(loopFrameBudget, Self.minimumLoopFrameBudget)
-        self.rendererStatus = Self.statusText(for: metalAvailability)
-        self.renderer = Self.makeRenderer(effectName: selectedEffectName, sampleText: sampleText, seed: seed, canvasWidth: self.canvasWidth, canvasHeight: self.canvasHeight, frameIntervalMilliseconds: Self.frameIntervalMilliseconds(for: self.framesPerSecond))
+        self.renderer = Self.makeRenderer(effectName: selectedEffectName, sampleText: sampleText, seed: seed, canvasWidth: self.canvasWidth, canvasHeight: self.canvasHeight, frameIntervalMilliseconds: Self.frameIntervalMilliseconds(for: self.framesPerSecond), framesPerSecond: self.framesPerSecond)
         self.currentSnapshot = try renderer.tick(at: .milliseconds(0))
     }
 
@@ -196,13 +201,12 @@ public struct TTFXGalleryViewModel {
 
     private mutating func reinitializeRenderer() {
         frameIndex = 0
-        rendererStatus = Self.statusText(for: metalAvailability)
-        renderer = Self.makeRenderer(effectName: selectedEffectName, sampleText: sampleText, seed: seed, canvasWidth: canvasWidth, canvasHeight: canvasHeight, frameIntervalMilliseconds: frameIntervalMilliseconds)
+        renderer = Self.makeRenderer(effectName: selectedEffectName, sampleText: sampleText, seed: seed, canvasWidth: canvasWidth, canvasHeight: canvasHeight, frameIntervalMilliseconds: frameIntervalMilliseconds, framesPerSecond: framesPerSecond)
         currentSnapshot = (try? renderer.tick(at: .milliseconds(0))) ?? currentSnapshot
     }
 
-    private static func makeRenderer(effectName: String, sampleText: String, seed: UInt64, canvasWidth: Int, canvasHeight: Int, frameIntervalMilliseconds: Int) -> TTFXDeterministicRenderer {
-        let box = EffectFrameBox(effectName: effectName, sampleText: sampleText, seed: seed, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+    private static func makeRenderer(effectName: String, sampleText: String, seed: UInt64, canvasWidth: Int, canvasHeight: Int, frameIntervalMilliseconds: Int, framesPerSecond: Int) -> TTFXDeterministicRenderer {
+        let box = EffectFrameBox(effectName: effectName, sampleText: sampleText, seed: seed, canvasWidth: canvasWidth, canvasHeight: canvasHeight, framesPerSecond: framesPerSecond)
         return TTFXDeterministicRenderer(frameInterval: .milliseconds(frameIntervalMilliseconds)) {
             try box.nextFrame()
         }
@@ -239,18 +243,22 @@ public struct TTFXGalleryViewModel {
 private final class EffectFrameBox {
     private var effect: any Effect
     private var frame: Frame
+    private var completed = false
 
-    init(effectName: String, sampleText: String, seed: UInt64, canvasWidth: Int, canvasHeight: Int) {
+    init(effectName: String, sampleText: String, seed: UInt64, canvasWidth: Int, canvasHeight: Int, framesPerSecond: Int) {
         let canvas = (try? Canvas(columns: canvasWidth, rows: canvasHeight)) ?? (try! Canvas(columns: 24, rows: 8))
         let input = canvas.ingest(sampleText)
-        let configuration = EffectConfiguration(text: sampleText, seed: seed)
+        let configuration = EffectConfiguration(text: sampleText, seed: seed, frameRate: framesPerSecond)
         self.effect = EffectRegistry.makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input, seed: seed)
             ?? EffectRegistry.makeEffect(named: EffectRegistry.names[0], configuration: configuration, canvas: canvas, input: input, seed: seed)!
         self.frame = (try? Frame(columns: canvas.columns, rows: canvas.rows)) ?? (try! Frame(columns: 24, rows: 8))
     }
 
     func nextFrame() throws -> Frame {
-        _ = effect.tick(into: &frame)
+        guard !completed else { return frame }
+        // Effects write the current visible cells; moved or hidden cells must start blank.
+        frame = try Frame(columns: frame.columns, rows: frame.rows)
+        completed = effect.tick(into: &frame) == .complete
         return frame
     }
 }

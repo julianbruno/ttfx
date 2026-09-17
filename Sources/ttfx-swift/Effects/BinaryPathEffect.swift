@@ -31,187 +31,213 @@ public struct BinaryPathEffect: Effect {
         }
     }
 
+    private struct Bit {
+        let symbol: UInt32
+        let color: UInt32
+        let points: [Coordinate]
+        let distances: [Double]
+        let total: Double
+        let maxSteps: Int
+        var coordinate: Coordinate
+        var step = 0
+        var released = false
+        var visible = false
+        var moving = true
+
+        mutating func tick() {
+            guard released && moving else { return }
+            if maxSteps == 0 || total == 0 {
+                coordinate = points.last!
+                moving = false
+                return
+            }
+            step += 1
+            var distance = Double(step) / Double(maxSteps) * total
+            for index in distances.indices {
+                if distance <= distances[index] {
+                    coordinate = distances[index] == 0 ? points[index] : Geometry.coordinateOnLine(
+                        from: points[index], to: points[index + 1], t: distance / distances[index])
+                    break
+                }
+                distance -= distances[index]
+                if index == distances.count - 1 { coordinate = points.last! }
+            }
+            if step >= maxSteps { moving = false }
+        }
+    }
+
+    private struct Representation {
+        let coordinate: Coordinate
+        let symbol: UInt32
+        let collapse: [UInt32]
+        let brighten: [UInt32]
+        var bits: [Bit]
+        var released = 0
+        var visible = false
+        var scene: [UInt32] = []
+        var sceneStep = 0
+        var eased = false
+        var foreground: UInt32 = 0
+        var active: Bool { sceneStep < scene.count || bits.contains { $0.released && $0.moving } }
+
+        mutating func activate(brightening: Bool) {
+            visible = true
+            scene = brightening ? brighten : collapse
+            eased = !brightening
+            sceneStep = 0
+            foreground = scene[0]
+        }
+
+        mutating func tick() {
+            for index in bits.indices { bits[index].tick() }
+            if sceneStep < scene.count {
+                let index = eased
+                    ? PyCompat.roundHalfEven(pow(Double(sceneStep) / Double(scene.count), 2) * Double(scene.count - 1))
+                    : sceneStep
+                foreground = scene[index]
+                sceneStep += 1
+            }
+        }
+    }
+
     private let canvas: Canvas
-    private let input: InputText
-    private let options: Configuration
-    private var tickIndex = 0
-    private var isComplete = false
-    private let finalColors: [UInt32]
+    private var rng: Xoshiro256PlusPlus
+    private var representations: [Representation] = []
+    private var pending: [Int] = []
+    private var active: [Int] = []
+    private var wipeGroups: [[Int]] = []
+    private var wiping = false
+    private var wipeFinished = false
+    private var complete = false
+    private var maxActive = 1
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, binaryPathConfiguration: .init())
     }
 
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        binaryPathConfiguration: Configuration
-    ) {
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
+                binaryPathConfiguration options: Configuration) {
         self.canvas = canvas
-        self.input = input
-        self.options = binaryPathConfiguration
-        self.finalColors = Self.resolveFinalColors(input: input, options: binaryPathConfiguration)
+        self.rng = .init(seed: seed)
+        guard !input.scalars.isEmpty else { complete = true; return }
+        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        for index in input.scalars.indices {
+            let target = coordinates[index]
+            let start = randomOutside()
+            var points = [start]
+            var columnOrientation = rng.integer(in: 0...1) == 0
+            while points.last! != target {
+                let last = points.last!
+                let columnDistance = abs(last.column - target.column)
+                let rowDistance = abs(last.row - target.row)
+                let next: Coordinate
+                if columnOrientation && rowDistance > 0 {
+                    let step = rng.integer(in: 1...min(rowDistance, max(10, Int(Double(canvas.columns) * 0.2))))
+                    next = .init(column: last.column, row: last.row + (last.row > target.row ? -step : step))
+                    columnOrientation = false
+                } else if !columnOrientation && columnDistance > 0 {
+                    let step = rng.integer(in: 1...min(columnDistance, 4))
+                    next = .init(column: last.column + (last.column > target.column ? -step : step), row: last.row)
+                    columnOrientation = true
+                } else { next = target }
+                points.append(next)
+            }
+            points += [target, target]
+            let distances = zip(points, points.dropFirst()).map { Geometry.lineLength(from: $0, to: $1) }
+            let total = distances.reduce(0, +)
+            let string = String(input.scalars[index], radix: 2)
+            let binary = String(repeating: "0", count: max(0, 8 - string.count)) + string
+            let bits = binary.unicodeScalars.map { symbol in
+                Bit(symbol: symbol.value, color: Self.rgb(options.binaryColors[rng.integer(in: options.binaryColors.indices)]),
+                    points: points, distances: distances, total: total,
+                    maxSteps: PyCompat.roundHalfEven(total / options.movementSpeed), coordinate: start)
+            }
+            let final = mapping[target]!
+            let dim = rustAdjustedBrightness(final, factor: 0.5)
+            let collapse = (try! Gradient(stops: [Color(hex: "ffffff"), dim], steps: 7)).spectrum
+                .flatMap { Array(repeating: Self.rgb($0), count: 3) }
+            let brighten = (try! Gradient(stops: [dim, final], steps: 10)).spectrum
+                .flatMap { Array(repeating: Self.rgb($0), count: 2) }
+            representations.append(.init(coordinate: target, symbol: input.scalars[index],
+                collapse: collapse, brighten: brighten, bits: bits))
+        }
+        pending = Array(representations.indices)
+        maxActive = max(1, Int(Double(pending.count) * options.activeBinaryGroups))
+        let grouped = Dictionary(grouping: representations.indices) {
+            representations[$0].coordinate.column + representations[$0].coordinate.row
+        }
+        wipeGroups = grouped.keys.sorted(by: >).map { grouped[$0]! }
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
-        guard !isComplete else { return .complete }
-        guard !input.scalars.isEmpty else {
-            isComplete = true
+        guard !complete else { return .complete }
+        // Rust emits a final held frame after its last active animation tick.
+        if wipeFinished && !representations.contains(where: \.active) {
+            render(into: &frame)
+            complete = true
             return .complete
         }
-
-        frame.withMutableCells { cells in
-            for index in cells.indices { cells[index] = .blank }
-        }
-
-        if isOneCellConfiguredParityRun {
-            renderOneCellParity(into: &frame)
-            tickIndex += 1
-            if tickIndex >= 55 {
-                isComplete = true
-                return .complete
+        if !wiping {
+            while active.count < maxActive && !pending.isEmpty {
+                active.append(pending.remove(at: rng.integer(in: pending.indices)))
             }
-            return .running
+            var finished: Set<Int> = []
+            for index in active {
+                if representations[index].released < representations[index].bits.count {
+                    let bit = representations[index].released
+                    representations[index].bits[bit].released = true
+                    representations[index].bits[bit].visible = true
+                    representations[index].released += 1
+                } else if representations[index].bits.allSatisfy({ $0.coordinate == representations[index].coordinate }) {
+                    for bit in representations[index].bits.indices { representations[index].bits[bit].visible = false }
+                    representations[index].activate(brightening: false)
+                    finished.insert(index)
+                }
+            }
+            active.removeAll { finished.contains($0) }
+            if !representations.contains(where: \.active) { wiping = true }
         }
-
-        renderGeneric(into: &frame)
-        tickIndex += 1
-        if tickIndex >= genericFrameCount {
-            isComplete = true
-            return .complete
+        if wiping {
+            for _ in 0..<2 {
+                if wipeGroups.isEmpty { wipeFinished = true }
+                else {
+                    for index in wipeGroups.removeFirst() { representations[index].activate(brightening: true) }
+                }
+            }
         }
+        for index in representations.indices { representations[index].tick() }
+        render(into: &frame)
         return .running
     }
 
-    private var isOneCellConfiguredParityRun: Bool {
-        canvas.columns == 1 && canvas.rows == 1 && input.scalars.count == 1 &&
-        options.binaryColors.count == 1 && rgb(options.binaryColors[0]) == 0x00ff00 &&
-        options.finalGradientStops.map(rgb) == [0x112233, 0x445566] &&
-        options.finalGradientSteps == [2] && options.finalGradientDirection == .horizontal &&
-        options.movementSpeed == 1 && options.activeBinaryGroups == 1
-    }
-
-    private mutating func renderOneCellParity(into frame: inout Frame) {
-        let source = input.scalars[0]
-        if tickIndex < 8 {
-            let bits = String(source, radix: 2).leftPadded(to: 8, with: "0")
-            let scalar = Array(bits.unicodeScalars)[tickIndex].value
-            frame[column: 1, row: 1] = Cell(codepoint: scalar, foreground: 0x00ff00, background: 0)
-            return
-        }
-
-        let colors: [UInt32] = [
-            0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff, 0xffffff,
-            0xdfe0e1, 0xdfe0e1, 0xdfe0e1, 0xdfe0e1,
-            0xbfc1c3, 0xbfc1c3, 0xbfc1c3,
-            0x9fa2a5, 0x9fa2a5,
-            0x7f8387, 0x7f8387, 0x7f8387,
-            0x5f6469,
-            0x3f454b, 0x3f454b,
-            0x222a33, 0x222a33, 0x222a33,
-            0x252e38, 0x252e38,
-            0x28323d, 0x28323d,
-            0x2b3642, 0x2b3642,
-            0x2e3a47, 0x2e3a47,
-            0x313e4c, 0x313e4c,
-            0x344251, 0x344251,
-            0x374656, 0x374656,
-            0x3a4a5b, 0x3a4a5b,
-            0x3d4e60, 0x3d4e60,
-            0x445566, 0x445566, 0x445566
+    private mutating func randomOutside() -> Coordinate {
+        let candidates: [Coordinate] = [
+            .init(column: rng.integer(in: 1...canvas.columns), row: canvas.rows + 1),
+            .init(column: rng.integer(in: 1...canvas.columns), row: 0),
+            .init(column: 0, row: rng.integer(in: 1...canvas.rows)),
+            .init(column: canvas.columns + 1, row: rng.integer(in: 1...canvas.rows)),
         ]
-        frame[column: 1, row: 1] = Cell(codepoint: source, foreground: colors[tickIndex - 8], background: 0)
+        return candidates[rng.integer(in: candidates.indices)]
     }
 
-    private var genericFrameCount: Int { 8 + 24 + 24 + max(0, input.scalars.count - 1) }
-
-    private mutating func renderGeneric(into frame: inout Frame) {
-        let binaryColor = rgb(options.binaryColors[0])
-        if tickIndex < 8 {
-            for index in input.scalars.indices where input.positions.indices.contains(index) {
-                let bits = String(input.scalars[index], radix: 2).leftPadded(to: 8, with: "0")
-                let scalar = Array(bits.unicodeScalars)[min(tickIndex, 7)].value
-                let position = input.positions[index]
-                if (1...canvas.columns).contains(position.column), (1...canvas.rows).contains(position.row) {
-                    frame[column: position.column, row: position.row] = Cell(codepoint: scalar, foreground: binaryColor, background: 0)
-                }
-            }
-            return
+    private func render(into frame: inout Frame) {
+        func put(_ symbol: UInt32, _ color: UInt32, _ coordinate: Coordinate) {
+            guard (1...canvas.columns).contains(coordinate.column), (1...canvas.rows).contains(coordinate.row) else { return }
+            frame[column: coordinate.column, row: coordinate.row] = .init(codepoint: symbol,
+                foreground: color, background: color == 0 ? 0xFFFF_FFFE : 0)
         }
-
-        let finalStart = max(0, tickIndex - 32)
-        for index in input.scalars.indices where input.positions.indices.contains(index) {
-            let position = input.positions[index]
-            guard (1...canvas.columns).contains(position.column), (1...canvas.rows).contains(position.row) else { continue }
-            let final = finalColors.indices.contains(index) ? finalColors[index] : rgb(options.finalGradientStops.last!)
-            let foreground: UInt32
-            if tickIndex < 32 {
-                foreground = collapseColor(final: final, offset: tickIndex - 8)
-            } else {
-                foreground = brightenColor(final: final, offset: finalStart)
-            }
-            frame[column: position.column, row: position.row] = Cell(codepoint: input.scalars[index], foreground: foreground, background: 0)
+        for source in representations where source.visible { put(source.symbol, source.foreground, source.coordinate) }
+        for source in representations {
+            for bit in source.bits where bit.visible { put(bit.symbol, bit.color, bit.coordinate) }
         }
     }
 
-    private func collapseColor(final: UInt32, offset: Int) -> UInt32 {
-        let dim = adjust(final, factor: 0.5)
-        let t = min(max(Double(offset) / 23.0, 0), 1)
-        return interpolate(0xffffff, dim, t)
-    }
-
-    private func brightenColor(final: UInt32, offset: Int) -> UInt32 {
-        let dim = adjust(final, factor: 0.5)
-        let t = min(max(Double(offset) / 23.0, 0), 1)
-        return interpolate(dim, final, t)
-    }
-
-    private static func resolveFinalColors(input: InputText, options: Configuration) -> [UInt32] {
-        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
-        guard let minRow = coordinates.map(\.row).min(),
-              let maxRow = coordinates.map(\.row).max(),
-              let minColumn = coordinates.map(\.column).min(),
-              let maxColumn = coordinates.map(\.column).max()
-        else { return [] }
-        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
-        let mapping = try! gradient.coordinateColorMapping(
-            minRow: minRow,
-            maxRow: maxRow,
-            minColumn: minColumn,
-            maxColumn: maxColumn,
-            direction: options.finalGradientDirection
-        )
-        let colors = Dictionary(uniqueKeysWithValues: mapping.entries.map { ($0.coordinate, rgb($0.color)) })
-        return coordinates.map { colors[$0] ?? rgb(options.finalGradientStops.last!) }
-    }
-
-    private func rgb(_ color: Color) -> UInt32 { Self.rgb(color) }
     private static func rgb(_ color: Color) -> UInt32 {
         UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue)
-    }
-
-    private func adjust(_ color: UInt32, factor: Double) -> UInt32 {
-        let red = UInt32(Double((color >> 16) & 0xff) * factor)
-        let green = UInt32(Double((color >> 8) & 0xff) * factor)
-        let blue = UInt32(Double(color & 0xff) * factor)
-        return red << 16 | green << 8 | blue
-    }
-
-    private func interpolate(_ start: UInt32, _ end: UInt32, _ t: Double) -> UInt32 {
-        func channel(_ shift: UInt32) -> UInt32 {
-            let a = Double((start >> shift) & 0xff)
-            let b = Double((end >> shift) & 0xff)
-            return UInt32(a + (b - a) * t)
-        }
-        return channel(16) << 16 | channel(8) << 8 | channel(0)
-    }
-}
-
-private extension String {
-    func leftPadded(to count: Int, with character: Character) -> String {
-        if self.count >= count { return self }
-        return String(repeating: String(character), count: count - self.count) + self
     }
 }

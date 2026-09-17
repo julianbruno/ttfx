@@ -25,6 +25,16 @@ import Testing
     ])
 }
 
+@Test func canvasTreatsPlainSpacesAsFillAndPreservesArenaIdentity() throws {
+    let input = try Canvas(columns: 4, rows: 2).ingest("A BCD\n E F")
+    #expect(input.scalars == [65, 66, 67, 69, 70])
+    #expect(input.positions == [
+        .init(column: 1, row: 2), .init(column: 3, row: 2), .init(column: 4, row: 2),
+        .init(column: 2, row: 1), .init(column: 4, row: 1),
+    ])
+    #expect(input.characterIDs == [0, 2, 3, 6, 8])
+}
+
 @Test func effectProtocolHasDeterministicConstructionAndCompletionStatus() throws {
     struct CompleteImmediately: Effect {
         init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {}

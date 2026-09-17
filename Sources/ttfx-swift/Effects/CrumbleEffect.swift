@@ -40,6 +40,7 @@ public struct CrumbleEffect: Effect {
         var path: PathState?
         var active = false
         var inputPathCompletionPending = false
+        var rendered: (symbol: UInt32, color: UInt32)?
 
         var foreground: UInt32 {
             switch scene {
@@ -141,8 +142,8 @@ public struct CrumbleEffect: Effect {
         }
 
         updateActivePaths()
-        render(into: &frame)
         updateActiveScenes()
+        render(into: &frame)
         pruneInactiveGlyphs()
         return stage == .complete ? .complete : .running
     }
@@ -216,7 +217,7 @@ public struct CrumbleEffect: Effect {
 
     private mutating func activateTop(_ index: Int) {
         let start = glyphs[index].coordinate
-        let end = Coordinate(column: glyphs[index].inputCoordinate.column, row: 1)
+        let end = Coordinate(column: glyphs[index].inputCoordinate.column, row: canvas.rows)
         let control = Coordinate(column: centered(canvas.columns), row: centered(canvas.rows))
         glyphs[index].path = makePath(kind: .top, start: start, end: end, control: control, easing: .outQuint, speed: 1.0)
         glyphs[index].active = true
@@ -293,9 +294,10 @@ public struct CrumbleEffect: Effect {
             glyphs[index].inputPathCompletionPending = false
             glyphs[index].scene = .flash
             glyphs[index].sceneIndex = 0
-            glyphs[index].sceneTicksRemaining = 5
+            glyphs[index].sceneTicksRemaining = 4
         }
 
+        glyphs[index].rendered = (glyphs[index].codepoint, glyphs[index].foreground)
         switch glyphs[index].scene {
         case .initial:
             return
@@ -305,13 +307,7 @@ public struct CrumbleEffect: Effect {
             let colors = sceneColors(glyphs[index])
             if glyphs[index].sceneIndex + 1 < colors.count {
                 glyphs[index].sceneIndex += 1
-                if glyphs[index].scene == .weaken && glyphs[index].sceneIndex + 1 == colors.count {
-                    glyphs[index].sceneTicksRemaining = 3
-                } else if glyphs[index].scene == .flash || glyphs[index].scene == .strengthen {
-                    glyphs[index].sceneTicksRemaining = 5
-                } else {
-                    glyphs[index].sceneTicksRemaining = 4
-                }
+                glyphs[index].sceneTicksRemaining = 4
             } else {
                 if glyphs[index].scene == .weaken {
                     glyphs[index].layer = 1
@@ -321,22 +317,30 @@ public struct CrumbleEffect: Effect {
                     glyphs[index].path = makePath(
                         kind: .fall,
                         start: glyphs[index].coordinate,
-                        end: Coordinate(column: glyphs[index].inputCoordinate.column, row: canvas.rows),
+                        end: Coordinate(column: glyphs[index].inputCoordinate.column, row: 1),
                         control: nil,
                         easing: .outBounce,
                         speed: 0.65
                     )
+                    glyphs[index].rendered = (glyphs[index].codepoint, glyphs[index].foreground)
                 } else if glyphs[index].scene == .flash {
                     glyphs[index].scene = .strengthen
                     glyphs[index].sceneIndex = 0
-                    glyphs[index].sceneTicksRemaining = 5
+                    glyphs[index].sceneTicksRemaining = 4
+                    glyphs[index].rendered = (glyphs[index].codepoint, glyphs[index].foreground)
                 }
             }
         case .dust:
-            guard glyphs[index].path != nil else { return }
-            if !glyphs[index].dustSymbols.isEmpty {
-                glyphs[index].sceneIndex = (glyphs[index].sceneIndex + 1) % glyphs[index].dustSymbols.count
+            if let path = glyphs[index].path, path.kind == .fall {
+                let total = Geometry.lineLength(from: path.start, to: path.end)
+                let fraction = path.steps == 0 ? 1 : Double(path.step) / Double(path.steps)
+                let reached = (path.easing?.value(at: fraction) ?? fraction) * total
+                let progress = max(max(total, 1) - max(total - reached, 1), 1) / max(total, 1)
+                glyphs[index].sceneIndex = min(4, max(0, PyCompat.roundHalfEven(progress * 4)))
+            } else if glyphs[index].path == nil {
+                glyphs[index].sceneIndex = glyphs[index].dustSymbols.count - 1
             }
+            glyphs[index].rendered = (glyphs[index].codepoint, glyphs[index].foreground)
         }
     }
 
@@ -379,7 +383,7 @@ public struct CrumbleEffect: Effect {
                 winners[cellIndex] = (glyph.layer, glyph.characterID, glyph)
             }
             for (index, winner) in winners {
-                cells[index] = .init(codepoint: winner.glyph.codepoint, foreground: winner.glyph.foreground, background: 0)
+                cells[index] = .init(codepoint: winner.glyph.rendered?.symbol ?? winner.glyph.codepoint, foreground: winner.glyph.rendered?.color ?? winner.glyph.foreground, background: 0)
             }
         }
     }

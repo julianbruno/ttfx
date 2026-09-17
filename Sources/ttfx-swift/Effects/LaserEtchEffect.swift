@@ -64,6 +64,7 @@ public struct LaserEtchEffect: Effect {
 
     private struct Spark {
         let symbol: UInt32
+        let poolID: Int
         let start: Coordinate
         let end: Coordinate
         let control: Coordinate
@@ -83,7 +84,7 @@ public struct LaserEtchEffect: Effect {
     private var laserPosition = Coordinate(column: 0, row: 0)
     private var laserVisible = true
     private var sparks: [Spark] = []
-    private var availableSparkSymbols: [UInt32] = []
+    private var availableSparkSymbols: [(Int, UInt32)] = []
 
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(
@@ -109,38 +110,36 @@ public struct LaserEtchEffect: Effect {
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
-        switch laserEtchConfiguration.etchPattern {
-        case .rowTopToBottom:
-            guard !emittedGroupedDeadBranchFrame else { return .complete }
+        guard case .algorithm = laserEtchConfiguration.etchPattern else {
             emittedGroupedDeadBranchFrame = true
             return .complete
-        case .algorithm, .rowBottomToTop, .columnLeftToRight, .columnRightToLeft,
-             .diagonalTopLeftToBottomRight, .diagonalBottomLeftToTopRight,
-             .diagonalTopRightToBottomLeft, .diagonalBottomRightToTopLeft,
-             .centerToOutside, .outsideToCenter:
-            if canvas.columns == 1, canvas.rows == 1, input.scalars.count == 1 {
-                renderOneCellDefault(into: &frame)
-                tickIndex += 1
-                return .running
-            }
-            if canvas.columns == 2, canvas.rows == 1, input.scalars.count == 2 {
-                guard tickIndex < Self.twoCellRowFrameCount else { return .complete }
-                renderTwoCellRowDefault(into: &frame)
-                tickIndex += 1
-                return tickIndex == Self.twoCellRowFrameCount ? .complete : .running
-            }
-            initializeIfNeeded()
-            guard !pendingCharacterIndexes.isEmpty || hasActiveRuntime else { return .complete }
-            advanceEtching()
-            render(into: &frame)
-            tickIndex += 1
-            if tickIndex >= Self.generalDefaultFrameCount { return .complete }
-            return (!pendingCharacterIndexes.isEmpty || hasActiveRuntime) ? .running : .complete
         }
+        initializeIfNeeded()
+        guard !pendingCharacterIndexes.isEmpty || hasActiveRuntime else { return .complete }
+        advanceEtching()
+        render(into: &frame)
+        let lifetime = sparkFrameCount
+        let currentTick = tickIndex
+        let reclaimed = sparks.filter { currentTick - $0.emittedTick >= lifetime - 1 }.sorted { $0.poolID < $1.poolID }
+        for spark in reclaimed { availableSparkSymbols.append((spark.poolID, spark.symbol)) }
+        sparks.removeAll { currentTick - $0.emittedTick >= lifetime - 1 }
+        tickIndex += 1
+        return (!pendingCharacterIndexes.isEmpty || hasActiveRuntime) ? .running : .complete
     }
 
+    private var sparkColors: [UInt32] {
+        (try! Gradient(stops: laserEtchConfiguration.sparkGradientStops, steps: [3, 8])).spectrum.map(\.rgbWord)
+    }
+    private var laserColors: [UInt32] {
+        (try! Gradient(stops: laserEtchConfiguration.laserGradientStops, steps: 6, loop: true)).spectrum.map(\.rgbWord)
+    }
+    private var sparkFrameCount: Int { sparkColors.count * laserEtchConfiguration.sparkCoolingFrames }
     private var hasActiveRuntime: Bool {
-        sparks.contains { tickIndex - $0.emittedTick < Self.sparkFrameCount }
+        sparks.contains { tickIndex - $0.emittedTick < sparkFrameCount }
+            || characters.contains { character in
+                guard let start = character.visibleTick else { return false }
+                return tickIndex - start < 3 + finalCoolingColors(for: character.position).count * 3
+            }
     }
 
     private mutating func initializeIfNeeded() {
@@ -186,14 +185,14 @@ public struct LaserEtchEffect: Effect {
         let symbols = [UInt32(UnicodeScalar(".").value), UInt32(UnicodeScalar(",").value), UInt32(UnicodeScalar("*").value)]
         availableSparkSymbols.removeAll(keepingCapacity: true)
         availableSparkSymbols.reserveCapacity(2000)
-        for _ in 0..<2000 {
-            availableSparkSymbols.append(symbols[rng.integer(in: 0..<symbols.count)])
+        for id in 0..<2000 {
+            availableSparkSymbols.append((id, symbols[rng.integer(in: 0..<symbols.count)]))
         }
     }
 
     private mutating func advanceEtching() {
         if charDelay == 0 {
-            if !pendingCharacterIndexes.isEmpty {
+            for _ in 0..<laserEtchConfiguration.etchSpeed where !pendingCharacterIndexes.isEmpty {
                 var nextIndex = pendingCharacterIndexes.removeFirst()
                 while characters[nextIndex].scalar == Self.spaceScalar, !pendingCharacterIndexes.isEmpty {
                     nextIndex = pendingCharacterIndexes.removeFirst()
@@ -203,7 +202,7 @@ public struct LaserEtchEffect: Effect {
                 laserPosition = position
                 emitSpark(at: position)
             }
-            charDelay = 1
+            charDelay = laserEtchConfiguration.etchDelay
         } else {
             charDelay -= 1
         }
@@ -211,31 +210,32 @@ public struct LaserEtchEffect: Effect {
     }
 
     private mutating func emitSpark(at position: Coordinate) {
-        let symbol = availableSparkSymbols.popLast() ?? UInt32(UnicodeScalar(".").value)
+        let (poolID, symbol) = availableSparkSymbols.popLast() ?? (2000 + sparks.count, [UInt32(46), 44, 42][rng.integer(in: 0...2)])
         let fallColumn = rng.integer(in: (position.column - 20)...(position.column + 20))
         let fall = Coordinate(column: fallColumn, row: 1)
         let control = Coordinate(column: fall.column, row: position.row + rng.integer(in: -10...20))
-        sparks.append(Spark(symbol: symbol, start: position, end: fall, control: control, emittedTick: tickIndex))
+        sparks.append(Spark(symbol: symbol, poolID: poolID, start: position, end: fall, control: control, emittedTick: tickIndex))
     }
 
     private mutating func render(into frame: inout Frame) {
+        frame.withMutableCells { cells in for index in cells.indices { cells[index] = .blank } }
         for index in characters.indices {
             guard let visibleTick = characters[index].visibleTick, !characters[index].isFill else { continue }
             let elapsed = tickIndex - visibleTick
             put(inputCell(for: characters[index], elapsed: elapsed), at: characters[index].position, into: &frame)
         }
-        for spark in sparks where tickIndex - spark.emittedTick < Self.sparkFrameCount {
+        for spark in sparks.sorted(by: { $0.poolID < $1.poolID }) where tickIndex - spark.emittedTick < sparkFrameCount - 1 {
             let elapsed = tickIndex - spark.emittedTick
             let coordinate = sparkCoordinate(spark, elapsed: elapsed)
-            let color = Self.sparkColors[min(elapsed / 7, Self.sparkColors.count - 1)]
+            let color = sparkColors[min(elapsed / laserEtchConfiguration.sparkCoolingFrames, sparkColors.count - 1)]
             put(Cell(codepoint: spark.symbol, foreground: color, background: 0), at: coordinate, into: &frame)
         }
         if laserVisible {
             var row = laserPosition.row
             var column = laserPosition.column
-            for beamIndex in 0..<canvas.rows {
+            for beamIndex in 0...canvas.rows {
                 let symbol = beamIndex == 0 ? UInt32(UnicodeScalar("*").value) : UInt32(UnicodeScalar("/").value)
-                let color = Self.laserColors[(beamIndex + tickIndex / 3) % Self.laserColors.count]
+                let color = laserColors[(beamIndex + tickIndex / 3) % laserColors.count]
                 put(Cell(codepoint: symbol, foreground: color, background: 0), at: Coordinate(column: column, row: row), into: &frame)
                 row += 1
                 column += 1
@@ -254,28 +254,30 @@ public struct LaserEtchEffect: Effect {
 
     private func finalCoolingColors(for position: Coordinate) -> [UInt32] {
         let finalColor = finalColor(for: position)
-        let stops = [Color(hex: "ffe680"), Color(hex: "ff7b00"), Color(hex: String(format: "%06x", finalColor))]
+        let stops = laserEtchConfiguration.coolGradientStops + [Color(hex: String(format: "%06x", finalColor))]
         let gradient = try! Gradient(stops: stops, steps: 8)
         return gradient.spectrum.map(\.rgbWord)
     }
 
     private func finalColor(for position: Coordinate) -> UInt32 {
         let nonFill = characters.filter { !$0.isFill }
-        let gradient = try! Gradient(stops: [Color(hex: "8A008A"), Color(hex: "00D1FF"), Color(hex: "ffffff")], steps: [8])
+        let gradient = try! Gradient(stops: laserEtchConfiguration.finalGradientStops, steps: laserEtchConfiguration.finalGradientSteps)
         let mapping = try! gradient.coordinateColorMapping(
             minRow: nonFill.map { $0.position.row }.min() ?? 1,
             maxRow: nonFill.map { $0.position.row }.max() ?? 1,
             minColumn: nonFill.map { $0.position.column }.min() ?? 1,
             maxColumn: nonFill.map { $0.position.column }.max() ?? 1,
-            direction: .vertical
+            direction: laserEtchConfiguration.finalGradientDirection
         )
         return mapping.entries.first { $0.coordinate == position }?.color.rgbWord ?? 0xFFFFFF
     }
 
     private func sparkCoordinate(_ spark: Spark, elapsed: Int) -> Coordinate {
         let distance = max(Geometry.bezierLength(from: spark.start, controls: [spark.control], to: spark.end), 0.3)
-        let progress = min(Double(elapsed + 1) * 0.3 / distance, 1)
-        return Geometry.coordinateOnBezier(from: spark.start, controls: [spark.control], to: spark.end, t: Easing.outSine.value(at: progress))
+        let steps = PyCompat.roundHalfEven(distance / 0.3)
+        let progress = steps == 0 ? 1 : min(Double(elapsed + 1) / Double(steps), 1)
+        // Keep Rust's multiply/divide order: rounding ties can otherwise land on a different cell.
+        return Geometry.coordinateOnBezier(from: spark.start, controls: [spark.control], to: spark.end, t: distance == 0 ? 1 : (Easing.outSine.value(at: progress) * distance) / distance)
     }
 
     private func put(_ cell: Cell, at coordinate: Coordinate, into frame: inout Frame) {
@@ -326,85 +328,8 @@ public struct LaserEtchEffect: Effect {
         }
     }
 
-    private mutating func renderOneCellDefault(into frame: inout Frame) {
-        let cell: Cell
-        if tickIndex == 0 {
-            cell = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
-        } else if tickIndex <= 2 {
-            cell = Cell(codepoint: UInt32(UnicodeScalar("^").value), foreground: 0xFFE680, background: 0)
-        } else {
-            let colorIndex = min((tickIndex - 3) / 3, Self.oneCellCoolingColors.count - 1)
-            cell = Cell(codepoint: input.scalars[0], foreground: Self.oneCellCoolingColors[colorIndex], background: 0)
-        }
-        frame[column: 1, row: 1] = cell
-    }
+    private static let spaceScalar: UInt32 = 32
 
-    private mutating func renderTwoCellRowDefault(into frame: inout Frame) {
-        let left: Cell
-        let right: Cell
-        switch tickIndex {
-        case 0:
-            left = Cell(codepoint: UInt32(UnicodeScalar(" ").value), foreground: 0, background: 0)
-            right = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
-        case 1:
-            left = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
-            right = left
-        case 2:
-            left = Cell(codepoint: UInt32(UnicodeScalar("*").value), foreground: 0xFFFFFF, background: 0)
-            right = Cell(codepoint: UInt32(UnicodeScalar(",").value), foreground: 0xFFFFFF, background: 0)
-        case 3...4:
-            left = Cell(codepoint: UInt32(UnicodeScalar("^").value), foreground: 0xFFE680, background: 0)
-            right = Cell(codepoint: input.scalars[1], foreground: 0xFFE680, background: 0)
-        default:
-            let leftColor = twoCellRowColor(startTick: 5)
-            let rightColor = twoCellRowColor(startTick: 3)
-            left = Cell(codepoint: input.scalars[0], foreground: leftColor, background: 0)
-            right = Cell(codepoint: input.scalars[1], foreground: rightColor, background: 0)
-        }
-        frame[column: 1, row: 1] = left
-        frame[column: 2, row: 1] = right
-    }
-
-    private func twoCellRowColor(startTick: Int) -> UInt32 {
-        guard tickIndex >= startTick else { return 0xFFE680 }
-        let colorIndex = min((tickIndex - startTick) / 3, Self.oneCellCoolingColors.count - 1)
-        return Self.oneCellCoolingColors[colorIndex]
-    }
-
-    private static let spaceScalar = UInt32(UnicodeScalar(" ").value)
-    private static let twoCellRowFrameCount = 142
-    private static let generalDefaultFrameCount = 148
-    private static let sparkFrameCount = 142
-
-    private static let oneCellCoolingColors: [UInt32] = [
-        0xFFE680,
-        0xFFD870,
-        0xFFCA60,
-        0xFFBC50,
-        0xFFAE40,
-        0xFFA030,
-        0xFF9220,
-        0xFF8410,
-        0xFF7B00,
-        0xFF8B1F,
-        0xFF9B3E,
-        0xFFAB5D,
-        0xFFBB7C,
-        0xFFCB9B,
-        0xFFDBBA,
-        0xFFEBD9,
-        0xFFFFFF
-    ]
-
-    private static let laserColors: [UInt32] = [
-        0xFFFFFF, 0xDDE6FF, 0xBBCDFF, 0x99B4FF, 0x779BFF, 0x5582FF, 0x376CFF
-    ]
-
-    private static let sparkColors: [UInt32] = [
-        0xFFFFFF, 0xFFF8E0, 0xFFF1C0, 0xFFEAA0, 0xFFE680, 0xFFD870, 0xFFCA60,
-        0xFFBC50, 0xFFAE40, 0xFFA030, 0xFF9220, 0xFF8410, 0xFF7B00, 0xBD5900,
-        0x7B3700, 0x391500, 0x1A0900
-    ]
 }
 
 private extension Color {

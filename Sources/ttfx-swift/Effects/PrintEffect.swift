@@ -34,6 +34,7 @@ public struct PrintEffect: Effect {
         let originalCoordinate: Coordinate
         var coordinate: Coordinate
         let frames: [(symbol: UInt32, foreground: UInt32)]
+        var isFill = false
         var visible = false
         var sceneTick = 0
         var sceneActive = false
@@ -130,7 +131,8 @@ public struct PrintEffect: Effect {
                 glyphs.append(.init(
                     originalCoordinate: coordinate,
                     coordinate: .init(column: column, row: 1),
-                    frames: frames
+                    frames: frames,
+                    isFill: positions[coordinate] == nil
                 ))
             }
             rows.append(identifiers)
@@ -221,7 +223,11 @@ public struct PrintEffect: Effect {
             }
         }
 
+        let previousHasText = rows[currentRow].contains { !glyphs[$0].isFill }
         currentRow += 1
+        if previousHasText, let firstText = rows[currentRow].firstIndex(where: { !glyphs[$0].isFill }) {
+            rows[currentRow].removeFirst(firstText)
+        }
         currentGlyph = 0
         headVisible = true
         headForeground = 0
@@ -246,9 +252,12 @@ public struct PrintEffect: Effect {
         carriageReturn.currentStep += 1
         let fraction = Double(carriageReturn.currentStep) / Double(carriageReturn.steps)
         let easing = options.printHeadEasing.value(at: fraction)
-        headColumn = PyCompat.roundHalfEven(
-            Double(carriageReturn.startColumn) + Double(carriageReturn.targetColumn - carriageReturn.startColumn) * easing
-        )
+        let distance = Double(abs(carriageReturn.targetColumn - carriageReturn.startColumn))
+        headColumn = Geometry.coordinateOnLine(
+            from: .init(column: carriageReturn.startColumn, row: 1),
+            to: .init(column: carriageReturn.targetColumn, row: 1),
+            t: distance == 0 ? 1 : (easing * distance) / distance
+        ).column
         if carriageReturn.currentStep == carriageReturn.steps {
             headVisible = false
             self.carriageReturn = nil

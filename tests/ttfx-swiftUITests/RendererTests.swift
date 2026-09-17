@@ -95,3 +95,106 @@ import TTFXCore
     #expect(commandPlan.drawableSize.width == 10)
     #expect(commandPlan.uploadPlan.cells[0].codepoint == UInt32(UnicodeScalar("M").value))
 }
+
+#if canImport(MetalKit)
+import MetalKit
+
+@Test @MainActor func metalDrawSkipsMissingDrawableWithoutReportingPresentation() throws {
+    let renderer = TTFXMetalRenderer(device: nil)
+    let view = MTKView(frame: .zero, device: nil)
+    let plan = renderer.draw(snapshot: TTFXFrameSnapshot(frame: try Frame(columns: 2, rows: 2)), cellSize: .init(width: 10, height: 20), view: view)
+    #expect(plan.operations.last == .skipGPUEncoding(reason: TTFXMetalCommandPlan.headlessSkipReason))
+    #expect(renderer.lastPresentedDrawableSize == nil)
+    #expect(renderer.lastEncodedOperationCount == 0)
+}
+#endif
+
+#if canImport(MetalKit)
+@Test func metalGeometryKeepsTopRowAboveBottomAndPreservesColors() throws {
+    var frame = try Frame(columns: 2, rows: 2)
+    frame[column: 1, row: 2] = Cell(codepoint: 65, foreground: 0xff0000, background: 0x112233)
+    frame[column: 2, row: 2] = Cell(codepoint: 66, foreground: 0xffffff, background: 0)
+    frame[column: 1, row: 1] = Cell(codepoint: 67, foreground: 0xffffff, background: 0)
+    let plan = TTFXMetalFrameUploadPlan(snapshot: .init(frame: frame), cellSize: .init(width: 10, height: 20))
+    let rects = Dictionary(uniqueKeysWithValues: [UInt32(32), 65, 66, 67].map { ($0, SIMD4<Float>(0, 0, 1, 1)) })
+    let vertices = TTFXMetalVertex.makeVertices(plan: plan, viewport: .init(width: 20, height: 40), atlasRects: rects)
+    #expect(vertices.count == 24)
+    #expect(vertices[0].position == SIMD2(-1, 1)) // A top left
+    #expect(vertices[6].position == SIMD2(0, 1)) // B top right
+    #expect(vertices[12].position == SIMD2(-1, 0)) // C bottom left
+    #expect(vertices[13].position == SIMD2(-1, -1))
+    #expect(vertices[0].foreground == 0xff0000)
+    #expect(vertices[0].background == 0x112233)
+    #expect(MemoryLayout<TTFXMetalVertex>.stride == 24)
+}
+
+@Test func metalRendererEncodesAndCommitsOffscreenWhenDeviceExists() throws {
+    guard let device = MTLCreateSystemDefaultDevice() else { return }
+    let renderer = TTFXMetalRenderer(device: device)
+    var frame = try Frame(columns: 2, rows: 2)
+    frame[column: 1, row: 2] = Cell(codepoint: 65, foreground: 0xffffff, background: 0x112233)
+    frame[column: 2, row: 1] = Cell(codepoint: 937, foreground: 0xff0000, background: 0)
+    let snapshot = TTFXFrameSnapshot(frame: frame)
+    let size = TTFXMetalDrawableSize(width: 80, height: 112)
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 80, height: 112, mipmapped: false)
+    descriptor.usage = .renderTarget
+    let target = try #require(device.makeTexture(descriptor: descriptor))
+    let pass = MTLRenderPassDescriptor()
+    pass.colorAttachments[0].texture = target
+    var submitted: (any MTLCommandBuffer)?
+    var presentationCount = 0
+    let plan = renderer.draw(snapshot: snapshot, cellSize: .init(width: 40, height: 56), drawableSize: size, logicalSize: size, pass: pass) { commandBuffer in
+        #expect(commandBuffer.status == .notEnqueued)
+        submitted = commandBuffer
+        presentationCount += 1
+    }
+    #expect(renderer.lastDrawError == nil)
+    let commandBuffer = try #require(submitted)
+    commandBuffer.waitUntilCompleted()
+    #expect(commandBuffer.status == .completed)
+    #expect(commandBuffer.error == nil)
+    #expect(presentationCount == 1)
+    #expect(renderer.lastPresentedDrawableSize == size)
+    #expect(renderer.lastEncodedOperationCount == 1)
+    #expect(plan.operations.last == .encodeGlyphDraw(count: 4))
+    #expect(renderer.lastGlyphCellBufferLength == plan.uploadPlan.byteCount)
+}
+#endif
+
+#if canImport(MetalKit)
+@Test func metalOffscreenPixelsContainBackgroundAndUprightGlyphsAcrossAtlasRows() throws {
+    guard let device = MTLCreateSystemDefaultDevice() else { return }
+    var frame = try Frame(columns: 20, rows: 2)
+    // More than 16 distinct scalars exercises multiple atlas rows.
+    for column in 1...20 {
+        frame[column: column, row: 2] = Cell(codepoint: UInt32(64 + column), foreground: 0xffffff, background: 0x112233)
+    }
+    let renderer = TTFXMetalRenderer(device: device)
+    let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 800, height: 112, mipmapped: false)
+    descriptor.storageMode = .shared
+    descriptor.usage = .renderTarget
+    let texture = try #require(device.makeTexture(descriptor: descriptor))
+    let pass = MTLRenderPassDescriptor()
+    pass.colorAttachments[0].texture = texture
+    var submitted: (any MTLCommandBuffer)?
+    let size = TTFXMetalDrawableSize(width: 800, height: 112)
+    renderer.draw(snapshot: .init(frame: frame), cellSize: .init(width: 40, height: 56), drawableSize: size, logicalSize: size, pass: pass) { submitted = $0 }
+    try #require(submitted).waitUntilCompleted()
+    #expect(renderer.lastDrawError == nil)
+    var pixels = [UInt8](repeating: 0, count: 800 * 112 * 4)
+    texture.getBytes(&pixels, bytesPerRow: 800 * 4, from: MTLRegionMake2D(0, 0, 800, 112), mipmapLevel: 0)
+    for column in 0..<20 {
+        let coverage = (0..<56).reduce(0) { total, y in
+            total + (0..<40).filter { x in pixels[(y * 800 + column * 40 + x) * 4 + 2] > 150 }.count
+        }
+        #expect(coverage > 30, "Missing glyph in column \(column)")
+    }
+    #expect(Array(pixels[0..<3]) == [0x33, 0x22, 0x11])
+    // Row 1 is blank black; the glyph row must remain above it.
+    #expect(pixels[(90 * 800 + 20) * 4 + 2] == 0)
+    // F has two arms above its stem: upper-half coverage exceeds lower-half.
+    let upper = (0..<28).reduce(0) { total, y in total + (0..<40).filter { x in pixels[(y * 800 + 5 * 40 + x) * 4 + 2] > 150 }.count }
+    let lower = (28..<56).reduce(0) { total, y in total + (0..<40).filter { x in pixels[(y * 800 + 5 * 40 + x) * 4 + 2] > 150 }.count }
+    #expect(upper > lower)
+}
+#endif

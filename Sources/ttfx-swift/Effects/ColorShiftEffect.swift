@@ -62,6 +62,7 @@ public struct ColorShiftEffect: Effect {
         var frameIndex = 0
         var ticksRemaining: Int
         var completedGradientLoops = 0
+        var displayedForeground: UInt32?
 
         var active: Bool { phase != .done }
 
@@ -105,8 +106,8 @@ public struct ColorShiftEffect: Effect {
             return .complete
         }
 
-        render(into: &frame)
         advanceScenes()
+        render(into: &frame)
 
         if !glyphs.contains(where: \.active) {
             complete = true
@@ -187,6 +188,7 @@ public struct ColorShiftEffect: Effect {
 
     private mutating func advanceScenes() {
         for index in glyphs.indices where glyphs[index].active {
+            glyphs[index].displayedForeground = glyphs[index].foreground
             glyphs[index].ticksRemaining -= 1
             guard glyphs[index].ticksRemaining == 0 else { continue }
             switch glyphs[index].phase {
@@ -199,12 +201,14 @@ public struct ColorShiftEffect: Effect {
                     if options.cycles == 0 || glyphs[index].completedGradientLoops < options.cycles {
                         glyphs[index].frameIndex = 0
                         glyphs[index].ticksRemaining = options.gradientFrames
+                        glyphs[index].displayedForeground = glyphs[index].foreground
                     } else if options.skipFinalGradient {
                         glyphs[index].phase = .done
                     } else {
                         glyphs[index].phase = .final
                         glyphs[index].frameIndex = 0
                         glyphs[index].ticksRemaining = options.gradientFrames
+                        glyphs[index].displayedForeground = glyphs[index].foreground
                     }
                 }
             case .final:
@@ -224,13 +228,13 @@ public struct ColorShiftEffect: Effect {
         frame.withMutableCells { cells in
             for index in cells.indices { cells[index] = .blank }
         }
-        for glyph in glyphs where glyph.active {
+        for glyph in glyphs {
             guard (1...canvas.columns).contains(glyph.coordinate.column),
                   (1...canvas.rows).contains(glyph.coordinate.row)
             else { continue }
             frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = Cell(
                 codepoint: glyph.symbol,
-                foreground: glyph.foreground,
+                foreground: glyph.displayedForeground ?? glyph.foreground,
                 background: 0
             )
         }

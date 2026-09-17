@@ -179,9 +179,15 @@ public struct WavesEffect: Effect {
         } else {
             distributed = cyclicDistribution(larger: colors, smaller: symbols).map { ($0.1, $0.0) }
         }
-        return Array(repeating: distributed, count: options.waveCount)
+        let timeline = Array(repeating: distributed, count: options.waveCount)
             .flatMap { $0 }
-            .map { FrameVisual(symbol: $0.0, foreground: $0.1, duration: options.waveLength) }
+            .flatMap { pair in Array(repeating: pair, count: options.waveLength) }
+        return timeline.indices.map { step in
+            let eased = options.waveEasing.value(at: Double(step) / Double(timeline.count))
+            let index = min(max(PyCompat.roundHalfEven(eased * Double(timeline.count - 1)), 0), timeline.count - 1)
+            let visual = timeline[index]
+            return FrameVisual(symbol: visual.0, foreground: visual.1, duration: 1)
+        }
     }
 
     private func groupedGlyphs() -> [[Int]] {

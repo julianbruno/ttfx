@@ -39,233 +39,140 @@ public struct SpotlightsEffect: Effect {
         }
     }
 
-    private struct Glyph {
-        let characterID: Int
-        let symbol: UInt32
-        let coordinate: Coordinate
-        let brightForeground: UInt32
-        let darkForeground: UInt32
-        var foreground: UInt32
-    }
-
+    private struct Glyph { let symbol: UInt32; let coordinate: Coordinate; let bright: Color; let dark: Color }
+    private struct SearchPath { let target: Coordinate; let control: Coordinate; let speed: Double }
     private struct Spotlight {
+        let paths: [SearchPath]
         var coordinate: Coordinate
-        let center: Coordinate
+        var origin: Coordinate
+        var pathIndex = 0
+        var step = 0
+        var maxSteps = 0
+        var returning = false
+        var active = true
     }
-
     private let canvas: Canvas
     private let options: Configuration
     private var rng: Xoshiro256PlusPlus
     private var glyphs: [Glyph] = []
     private var spotlights: [Spotlight] = []
-    private var illuminateRange = 1
-    private var emittedFrames = 0
-    private var searchTicksRemaining = 0
+    private var range = 1
+    private var remaining = 0
     private var searching = true
-    private var expanding = false
-    private var isComplete = false
-
+    private var complete = false
+    private var center: Coordinate {
+        .init(column: max(1, (canvas.columns + 1) / 2), row: max(1, (canvas.rows + 1) / 2))
+    }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64) {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, spotlightsConfiguration: .init())
     }
-
-    public init(
-        configuration: EffectConfiguration,
-        canvas: Canvas,
-        input: InputText,
-        seed: UInt64,
-        spotlightsConfiguration: Configuration
-    ) {
+    public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
+                spotlightsConfiguration: Configuration) {
         self.canvas = canvas
         self.options = spotlightsConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
-        build(input: input)
+        self.rng = .init(seed: seed)
+        self.remaining = spotlightsConfiguration.searchDuration
+        guard !input.scalars.isEmpty else { complete = true; return }
+        for _ in 0..<options.spotlightCount {
+            let spawn = randomOutside()
+            var targets = [randomInside()]
+            for _ in 0..<10 {
+                var target = randomInside()
+                while Geometry.lineLength(from: targets.last!, to: target, doubleRowDifference: false) < Double(canvas.columns / 4) {
+                    target = randomInside()
+                }
+                targets.append(target)
+            }
+            var paths: [SearchPath] = []
+            for target in targets {
+                let speed = rng.uniform(options.searchSpeedRange.lowerBound, options.searchSpeedRange.upperBound)
+                paths.append(.init(target: target, control: randomOutside(), speed: speed))
+            }
+            let steps = PyCompat.roundHalfEven(Geometry.bezierLength(from: spawn, controls: [paths[0].control], to: paths[0].target) / paths[0].speed)
+            spotlights.append(.init(paths: paths, coordinate: spawn, origin: spawn, maxSteps: steps))
+        }
+        let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
+        let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
+        let mapping = Dictionary(uniqueKeysWithValues: (try! gradient.coordinateColorMapping(
+            minRow: coordinates.map(\.row).min()!, maxRow: coordinates.map(\.row).max()!,
+            minColumn: coordinates.map(\.column).min()!, maxColumn: coordinates.map(\.column).max()!,
+            direction: options.finalGradientDirection)).entries.map { ($0.coordinate, $0.color) })
+        glyphs = coordinates.indices.map {
+            let bright = mapping[coordinates[$0]]!
+            return .init(symbol: input.scalars[$0], coordinate: coordinates[$0], bright: bright, dark: rustAdjustedBrightness(bright, factor: 0.2))
+        }
+        let smallest = min(canvas.columns, canvas.rows)
+        range = max(1, min(Int(floor(Double(smallest) / options.beamWidthRatio)), smallest))
     }
-
     public mutating func tick(into frame: inout Frame) -> TickStatus {
-        guard !isComplete else { return .complete }
-        guard !glyphs.isEmpty else {
-            isComplete = true
-            return .complete
+        guard !complete else { return .complete }
+        var lit = Set<Coordinate>()
+        for light in spotlights { lit.formUnion(Geometry.coordinatesInEllipse(center: light.coordinate, diameter: range)) }
+        for glyph in glyphs {
+            var color = glyph.dark
+            if lit.contains(glyph.coordinate) {
+                let distance = spotlights.map { Geometry.lineLength(from: $0.coordinate, to: glyph.coordinate) }.min() ?? .infinity
+                let threshold = Double(range) * (1 - options.beamFalloff)
+                color = distance > threshold
+                    ? rustAdjustedBrightness(glyph.bright, factor: max(0.2, 1 - (distance - threshold) / (Double(range) * options.beamFalloff)))
+                    : glyph.bright
+            }
+            let word = Self.rgb(color)
+            frame[column: glyph.coordinate.column, row: glyph.coordinate.row] = .init(codepoint: glyph.symbol,
+                foreground: word, background: word == 0 ? 0xFFFF_FFFE : 0)
         }
-
-        if emittedFrames <= options.searchDuration {
-            darkenGlyphs()
-        } else {
-            expanding = true
-            illuminateGlyphs()
+        if searching {
+            remaining -= 1
+            if remaining == 0 {
+                searching = false
+                for index in spotlights.indices {
+                    spotlights[index].returning = true
+                    spotlights[index].origin = spotlights[index].coordinate
+                    spotlights[index].step = 0
+                    spotlights[index].maxSteps = PyCompat.roundHalfEven(Geometry.lineLength(from: spotlights[index].coordinate, to: center) / 0.5)
+                }
+            }
         }
-        render(into: &frame)
-        emittedFrames += 1
-
-        let limit = floor(Double(max(canvas.columns, canvas.rows)) / 1.5)
-        if emittedFrames > options.searchDuration + 1 && Double(illuminateRange) > limit {
-            isComplete = true
-        } else if expanding {
-            illuminateRange += 1
+        if !spotlights.contains(where: \.active) {
+            if spotlights.count > 1 { spotlights.removeLast(spotlights.count - 1) }
+            range += 1
+            if Double(range) > floor(Double(max(canvas.columns, canvas.rows)) / 1.5) { complete = true }
         }
-
-        return isComplete ? .complete : .running
-    }
-
-    private mutating func build(input: InputText) {
-        var sources: [(characterID: Int, symbol: UInt32, coordinate: Coordinate)] = []
-        for (index, pair) in zip(input.scalars, input.positions).enumerated() {
-            sources.append((index, pair.0, Coordinate(column: pair.1.column, row: pair.1.row)))
-        }
-        guard !sources.isEmpty else {
-            isComplete = true
-            return
-        }
-
-        let bottom = sources.map(\.coordinate.row).min()!
-        let top = sources.map(\.coordinate.row).max()!
-        let left = sources.map(\.coordinate.column).min()!
-        let right = sources.map(\.coordinate.column).max()!
-        let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
-        let mapping = try! finalGradient.coordinateColorMapping(
-            minRow: bottom,
-            maxRow: top,
-            minColumn: left,
-            maxColumn: right,
-            direction: options.finalGradientDirection
-        )
-        let finalColors = Dictionary(uniqueKeysWithValues: mapping.entries.map { ($0.coordinate, $0.color) })
-
-        glyphs = sources.sorted {
-            if $0.coordinate.row != $1.coordinate.row { return $0.coordinate.row > $1.coordinate.row }
-            if $0.coordinate.column != $1.coordinate.column { return $0.coordinate.column < $1.coordinate.column }
-            return $0.characterID < $1.characterID
-        }.map { source in
-            let bright = finalColors[source.coordinate] ?? finalGradient.spectrum.last!
-            let dark = adjustBrightness(bright, factor: 0.2)
-            return Glyph(
-                characterID: source.characterID,
-                symbol: source.symbol,
-                coordinate: source.coordinate,
-                brightForeground: rgb(bright),
-                darkForeground: rgb(dark),
-                foreground: rgb(dark)
-            )
-        }
-
-        let center = Coordinate(column: (canvas.columns + 1) / 2, row: (canvas.rows + 1) / 2)
-        spotlights = (0..<options.spotlightCount).map { _ in
-            Spotlight(coordinate: randomCanvasCoordinate(), center: center)
-        }
-        let smallestDimension = min(canvas.columns, canvas.rows)
-        illuminateRange = max(Int(floor(Double(smallestDimension) / options.beamWidthRatio)), 1)
-        emittedFrames = 0
-        searchTicksRemaining = options.searchDuration
-        searching = true
-        expanding = false
-    }
-
-    private mutating func darkenGlyphs() {
-        for index in glyphs.indices { glyphs[index].foreground = glyphs[index].darkForeground }
-    }
-
-    private mutating func illuminateGlyphs() {
-        for index in glyphs.indices {
-            let distance = spotlights.map { Geometry.lineLength(from: $0.coordinate, to: glyphs[index].coordinate) }.min() ?? .infinity
-            if expanding || distance <= Double(illuminateRange) {
-                glyphs[index].foreground = foreground(for: glyphs[index], distance: distance)
+        for index in spotlights.indices where spotlights[index].active {
+            spotlights[index].step += 1
+            let light = spotlights[index]
+            let ratio = light.maxSteps == 0 ? 1 : min(1, Double(light.step) / Double(light.maxSteps))
+            if light.returning {
+                spotlights[index].coordinate = Geometry.coordinateOnLine(from: light.origin, to: center, t: Easing.inOutSine.value(at: ratio))
+                if ratio == 1 { spotlights[index].active = false }
             } else {
-                glyphs[index].foreground = glyphs[index].darkForeground
+                let path = light.paths[light.pathIndex]
+                spotlights[index].coordinate = Geometry.coordinateOnBezier(from: light.origin, controls: [path.control], to: path.target,
+                    t: Easing.inOutQuad.value(at: ratio))
+                if ratio == 1 {
+                    let next = (light.pathIndex + 1) % light.paths.count
+                    let nextPath = light.paths[next]
+                    spotlights[index].pathIndex = next
+                    spotlights[index].origin = spotlights[index].coordinate
+                    spotlights[index].step = 0
+                    spotlights[index].maxSteps = PyCompat.roundHalfEven(Geometry.bezierLength(from: spotlights[index].coordinate,
+                        controls: [nextPath.control], to: nextPath.target) / nextPath.speed)
+                }
             }
         }
+        return complete ? .complete : .running
     }
-
-    private func foreground(for glyph: Glyph, distance: Double) -> UInt32 {
-        guard options.beamFalloff > 0 else { return glyph.brightForeground }
-        let range = Double(illuminateRange)
-        if !expanding && distance > range * (1.0 - options.beamFalloff) {
-            let factor = max(0.2, 1.0 - (distance - range * (1.0 - options.beamFalloff)) / (range * options.beamFalloff))
-            return rgb(adjustBrightness(color(fromRGB: glyph.brightForeground), factor: factor))
-        }
-        return glyph.brightForeground
+    private mutating func randomInside() -> Coordinate {
+        .init(column: rng.integer(in: 1...canvas.columns), row: rng.integer(in: 1...canvas.rows))
     }
-
-    private mutating func randomCanvasCoordinate() -> Coordinate {
-        Coordinate(column: rng.integer(in: 1...canvas.columns), row: rng.integer(in: 1...canvas.rows))
+    private mutating func randomOutside() -> Coordinate {
+        let candidates: [Coordinate] = [
+            .init(column: rng.integer(in: 1...canvas.columns), row: canvas.rows + 1),
+            .init(column: rng.integer(in: 1...canvas.columns), row: 0),
+            .init(column: 0, row: rng.integer(in: 1...canvas.rows)),
+            .init(column: canvas.columns + 1, row: rng.integer(in: 1...canvas.rows)),
+        ]
+        return candidates[rng.integer(in: candidates.indices)]
     }
-
-    private func render(into frame: inout Frame) {
-        frame.withMutableCells { cells in
-            for index in cells.indices { cells[index] = .blank }
-            for glyph in glyphs.sorted(by: { $0.characterID < $1.characterID }) {
-                guard (1...canvas.columns).contains(glyph.coordinate.column),
-                      (1...canvas.rows).contains(glyph.coordinate.row)
-                else { continue }
-                let cellIndex = (canvas.rows - glyph.coordinate.row) * canvas.columns + glyph.coordinate.column - 1
-                cells[cellIndex] = Cell(codepoint: glyph.symbol, foreground: glyph.foreground, background: 0)
-            }
-        }
-    }
-
-    private func rgb(_ color: Color) -> UInt32 {
-        UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue)
-    }
-
-    private func color(fromRGB word: UInt32) -> Color {
-        Color(hex: String(format: "%02x%02x%02x", (word >> 16) & 0xff, (word >> 8) & 0xff, word & 0xff))
-    }
-
-    private func adjustBrightness(_ color: Color, factor: Double) -> Color {
-        let red = Double(color.red) / 255.0
-        let green = Double(color.green) / 255.0
-        let blue = Double(color.blue) / 255.0
-        let maxValue = max(red, green, blue)
-        let minValue = min(red, green, blue)
-        var lightness = (maxValue + minValue) / 2.0
-        let threshold = 0.5
-        let hue: Double
-        let saturation: Double
-        if maxValue == minValue {
-            hue = 0
-            saturation = 0
-        } else {
-            let diff = maxValue - minValue
-            saturation = lightness > threshold ? diff / (2.0 - maxValue - minValue) : diff / (maxValue + minValue)
-            var rawHue: Double
-            if maxValue == red {
-                rawHue = (green - blue) / diff + (green < blue ? 6.0 : 0.0)
-            } else if maxValue == green {
-                rawHue = (blue - red) / diff + 2.0
-            } else {
-                rawHue = (red - green) / diff + 4.0
-            }
-            hue = rawHue / 6.0
-        }
-
-        lightness = min(max(lightness * factor, 0), 1)
-        let adjusted: (Double, Double, Double)
-        if saturation == 0 {
-            adjusted = (lightness, lightness, lightness)
-        } else {
-            let intensity = lightness < threshold
-                ? lightness * (1.0 + saturation)
-                : lightness + saturation - lightness * saturation
-            let scaled = 2.0 * lightness - intensity
-            adjusted = (
-                hueToRGB(scaled: scaled, intensity: intensity, hue: hue + 1.0 / 3.0),
-                hueToRGB(scaled: scaled, intensity: intensity, hue: hue),
-                hueToRGB(scaled: scaled, intensity: intensity, hue: hue - 1.0 / 3.0)
-            )
-        }
-        let adjustedRed = min(max(PyCompat.roundHalfEven(adjusted.0 * 255.0), 0), 255)
-        let adjustedGreen = min(max(PyCompat.roundHalfEven(adjusted.1 * 255.0), 0), 255)
-        let adjustedBlue = min(max(PyCompat.roundHalfEven(adjusted.2 * 255.0), 0), 255)
-        return Color(hex: String(format: "%02x%02x%02x", adjustedRed, adjustedGreen, adjustedBlue))
-    }
-
-    private func hueToRGB(scaled: Double, intensity: Double, hue originalHue: Double) -> Double {
-        var hue = originalHue
-        if hue < 0 { hue += 1 }
-        if hue > 1 { hue -= 1 }
-        if hue < 1.0 / 6.0 { return scaled + (intensity - scaled) * 6.0 * hue }
-        if hue < 1.0 / 2.0 { return intensity }
-        if hue < 2.0 / 3.0 { return scaled + (intensity - scaled) * (2.0 / 3.0 - hue) * 6.0 }
-        return scaled
-    }
+    private static func rgb(_ color: Color) -> UInt32 { UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue) }
 }
