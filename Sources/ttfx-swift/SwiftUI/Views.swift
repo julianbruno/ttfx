@@ -2,21 +2,52 @@ import SwiftUI
 
 public struct TTFXFrameView: View {
     public let snapshot: TTFXFrameSnapshot
+    public let fontSize: CGFloat
+    public let cellSize: CGSize
 
-    public init(snapshot: TTFXFrameSnapshot) {
+    public init(snapshot: TTFXFrameSnapshot, fontSize: CGFloat = 20, cellSize: CGSize = CGSize(width: 16, height: 24)) {
         self.snapshot = snapshot
+        self.fontSize = fontSize
+        self.cellSize = cellSize
     }
 
     public var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(snapshot.visibleTextLines.enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .font(.system(.body, design: .monospaced))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
+        Canvas { context, _ in
+            for cell in snapshot.cells {
+                let rect = CGRect(
+                    x: CGFloat(cell.column - 1) * cellSize.width,
+                    y: CGFloat(snapshot.rows - cell.row) * cellSize.height,
+                    width: cellSize.width,
+                    height: cellSize.height
+                )
+                context.fill(Path(rect), with: .color(Self.color(cell.background)))
+                guard cell.codepoint != 32 else { continue }
+                let text = context.resolve(
+                    Text(cell.glyph)
+                        .font(.custom("Menlo", fixedSize: fontSize))
+                        .foregroundColor(Self.color(cell.foreground))
+                )
+                let size = text.measure(in: CGSize(width: CGFloat.infinity, height: CGFloat.infinity))
+                // Rust's terminal replay places Menlo at x + 1 and baseline y + 5
+                // in bottom-origin coordinates. Scale the same inset for previews.
+                let scale = fontSize / 20
+                let origin = CGPoint(
+                    x: rect.minX + scale,
+                    y: rect.maxY - 5 * scale - text.firstBaseline(in: size)
+                )
+                var cellContext = context
+                cellContext.clip(to: Path(rect))
+                cellContext.draw(text, at: origin, anchor: .topLeading)
             }
         }
+        .frame(width: CGFloat(snapshot.columns) * cellSize.width, height: CGFloat(snapshot.rows) * cellSize.height)
         .accessibilityLabel(snapshot.visibleTextLines.joined(separator: "\n"))
+    }
+
+    private static func color(_ rgb: UInt32) -> Color {
+        Color(.sRGB, red: Double((rgb >> 16) & 255) / 255,
+              green: Double((rgb >> 8) & 255) / 255,
+              blue: Double(rgb & 255) / 255, opacity: 1)
     }
 }
 

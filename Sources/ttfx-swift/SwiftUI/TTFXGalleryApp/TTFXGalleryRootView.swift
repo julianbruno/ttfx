@@ -106,11 +106,19 @@ public struct TTFXGalleryRootView: View {
             TTFXMetalFrameView(snapshot: viewModel.currentSnapshot, cellSize: .init(width: Float(viewModel.previewFontSize * 0.68), height: Float(viewModel.previewFontSize * 1.2)))
                 .frame(width: visiblePreviewMinimumSize.width, height: visiblePreviewMinimumSize.height)
             #else
-            TTFXFrameView(snapshot: viewModel.currentSnapshot)
+            swiftUIFramePreview
             #endif
         case .swiftUIFrameView:
-            TTFXGalleryVisiblePreview(snapshot: viewModel.currentSnapshot, sampleText: viewModel.sampleText, fontSize: viewModel.previewFontSize)
+            swiftUIFramePreview
         }
+    }
+
+    private var swiftUIFramePreview: some View {
+        TTFXFrameView(
+            snapshot: viewModel.currentSnapshot,
+            fontSize: viewModel.previewFontSize,
+            cellSize: CGSize(width: viewModel.previewFontSize * 0.68, height: viewModel.previewFontSize * 1.2)
+        )
     }
 
     private var controls: some View {
@@ -217,29 +225,6 @@ public struct TTFXGalleryRootView: View {
                 }
             }
         }
-    }
-}
-
-
-private struct TTFXGalleryVisiblePreview: View {
-    let snapshot: TTFXFrameSnapshot
-    let sampleText: String
-    let fontSize: Double
-
-    private var visibleLines: [String] {
-        TTFXGalleryRootView.visiblePreviewLines(snapshot: snapshot, sampleText: sampleText)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(visibleLines.enumerated()), id: \.offset) { _, line in
-                Text(line)
-                    .font(.system(size: fontSize, weight: .regular, design: .monospaced))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-            }
-        }
-        .accessibilityLabel(visibleLines.joined(separator: "\n"))
     }
 }
 

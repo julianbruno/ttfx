@@ -84,7 +84,7 @@ internal enum CaptureError: LocalizedError {
             try metalWriter.finish()
             manifest.effects.append(.init(name: name,
                 rust: .init(path: "\(name)/rust.mp4", frames: rustCount, completed: rawFrames.count <= maxFrames, provenance: "Rust terminal ANSI output replayed with CoreText (Menlo). Deterministic export, not a screen recording."),
-                swiftUI: .init(path: "\(name)/swiftui.mp4", frames: swiftCount, completed: status == .complete, provenance: "Swift effect engine rendered by the app's SwiftUI fallback frame view with monospaced text."),
+                swiftUI: .init(path: "\(name)/swiftui.mp4", frames: swiftCount, completed: status == .complete, provenance: "Swift effect engine rendered by the app's SwiftUI fallback frame view with a colored fixed-cell Menlo grid."),
                 metal: .init(path: "\(name)/metal.mp4", frames: swiftCount, completed: status == .complete, provenance: "Swift effect engine rendered by the gallery’s production Metal atlas and shaders to GPU textures.")))
             manifest.effects.sort { $0.name < $1.name }
             try encoder.encode(manifest).write(to: output.appendingPathComponent("manifest.json"), options: .atomic)
@@ -93,7 +93,7 @@ internal enum CaptureError: LocalizedError {
         print("Library ready: \(output.path) — \(manifest.effects.count) effect pairs")
     }
     @MainActor static func renderSwiftUIBGRA(snapshot: TTFXFrameSnapshot, width: Int, height: Int) throws -> Data {
-        let content = TTFXFrameView(snapshot: snapshot)
+        let content = TTFXFrameView(snapshot: snapshot, fontSize: 20, cellSize: CGSize(width: 16, height: 24))
             .frame(width: CGFloat(width), height: CGFloat(height), alignment: .topLeading)
             .background(Color.black)
             .environment(\.colorScheme, .dark)
