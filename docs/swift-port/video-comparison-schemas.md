@@ -15,7 +15,7 @@ artifacts/video-comparison/
     └── metal.mp4
 ```
 
-Use this guide when you need to inspect, validate, regenerate, or hand-edit a comparison library.
+Use this guide when you need to inspect, validate, regenerate, or hand-edit a comparison library. For the recording pipeline that creates these files, see [How TTFX video comparison recordings are made](video-recording.md).
 
 ## Quick use
 
@@ -62,7 +62,7 @@ Current version:
 ```json
 {
   "version": 1,
-  "generatedAt": "2026-09-17T15:00:13Z",
+  "generatedAt": "<ISO-8601 capture timestamp>",
   "revision": "<git revision or unknown>",
   "text": "TTFX\nRust + Swift\nVisual comparison",
   "seed": 42,
@@ -150,7 +150,7 @@ ComparisonEffect
 "metal": { ... }
 ```
 
-Those libraries still load. The app shows the **Show SwiftUI** toggle only when `swiftUI` is present for the selected effect.
+Those libraries still load. The app shows a right-side missing-recording notice when **Show SwiftUI** is enabled but `swiftUI` is absent for the selected effect. Regenerate with `./tools/video-comparison/capture.sh` to add `swiftui.mp4` and `swiftUI` manifest entries.
 
 ### Timeline rule
 

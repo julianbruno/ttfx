@@ -34,14 +34,39 @@ import Foundation
     #expect(threeTrackManifest.effects[0].maximumFrames == 4)
 }
 
-@Test func libraryRejectsMissingVideoAndPathEscape() throws {
+@Test func libraryRejectsMissingManifestVideoAndPathEscape() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: root) }
+    #expect(throws: ComparisonError.self) { try ComparisonManifest.load(from: root) }
     let video = ComparisonVideo(path: "missing.mp4", frames: 10, completed: true, provenance: "test")
     #expect(throws: (any Error).self) { try ComparisonManifest.videoURL(video, directory: root) }
     var escaping = video; escaping.path = "../outside.mp4"
     #expect(throws: (any Error).self) { try ComparisonManifest.videoURL(escaping, directory: root) }
+}
+
+@testable import TTFXComparisonApp
+
+@Test func comparisonAppDefaultLibraryFallsBackFromBuildDirectoryToSourceCheckout() throws {
+    let fakeRoot = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    let fakeSource = fakeRoot.appendingPathComponent("Sources/TTFXComparisonApp/ComparisonRootView.swift")
+    let buildDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathComponent("Build/Products/Debug")
+    try FileManager.default.createDirectory(at: fakeSource.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
+    try Data().write(to: fakeRoot.appendingPathComponent("Cargo.toml"))
+    try Data().write(to: fakeRoot.appendingPathComponent("Package.swift"))
+    defer { try? FileManager.default.removeItem(at: fakeRoot); try? FileManager.default.removeItem(at: buildDirectory.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()) }
+
+    let library = ComparisonRootView.defaultLibraryURL(arguments: ["TTFXComparisonApp"], storedLibraryPath: nil, currentDirectory: buildDirectory, sourceFile: fakeSource.path, environment: [:])
+    #expect(library.path == fakeRoot.appendingPathComponent("artifacts/video-comparison").path)
+}
+
+@Test func comparisonAppDefaultLibraryHonorsExplicitLibraryAndStoredSelection() {
+    let explicit = "/tmp/explicit-comparison"
+    let stored = "/tmp/stored-comparison"
+    let current = URL(fileURLWithPath: "/tmp")
+    #expect(ComparisonRootView.defaultLibraryURL(arguments: ["TTFXComparisonApp", "--library", explicit], storedLibraryPath: stored, currentDirectory: current, environment: [:]).path == explicit)
+    #expect(ComparisonRootView.defaultLibraryURL(arguments: ["TTFXComparisonApp"], storedLibraryPath: stored, currentDirectory: current, environment: [:]).path == stored)
 }
 
 @testable import TTFXVideoCapture

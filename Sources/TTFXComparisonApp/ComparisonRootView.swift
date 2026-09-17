@@ -48,17 +48,19 @@ struct ComparisonRootView: View {
                         Text("\(manifest.columns) × \(manifest.rows) · \(manifest.fps) fps · seed \(manifest.seed)")
                             .foregroundStyle(.secondary)
                     }
-                    if effect.swiftUI != nil {
-                        Toggle("Show SwiftUI", isOn: $showSwiftUI)
-                            .toggleStyle(.switch)
-                            .help("Hide the SwiftUI recording to compare only Rust and Swift Metal.")
-                    }
+                    Toggle("Show SwiftUI", isOn: $showSwiftUI)
+                        .toggleStyle(.switch)
+                        .help("Show or hide the right SwiftUI comparison pane.")
                     HStack(alignment: .top, spacing: 18) {
                         videoPane("Rust terminal", video: effect.rust, avPlayer: player.rust, manifest: manifest)
-                        if showSwiftUI, let swiftUI = effect.swiftUI {
-                            videoPane("SwiftUI", video: swiftUI, avPlayer: player.swiftUI, manifest: manifest)
-                        }
                         videoPane("Swift Metal", video: effect.metal, avPlayer: player.metal, manifest: manifest)
+                        if showSwiftUI {
+                            if let swiftUI = effect.swiftUI {
+                                videoPane("SwiftUI", video: swiftUI, avPlayer: player.swiftUI, manifest: manifest)
+                            } else {
+                                missingSwiftUIPane()
+                            }
+                        }
                     }
                     HStack {
                         Button { player.seek(0) } label: { Image(systemName: "backward.end.fill") }.help("Restart both videos")
@@ -117,6 +119,34 @@ struct ComparisonRootView: View {
             Text(video.provenance).font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
         }.frame(maxWidth: .infinity, alignment: .topLeading)
     }
+
+    private func missingSwiftUIPane() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("SwiftUI").font(.headline)
+                Spacer()
+                Text("Missing recording").font(.caption).foregroundStyle(.orange)
+            }
+            ZStack {
+                Color.black
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.title2)
+                    Text("No SwiftUI video in this library")
+                        .font(.headline)
+                    Text("Regenerate with ./tools/video-comparison/capture.sh to add swiftui.mp4 entries.")
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.secondary)
+                }
+                .padding()
+            }
+            .aspectRatio(2, contentMode: .fit)
+            Text("Older two-track libraries only contain Rust and Metal videos.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }.frame(maxWidth: .infinity, alignment: .topLeading)
+    }
     private func chooseLibrary() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
@@ -124,12 +154,47 @@ struct ComparisonRootView: View {
     }
     private func loadDefault() {
         guard directory == nil else { return }
-        let arguments = ProcessInfo.processInfo.arguments
+        load(Self.defaultLibraryURL(
+            arguments: ProcessInfo.processInfo.arguments,
+            storedLibraryPath: UserDefaults.standard.string(forKey: "comparisonLibrary"),
+            currentDirectory: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        ))
+    }
+
+    nonisolated static func defaultLibraryURL(arguments: [String], storedLibraryPath: String?, currentDirectory: URL, sourceFile: String = #filePath, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
         if let index = arguments.firstIndex(of: "--library"), arguments.indices.contains(index + 1) {
-            load(URL(fileURLWithPath: arguments[index + 1])); return
+            return URL(fileURLWithPath: arguments[index + 1]).standardizedFileURL
         }
-        if let stored = UserDefaults.standard.string(forKey: "comparisonLibrary") { load(URL(fileURLWithPath: stored)); return }
-        load(URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("artifacts/video-comparison"))
+        if let storedLibraryPath, !storedLibraryPath.isEmpty {
+            return URL(fileURLWithPath: storedLibraryPath).standardizedFileURL
+        }
+        return projectRoot(currentDirectory: currentDirectory, sourceFile: sourceFile, environment: environment)
+            .appendingPathComponent("artifacts/video-comparison")
+            .standardizedFileURL
+    }
+
+    nonisolated static func projectRoot(currentDirectory: URL, sourceFile: String = #filePath, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let override = environment["TTFX_REPOSITORY_ROOT"], !override.isEmpty {
+            return URL(fileURLWithPath: override).standardizedFileURL
+        }
+        if let root = firstAncestorContainingProjectFiles(from: currentDirectory) { return root }
+        let sourceDirectory = URL(fileURLWithPath: sourceFile).deletingLastPathComponent()
+        if let root = firstAncestorContainingProjectFiles(from: sourceDirectory) { return root }
+        return currentDirectory.standardizedFileURL
+    }
+
+    nonisolated static func firstAncestorContainingProjectFiles(from url: URL) -> URL? {
+        var candidate = url.standardizedFileURL
+        let fileManager = FileManager.default
+        for _ in 0..<64 {
+            let hasCargo = fileManager.fileExists(atPath: candidate.appendingPathComponent("Cargo.toml").path)
+            let hasPackage = fileManager.fileExists(atPath: candidate.appendingPathComponent("Package.swift").path)
+            if hasCargo && hasPackage { return candidate }
+            let parent = candidate.deletingLastPathComponent()
+            if parent.path == candidate.path { return nil }
+            candidate = parent
+        }
+        return nil
     }
     private func load(_ url: URL) {
         do {

@@ -163,10 +163,19 @@ Upstream is not vendored here — the harness fetches it, because it's their cod
 
 ## Native Swift port
 
-A native Swift port is being developed alongside the Rust binary. This is intentionally a
-**port of the Rust port**, not a direct reimagining of TTE: Python TTE defines the original behavior,
-Rust `ttfx` is the production parity port in this repository, and Swift follows the Rust model while
-checking itself against Rust-backed parity tests. It lives in the root Swift package and does **not**
+The native Swift work is **WIP** and intentionally a **port of a port**:
+
+```text
+TerminalTextEffects (Python, ChrisBuilds)
+        ↓ parity port
+Rust ttfx (this repository's production binary)
+        ↓ native port in progress
+Swift ttfx / TTFXSwiftUI / TTFXGalleryApp
+```
+
+The Swift code follows the Rust implementation rather than reimagining TTE directly. That keeps one
+local oracle: Rust owns the production terminal behavior, while Swift proves itself against Rust-backed
+parity tests and side-by-side visual comparison. It lives in the root Swift package and does **not**
 replace the Rust `ttfx` product or change the Rust parity claims above. Status and architecture:
 [`docs/swift-port/README.md`](docs/swift-port/README.md).
 
@@ -183,9 +192,16 @@ This toolchain’s `swift run` takes the executable name, not `--product`. Per-e
 go after the effect name (`ttfx print --print-speed 5`, `ttfx rain --rain-symbols o .`).
 Unknown effect flags are rejected. `ttfx <effect> --help` lists that effect’s flags.
 
-### Gallery app
+### Native app examples
 
-Open the Xcode **app** project, not the SwiftPM executable:
+There are two native Swift app workflows in this repo:
+
+| App | What it shows | How to run |
+|---|---|---|
+| `TTFXGalleryApp` | Live SwiftUI/Metal preview of one Swift effect at a time. You can change text, seed, canvas, effect, playback, and renderer. | `xcodegen generate && open TTFXGalleryApp.xcodeproj`, then run scheme **TTFXGalleryApp** on **My Mac** or an iOS Simulator. |
+| `TTFX Video Comparison` | Three synchronized panes for each effect: Rust terminal replay, Swift Metal, and an optional SwiftUI pane on the right. This is the visual parity review tool. | `./tools/video-comparison/capture.sh` once, then `./script/build_and_run.sh --compare`. |
+
+Open the Xcode **app** project for the gallery, not the SwiftPM executable:
 
 ```sh
 xcodegen generate
@@ -203,6 +219,65 @@ identifier` and `linkd.autoShortcut` XPC errors.
 The SwiftPM executable remains for `swift build --product TTFXGalleryApp` / tests. `TTFXGalleryApp`
 lists `EffectRegistry.names` in registry order and lets you edit text, seed, canvas, effect, and
 playback through the native SwiftUI snapshot path.
+
+### TTFX Video Comparison
+
+The comparison app uses real project outputs, but they are generated artifacts and are intentionally
+ignored by Git. A local capture library looks like this:
+
+```text
+artifacts/video-comparison/
+├── manifest.json
+├── provenance.json
+└── print/
+    ├── rust.frames
+    ├── rust.mp4
+    ├── swiftui.mp4
+    └── metal.mp4
+```
+
+Generate it before opening the app:
+
+```sh
+./tools/video-comparison/capture.sh --effect print --max-frames 240
+./script/build_and_run.sh --compare
+```
+
+That command creates real local videos you can inspect outside the app too:
+
+```sh
+open artifacts/video-comparison/print/rust.mp4
+open artifacts/video-comparison/print/swiftui.mp4
+open artifacts/video-comparison/print/metal.mp4
+```
+
+For a full visual sweep, omit `--effect print`; that produces Rust/SwiftUI/Metal videos for all 37
+effects. The comparison app opens `artifacts/video-comparison` automatically when launched through
+`./script/build_and_run.sh --compare`. Inside the app, choose an effect, press **Play** or Space, and
+scrub the shared timeline. The layout is **Rust terminal** on the left, **Swift Metal** in the middle,
+and optional **SwiftUI** on the right. The **Show SwiftUI** toggle hides that right pane when you want
+to compare only Rust terminal replay against Swift Metal. If an older two-track library has no
+`swiftui.mp4` entries, the right pane stays visible as a missing-recording notice until you regenerate.
+
+If the app says `manifest.json` could not be opened, it means the selected/default library folder does
+not contain a generated comparison library. Usually one of these happened:
+
+- `./tools/video-comparison/capture.sh` has not been run yet on this checkout;
+- the app was launched directly from Xcode or Finder without the `--library` argument, so its working
+  directory was not the repository root;
+- **Open Library…** was pointed at an effect folder like `artifacts/video-comparison/print` instead of
+  the library root `artifacts/video-comparison`.
+
+Fix it with:
+
+```sh
+./tools/video-comparison/capture.sh
+./script/build_and_run.sh --compare
+```
+
+More detail: [`docs/swift-port/video-comparison.md`](docs/swift-port/video-comparison.md),
+[`docs/swift-port/video-recording.md`](docs/swift-port/video-recording.md), and
+[`docs/swift-port/video-comparison-schemas.md`](docs/swift-port/video-comparison-schemas.md).
 
 | Area | Current status |
 |---|---|

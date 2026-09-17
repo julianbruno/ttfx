@@ -1,23 +1,79 @@
-# Compare Rust and Swift Metal effects on macOS
+# TTFX Video Comparison
 
-Generate videos from each renderer for all 37 effects, then inspect them together in the native **TTFX Video Comparison** app.
+Generate local Rust, Swift Metal, and SwiftUI videos for each effect, then inspect them together in the native **TTFX Video Comparison** app.
+
+## Table of contents
+
+- [Quick path](#quick-path)
+- [What the app shows](#what-the-app-shows)
+- [What gets generated](#what-gets-generated)
+- [How recording works](#how-recording-works)
+- [Long effects and reruns](#long-effects-and-reruns)
+- [Troubleshooting](#troubleshooting)
+- [Current local capture](#current-local-capture)
+- [Related docs](#related-docs)
+
+## Quick path
+
+From the repository root:
 
 ```sh
 ./tools/video-comparison/capture.sh
 ./script/build_and_run.sh --compare
 ```
 
-The recordings and their manifest live in `artifacts/video-comparison/`. The app opens that folder automatically; **Open Library…** also loads another generated folder. Select an effect, press **Play** (Space), or scrub the shared timeline. All visible videos start against the same host clock. A shorter video holds its final frame while the others continue. Use **Show SwiftUI** to hide the SwiftUI pane when you want a Rust-vs-Metal-only review.
+For a faster smoke run that refreshes only one effect:
 
-## What the videos represent
+```sh
+./tools/video-comparison/capture.sh --effect print --max-frames 240
+./script/build_and_run.sh --compare
+```
 
-| Video | Pixel source |
+The recordings and their manifest live in `artifacts/video-comparison/`. That directory is generated and ignored by Git.
+
+## What the app shows
+
+The comparison app opens `artifacts/video-comparison/` automatically when launched through `./script/build_and_run.sh --compare`. **Open Library…** can load another generated folder.
+
+For each selected effect, the app shows three synchronized panes:
+
+| Position | Pane | Source |
+|---|---|---|
+| Left | Rust terminal | Rust `ttfx --parity-dump` ANSI output replayed by Swift/CoreText. |
+| Middle | Swift Metal | Native Swift effect frames rendered by the production Metal renderer. |
+| Right | SwiftUI | Native Swift effect frames rendered by the SwiftUI fallback view. |
+
+Use **Play** or Space to play/pause, and scrub the shared timeline. All visible videos use the same host clock. If one visible video ends earlier, it holds its final frame while the others continue.
+
+The right SwiftUI pane is optional: **Show SwiftUI** hides or shows it. If an old two-track library has no `swiftui.mp4` or `swiftUI` manifest entries, the app keeps the right pane as a missing-recording notice until the library is regenerated.
+
+## What gets generated
+
+The default generated layout is:
+
+```text
+artifacts/video-comparison/
+├── manifest.json
+├── provenance.json
+└── <effect>/
+    ├── rust.frames
+    ├── rust.mp4
+    ├── swiftui.mp4
+    └── metal.mp4
+```
+
+Each file has a different role:
+
+| File | Meaning |
 |---|---|
-| Rust terminal | Actual Rust `--parity-dump` ANSI frames replayed by CoreText with Menlo. This is a deterministic terminal-output export, not a screen recording of a terminal application. |
-| SwiftUI | Native Swift effect ticks drawn by the app's SwiftUI fallback frame view. |
-| Swift Metal | Native Swift effect ticks drawn using the gallery's production Metal glyph atlas and shaders into GPU textures. There is no software fallback. |
+| `manifest.json` | App-facing index: effect names, video paths, frame counts, completion flags, capture settings. |
+| `provenance.json` | Capture-level audit metadata: Rust binary path, ffmpeg path, Rust command template, working-tree status. |
+| `<effect>/rust.frames` | Original length-prefixed ANSI frames emitted by Rust. |
+| `<effect>/rust.mp4` | Rust terminal replay video. |
+| `<effect>/metal.mp4` | Swift Metal video. |
+| `<effect>/swiftui.mp4` | SwiftUI fallback video. |
 
-Both use the same three-line text, 24×8 canvas anchored southwest, seed 42, and 25 frames per second. Every engine frame is encoded once, without sampling or stretching time. The capture path bypasses the gallery's wall-clock scheduler, so it assesses visual effect behavior and the Metal renderer rather than display scheduling. Font rasterization can differ between CoreText and the Metal atlas.
+The default sample uses the same text, seed, canvas, and frame rate for all panes:
 
 ```text
 TTFX
@@ -25,28 +81,31 @@ Rust + Swift
 Visual comparison
 ```
 
-### Rust terminal replay details
+| Setting | Default |
+|---|---:|
+| Canvas | 24 × 8 terminal cells |
+| Cell size | 16 × 24 pixels |
+| Video size | 384 × 192 pixels |
+| FPS | 25 |
+| Seed | 42 |
+| Safety limit | 3000 frames |
 
-The Rust implementation is part of this repository, not an external checkout: `Cargo.toml` defines the `ttfx` package and the Rust sources live under `src/` (`src/main.rs`, `src/cli.rs`, `src/engine/**`, and `src/effects/**`). The capture script builds that code with `cargo build --release` and uses `target/release/ttfx` as the Rust oracle.
+## How recording works
 
-The `Rust terminal` video is not a screen recording. `TTFXVideoCapture` runs the Rust binary with `--parity-dump`, fixed canvas/seed/fps arguments, and the sample text on stdin. Rust emits length-prefixed ANSI frames, which are preserved as `rust.frames` next to the rendered video. Swift parses those frames and sends each one through `Sources/TTFXVideoCapture/ANSIRasterizer.swift`.
+The short version:
 
-`ANSIRasterizer` implements the bounded terminal replay used by the comparison videos:
+1. `tools/video-comparison/capture.sh` builds the Rust binary with `cargo build --release`.
+2. It builds the Swift recorder with `swift build --product TTFXVideoCapture`.
+3. `TTFXVideoCapture` runs Rust once per effect with `--parity-dump` and records `rust.frames`.
+4. Swift replays the Rust ANSI frames through CoreText/Menlo into `rust.mp4`.
+5. Swift runs the native effect engine and records the same ticks twice: once through SwiftUI into `swiftui.mp4`, once through Metal into `metal.mp4`.
+6. The recorder writes or updates `manifest.json` after each effect.
 
-- It allocates a BGRA CoreGraphics bitmap sized from the terminal grid (`columns × 16` by `rows × 24`).
-- It starts with a black canvas and interprets ANSI SGR color/style sequences from the Rust frame stream.
-- Supported SGR includes reset, bold on/off, inverse on/off, foreground/background reset, 16-color ANSI, xterm-256, and truecolor `38;2;r;g;b` / `48;2;r;g;b`.
-- It draws each non-space Unicode scalar with CoreText using Menlo at size 20, clipping to a 16×24 cell and caching `CTLine`s by scalar/color/bold.
-- It converts the ANSI top-to-bottom row order into CoreGraphics coordinates with `height - (row + 1) * 24`.
-- The resulting BGRA frames are piped to `ffmpeg` as rawvideo and encoded as `rust.mp4`.
-
-This means the Rust video uses the real Rust engine and its real ANSI output, but the pixels are produced by a deterministic CoreText/Menlo replay, not by Terminal.app, iTerm2, or a live terminal emulator. It is suitable for repeatable visual comparison; it is not a claim that every terminal application will rasterize the output identically.
-
-Each effect folder contains `rust.mp4`, `swiftui.mp4`, `metal.mp4`, and the original length-prefixed `rust.frames` evidence. `manifest.json` records frame counts, completion state, capture settings and source revision. Older two-track libraries without `swiftui.mp4` still load; the app only shows the SwiftUI toggle when that track is present. `provenance.json` records commands and whether the working tree was modified. These are local generated artifacts, ignored by Git. See [Video comparison schemas](video-comparison-schemas.md) for every field and safe manual workflows.
+For the full pipeline, renderer boundaries, and exact assumptions, see [How TTFX video comparison recordings are made](video-recording.md).
 
 ## Long effects and reruns
 
-The default safety limit is 3,000 frames (120 seconds at 25 fps). The app labels recordings that reach this limit. Rust requests one extra frame to distinguish completion at the limit from truncation; Swift reports its actual completion status. A limit does not establish visual parity or effect completion.
+The default safety limit is 3,000 frames (120 seconds at 25 fps). The app labels recordings that reach this limit as **Capture limit reached**. A limit does not establish visual parity or effect completion.
 
 Regenerate a specific effect with a larger budget:
 
@@ -54,24 +113,53 @@ Regenerate a specific effect with a larger budget:
 ./tools/video-comparison/capture.sh --effect rings --max-frames 10000
 ```
 
-A single-effect rerun preserves other entries in a compatible library. Use `--output /absolute/folder` for another library, or `--fps`, `--seed`, `--rust`, and `--ffmpeg` to override capture inputs. Effect-specific option defaults remain each implementation's own defaults so discrepancies stay visible.
+A single-effect rerun preserves other entries in a compatible library. Use `--output /absolute/folder` for another library, or `--fps`, `--seed`, `--rust`, and `--ffmpeg` to override capture inputs.
 
-For manual comparison, inspect the initial state, motion/order, colors, particle behavior, and the final text. Pause and scrub near divergences. Matching videos are visual evidence for this sample and seed only; creating the recordings does not mark effects as equivalent.
+For manual review, inspect:
 
-## Verified capture — September 17, 2026
+- initial state;
+- motion and ordering;
+- foreground/background colors;
+- particle behavior;
+- final text;
+- mismatched durations or completion flags.
 
-The current library was regenerated after the native Swift effect corrections and output-frame clearing fix at **2026-09-17 15:00:13 UTC**. All 37 pairs now have matching frame counts: **74 complete videos, no truncations**, totaling 11,546,993 bytes. `ffprobe` verified frame counts against the manifest, 384×192 dimensions and 25 fps; all 74 videos passed a full decode. See `artifacts/video-comparison/validation.json`.
+Matching videos are visual evidence for the chosen sample and seed only. They do not prove global effect equivalence.
 
-For example, `rings` now has 1,398 frames (55.92 seconds) in both implementations. The earlier library, where 19 effects had different durations, is preserved locally in `artifacts/video-comparison-before-parity/`.
+## Troubleshooting
 
-Native behavior is also checked independently of the video renderer: all 37 effects match Rust's complete ANSI glyph, position and RGB sequences and completion counts for three multiline inputs, seeds 42/7/123 and canvases 24×8, 16×6 and 18×7. Six additional Matrix/Thunderstorm cases verify requested rates of 60, 17 and 0 fps. This proves parity for those 117 cases; font rasterization and video compression can still differ.
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `manifest.json` could not be opened | The selected/default folder is not a generated comparison library. | Run `./tools/video-comparison/capture.sh`, then `./script/build_and_run.sh --compare`. |
+| Right pane says no SwiftUI recording | The library was generated before the SwiftUI track existed. | Regenerate with `./tools/video-comparison/capture.sh`. |
+| App opens but shows old data | UserDefaults may remember a previous library path. | Use **Open Library…** and choose `artifacts/video-comparison`, or pass `--library` through the launch script. |
+| A recording says capture limit reached | The effect hit `--max-frames`. | Rerun that effect with a higher limit, e.g. `--effect rings --max-frames 10000`. |
+| Metal capture fails | No usable Metal device/command encoding path. | Run on a macOS machine with Metal support; the recorder does not silently substitute SwiftUI. |
 
-The final Swift suite ran 188 tests, including the parameterized parity cases, historical configured-effect regressions, gallery, renderer and comparison playback tests. 187 passed in the combined run; one historical Rust subprocess reached its 30-second timeout and passed unchanged in isolation in 0.555 seconds. A separate public Swift CLI check matched all 37 held-out seed-123 sequences and the six clock sequences byte for byte.
+Quick manifest check:
 
 ```sh
-swift test --disable-sandbox
+grep '"swiftUI"' artifacts/video-comparison/manifest.json | head
 ```
 
-The gallery, CLI, reusable effect engine and video exporter clear their output frame before each tick, so moving glyphs do not leave stale cells behind.
+## Current local capture
 
-The rebuilt native comparison app loaded the refreshed library and was checked with `rings` playback, showing matching 55.92-second timelines. To reopen it, run `./script/build_and_run.sh --compare`. The script builds and launches `.build/apps/TTFXComparisonApp.app` with the generated library's absolute path.
+The current local library was regenerated at **2026-09-17T17:01:22Z**.
+
+| Metric | Value |
+|---|---:|
+| Effects | 37 |
+| Videos | 111 |
+| Effects with SwiftUI track | 37 |
+| Incomplete recordings | 0 |
+| Total encoded frames | 37,848 |
+
+`rings` currently has 1,398 frames in all three panes: Rust terminal, Swift Metal, and SwiftUI.
+
+`artifacts/video-comparison/validation.json` may be stale after regeneration unless you rerun the validation helper that produced it. Treat `manifest.json` as the app's source of truth for the loaded library.
+
+## Related docs
+
+- [How TTFX video comparison recordings are made](video-recording.md)
+- [Video comparison schemas](video-comparison-schemas.md)
+- [Metal toolchain for the Swift port](metal-toolchain.md)

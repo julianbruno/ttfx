@@ -54,10 +54,11 @@ struct TTFXMetalGlyphAtlas {
                     NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true
                 ])
                 let line = CTLineCreateWithAttributedString(string)
-                let advance = CTLineGetTypographicBounds(line, nil, nil, nil)
+                let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                let descent = CGFloat(CTFontGetDescent(font))
                 context.saveGState()
                 context.clip(to: CGRect(x: x, y: y, width: slotWidth, height: slotHeight))
-                context.textPosition = CGPoint(x: CGFloat(x) + (CGFloat(slotWidth) - advance) / 2, y: CGFloat(y) + CTFontGetDescent(font) + 2)
+                context.textPosition = CGPoint(x: CGFloat(x) + (CGFloat(slotWidth) - advance) / 2, y: CGFloat(y) + descent + 2)
                 CTLineDraw(line, context)
                 context.restoreGState()
                 // Bitmap scanlines run from top to bottom, Quartz text is upright.

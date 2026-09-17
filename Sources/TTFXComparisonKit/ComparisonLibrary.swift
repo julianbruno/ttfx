@@ -38,7 +38,11 @@ public struct ComparisonManifest: Codable, Equatable, Sendable {
         self.columns = columns; self.rows = rows; self.fps = fps; self.maxFrames = maxFrames; self.effects = effects
     }
     public static func load(from directory: URL) throws -> Self {
-        let manifest = try JSONDecoder().decode(Self.self, from: Data(contentsOf: directory.appendingPathComponent("manifest.json")))
+        let manifestURL = directory.appendingPathComponent("manifest.json")
+        guard FileManager.default.fileExists(atPath: manifestURL.path) else {
+            throw ComparisonError.missingManifest(manifestURL.path)
+        }
+        let manifest = try JSONDecoder().decode(Self.self, from: Data(contentsOf: manifestURL))
         guard manifest.version == 1, manifest.fps > 0, manifest.columns > 0, manifest.rows > 0,
               Set(manifest.effects.map(\.name)).count == manifest.effects.count else {
             throw ComparisonError.invalidManifest
@@ -72,10 +76,12 @@ public extension ComparisonEffect {
 
 public enum ComparisonError: LocalizedError {
     case invalidManifest
+    case missingManifest(String)
     case missingVideo(String)
     public var errorDescription: String? {
         switch self {
         case .invalidManifest: "The video library manifest is invalid or uses an unsupported version."
+        case .missingManifest(let path): "No video comparison manifest found at \(path). Generate one with ./tools/video-comparison/capture.sh, or open a folder that contains manifest.json."
         case .missingVideo(let path): "Video is missing or outside the library: \(path)"
         }
     }
