@@ -32,7 +32,7 @@ Sentinel 0xFFFF_FFFE is metadata, never visible RGB. Default fg0 white; explicit
 - Parent and worker inspected final overflow contact sheet; white backgrounds gone, placement/colors retained.
 - Local ignored proof: `artifacts/video-comparison/metal-parity-overflow.png` (Rust/Metal/SwiftUI), `metal-parity-check.json` (metadata/sample/background metrics).
 - Rollback: regeneration from previous renderer replaces ignored videos; tracked proof can be reverted independently.
-- M02 work-unit commit: pending evidence commit.
+- M02 work-unit commit: `a0d708b`.
 - RDD off globally; no review lifecycle/remote/push/PR operations. Unrelated `docs/swift-port/cross-platform-cli-spec.md` untouched.
 
 ## Next step
