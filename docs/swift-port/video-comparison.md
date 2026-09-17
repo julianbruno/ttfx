@@ -163,3 +163,7 @@ The current local library was regenerated at **2026-09-17T17:01:22Z**.
 - [How TTFX video comparison recordings are made](video-recording.md)
 - [Video comparison schemas](video-comparison-schemas.md)
 - [Metal toolchain for the Swift port](metal-toolchain.md)
+
+## Swift CLI track
+
+Capture builds and executes the pure-Swift `ttfx` binary with the same deterministic arguments and UTF-8 input as Rust. Override it with `--swift-cli /absolute/path/to/ttfx`. Its length-prefixed ANSI dump is saved as `swift-cli.frames` and replayed through CoreText into `swift-cli.mp4`; this is not a SwiftUI or Metal recording. Legacy libraries may omit the optional `swiftCLI` track. A max-frames-plus-one probe marks capped recordings without stretching their duration. This macOS capture tooling does not certify CLI portability or effect parity.

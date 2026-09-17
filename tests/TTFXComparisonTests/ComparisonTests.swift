@@ -23,6 +23,7 @@ import Foundation
     try Data(legacy.utf8).write(to: root.appendingPathComponent("manifest.json"))
     let legacyManifest = try ComparisonManifest.load(from: root)
     #expect(legacyManifest.effects[0].swiftUI == nil)
+    #expect(legacyManifest.effects[0].swiftCLI == nil)
     #expect(legacyManifest.effects[0].maximumFrames == 3)
 
     let threeTrack = """
@@ -113,4 +114,46 @@ import Foundation
     #expect(Array(pixels[0..<4]) == [0, 0, 255, 255])
     let bottom = 30 * 16 * 4
     #expect(Array(pixels[bottom..<(bottom + 4)]) == [255, 0, 0, 255])
+}
+
+@Test func swiftCLITrackParticipatesInManifestValidationAndDuration() throws {
+    let video = ComparisonVideo(path: "print/swift-cli.mp4", frames: 12, completed: false, provenance: "Swift CLI ANSI replay")
+    let effect = ComparisonEffect(name: "print", rust: video, swiftCLI: video, metal: video)
+    #expect(effect.videos.count == 3)
+    #expect(effect.maximumFrames == 12)
+    let roundTrip = try JSONDecoder().decode(ComparisonEffect.self, from: JSONEncoder().encode(effect))
+    #expect(roundTrip.swiftCLI == video)
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root.appendingPathComponent("print"), withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let manifest = ComparisonManifest(generatedAt: "now", revision: "test", text: "input", seed: 42, columns: 24, rows: 8, fps: 25, maxFrames: 12, effects: [effect])
+    try JSONEncoder().encode(manifest).write(to: root.appendingPathComponent("manifest.json"))
+    #expect(throws: ComparisonError.self) { try ComparisonManifest.load(from: root) }
+    try Data([0]).write(to: root.appendingPathComponent(video.path))
+    #expect(try ComparisonManifest.load(from: root).effects[0].swiftCLI == video)
+    var invalid = manifest
+    invalid.effects[0].swiftCLI?.frames = 0
+    try JSONEncoder().encode(invalid).write(to: root.appendingPathComponent("manifest.json"))
+    #expect(throws: ComparisonError.self) { try ComparisonManifest.load(from: root) }
+}
+
+@Test func ansiSubprocessUsesIdenticalArgumentsAndExactUnicodeInput() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let binary = root.appendingPathComponent("fake-cli")
+    let script = "#!/bin/sh\nprintf '%s\\n' \"$@\" > '\(root.path)/args'\ncat > '\(root.path)/input'\nprintf '2\\nΩ\\n'\n"
+    try Data(script.utf8).write(to: binary)
+    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+    #expect(TTFXVideoCapture.dumpArguments(name: "print", fps: 30, seed: 123, cap: 8) == ["--parity-dump", "--virtual-clock", "--seed", "123", "--frame-rate", "30", "--max-frames", "8", "--ignore-terminal-dimensions", "--canvas-width", "24", "--canvas-height", "8", "--anchor-text", "sw", "--anchor-canvas", "sw", "print"])
+    let output = root.appendingPathComponent("frames")
+    let text = "Ω\ninput without final newline"
+    try TTFXVideoCapture.ansiDump(binary: binary.path, name: "print", text: text, fps: 30, seed: 123, cap: 8, output: output, label: "Swift CLI")
+    #expect(try Data(contentsOf: root.appendingPathComponent("input")) == Data(text.utf8))
+    #expect(try String(contentsOf: root.appendingPathComponent("args"), encoding: .utf8).split(separator: "\n").map(String.init) == TTFXVideoCapture.dumpArguments(name: "print", fps: 30, seed: 123, cap: 8))
+    #expect(try TTFXVideoCapture.parseFrames(Data(contentsOf: output)) == ["Ω"])
+    try Data("#!/bin/sh\nexit 7\n".utf8).write(to: binary)
+    #expect(throws: CaptureError.self) {
+        try TTFXVideoCapture.ansiDump(binary: binary.path, name: "print", text: "", fps: 25, seed: 42, cap: 2, output: output, label: "Swift CLI")
+    }
 }

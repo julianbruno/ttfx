@@ -8,6 +8,7 @@ This document describes the recording pipeline behind **TTFX Video Comparison**.
 - [Generated library layout](#generated-library-layout)
 - [Recording pipeline](#recording-pipeline)
 - [Rust terminal recording](#rust-terminal-recording)
+- [Swift CLI recording](#swift-cli-recording)
 - [SwiftUI recording](#swiftui-recording)
 - [Swift Metal recording](#swift-metal-recording)
 - [Timeline and completion rules](#timeline-and-completion-rules)
@@ -30,7 +31,9 @@ For a faster local smoke recording:
 ./script/build_and_run.sh --compare
 ```
 
-The capture script builds the Rust binary and the Swift recorder, then runs `TTFXVideoCapture`.
+Prerequisites: macOS with Xcode/Swift, Cargo, working Metal support, and ffmpeg (default `/opt/homebrew/bin/ffmpeg`; override with `--ffmpeg`). No network installation is performed by this procedure.
+
+The capture script builds the Rust binary, pure-Swift CLI, and Swift recorder, then runs `TTFXVideoCapture`.
 
 ## Generated library layout
 
@@ -43,27 +46,31 @@ artifacts/video-comparison/
 └── <effect>/
     ├── rust.frames
     ├── rust.mp4
+    ├── swift-cli.frames
+    ├── swift-cli.mp4
     ├── swiftui.mp4
     └── metal.mp4
 ```
 
-`manifest.json` is what the app loads. For each effect it points to three synchronized panes:
+`manifest.json` is what the app loads. For each effect it points to four synchronized panes:
 
 | Pane | File | Producer |
 |---|---|---|
 | Rust terminal | `<effect>/rust.mp4` | Rust `ttfx --parity-dump` ANSI frames replayed through Swift/CoreText. |
+| Swift CLI | `<effect>/swift-cli.mp4` | Actual pure-Swift `ttfx --parity-dump --virtual-clock` ANSI output replayed through CoreText. |
 | Swift Metal | `<effect>/metal.mp4` | Native Swift effect frames rendered by `TTFXMetalRenderer`. |
 | SwiftUI | `<effect>/swiftui.mp4` | Native Swift effect frames rendered by the SwiftUI fallback frame view. |
 
-The app layout is Rust terminal on the left, Swift Metal in the middle, and optional SwiftUI on the right. The **Show SwiftUI** toggle hides or shows the right pane.
+The app shows Rust terminal and Swift Metal plus optional Swift CLI and SwiftUI panes. **Show Swift CLI** and **Show SwiftUI** independently hide or show their panes.
 
 ## Recording pipeline
 
 `tools/video-comparison/capture.sh` runs:
 
 1. `cargo build --release`
-2. `swift build --product TTFXVideoCapture`
-3. `.build/.../TTFXVideoCapture` with any arguments passed through
+2. `swift build --product ttfx`
+3. `swift build --product TTFXVideoCapture`
+4. `.build/.../TTFXVideoCapture` with any arguments passed through
 
 `TTFXVideoCapture` then:
 
@@ -93,7 +100,7 @@ For each effect, `TTFXVideoCapture` invokes the Rust binary with a fixed parity-
 
 ```sh
 target/release/ttfx \
-  --parity-dump \
+  --parity-dump --virtual-clock \
   --seed 42 \
   --frame-rate 25 \
   --max-frames 3001 \
@@ -115,6 +122,19 @@ Rust emits length-prefixed ANSI frames. The recorder keeps those bytes in `<effe
 - pipes raw BGRA frames to ffmpeg as `rust.mp4`.
 
 This is deterministic terminal-output replay. It is suitable for side-by-side review, but it does not claim to match every terminal emulator's font or rasterization choices.
+
+## Swift CLI recording
+
+The recorder launches the actual pure-Swift CLI executable next to `TTFXVideoCapture`, not an in-process effect or relabeled GUI recording. Both executable paths use identical arguments, UTF-8 stdin, seed, canvas, FPS, and a `maxFrames + 1` completion probe. The output is retained as `swift-cli.frames`, decoded with the same length-prefixed parser, and rasterized through the same `ANSIRasterizer` as Rust into `swift-cli.mp4`.
+
+Select a different built executable and output folder explicitly:
+
+```sh
+./tools/video-comparison/capture.sh --swift-cli /absolute/path/to/ttfx \
+  --effect print --max-frames 240 --output /tmp/ttfx-cli-comparison
+```
+
+`provenance.json` records `swiftCLIBinary` and `swiftCLICommand`. This track exercises ANSI serialization and the executable boundary; it does not certify effect parity or Windows/Linux support. Capture and replay remain macOS tooling.
 
 ## SwiftUI recording
 
@@ -146,11 +166,11 @@ There is no software fallback in the Metal recording path. If Metal cannot encod
 
 The recorder writes one encoded video frame for each engine tick. It does not sample, interpolate, or stretch time.
 
-The comparison app uses the maximum frame count among the visible videos for the selected effect. If one visible video is shorter, it holds its final encoded frame while the others continue.
+The comparison app uses the maximum frame count among all present videos for the selected effect. If one visible video is shorter, it holds its final encoded frame while the others continue.
 
 `completed` in the manifest means the effect finished before the safety limit. A recording that reaches `maxFrames` is labeled **Capture limit reached** and is not proof that the effect reached its final state.
 
-Rust asks for one extra frame (`maxFrames + 1`) so the recorder can distinguish a clean completion at the limit from truncation.
+Rust and Swift CLI ask for one extra frame (`maxFrames + 1`) so the recorder can distinguish a clean completion at the limit from truncation.
 
 ## Regenerating old two-track libraries
 
@@ -178,3 +198,14 @@ grep '"swiftUI"' artifacts/video-comparison/manifest.json | head
 - [Video comparison guide](video-comparison.md) — how to open and inspect the generated videos.
 - [Video comparison schemas](video-comparison-schemas.md) — exact `manifest.json` and `provenance.json` fields.
 - [Metal toolchain](metal-toolchain.md) — installing and validating the Metal-backed Swift path.
+
+## Verify a recording
+
+```sh
+swift test --filter TTFXComparisonTests
+ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,nb_frames \
+  artifacts/video-comparison/print/swift-cli.mp4
+ffmpeg -v error -i artifacts/video-comparison/print/swift-cli.mp4 -f null -
+```
+
+Expect 384 × 192, configured FPS, and the `swiftCLI.frames` manifest count. Repeat decoding and metadata checks for every generated track. Inspect `swift-cli.frames` to separate executable output issues from replay issues. Libraries without `swiftCLI` still load and display a missing-recording notice; regenerate to add the track. Both optional panes have independent visibility toggles, but hiding a pane does not remove its player from the synchronized timeline.

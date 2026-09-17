@@ -19,13 +19,14 @@ internal enum CaptureError: LocalizedError {
             return arguments[i + 1]
         }
         if arguments.contains("--help") {
-            print("TTFXVideoCapture [--output directory] [--rust binary] [--ffmpeg binary] [--effect name] [--max-frames 3000] [--fps 25] [--seed 42]")
+            print("TTFXVideoCapture [--output directory] [--rust binary] [--swift-cli binary] [--ffmpeg binary] [--effect name] [--max-frames 3000] [--fps 25] [--seed 42]")
             return
         }
         let currentDirectory = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         let root = projectRoot(currentDirectory: currentDirectory)
         let output = URL(fileURLWithPath: option("--output", root.appendingPathComponent("artifacts/video-comparison").path))
         let rust = option("--rust", root.appendingPathComponent("target/release/ttfx").path)
+        let swiftCLI = option("--swift-cli", URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("ttfx").path)
         let ffmpeg = option("--ffmpeg", "/opt/homebrew/bin/ffmpeg")
         guard let fps = Int(option("--fps", "25")), (1...120).contains(fps),
               let maxFrames = Int(option("--max-frames", "3000")), (1...100000).contains(maxFrames),
@@ -44,7 +45,7 @@ internal enum CaptureError: LocalizedError {
             manifest.effects = existing.effects.filter { $0.name != selected }
         }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-        let provenance: [String: String] = ["rustBinary": rust, "ffmpegBinary": ffmpeg, "rustCommand": "--parity-dump --seed \(seed) --frame-rate \(fps) --max-frames \(maxFrames + 1) --ignore-terminal-dimensions --canvas-width 24 --canvas-height 8 --anchor-text sw --anchor-canvas sw EFFECT", "workingTreeStatus": git.workingTreeStatus, "captureMethod": "Rust ANSI replay through CoreText; Swift native effect frames through production Metal shaders; one encoded frame per engine tick. No frame sampling or duration normalization."]
+        let provenance: [String: String] = ["rustBinary": rust, "swiftCLIBinary": swiftCLI, "swiftCLICommand": dumpArguments(name: "EFFECT", fps: fps, seed: seed, cap: maxFrames + 1).joined(separator: " "), "ffmpegBinary": ffmpeg, "rustCommand": dumpArguments(name: "EFFECT", fps: fps, seed: seed, cap: maxFrames + 1).joined(separator: " "), "workingTreeStatus": git.workingTreeStatus, "captureMethod": "Rust and actual Swift CLI executable ANSI replay through CoreText; Swift native effect frames through production Metal shaders; one encoded frame per engine tick. No frame sampling or duration normalization."]
         try encoder.encode(provenance).write(to: output.appendingPathComponent("provenance.json"), options: .atomic)
         let renderer = TTFXMetalRenderer()
         guard renderer.canEncodeGPUCommands else { throw CaptureError.message("Metal GPU unavailable; no substitute renderer is used") }
@@ -54,7 +55,7 @@ internal enum CaptureError: LocalizedError {
             let directory = output.appendingPathComponent(name)
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             let dumpURL = directory.appendingPathComponent("rust.frames")
-            try rustDump(binary: rust, name: name, text: text, fps: fps, seed: seed, cap: maxFrames + 1, output: dumpURL)
+            try ansiDump(binary: rust, name: name, text: text, fps: fps, seed: seed, cap: maxFrames + 1, output: dumpURL, label: "Rust")
             let rawFrames = try parseFrames(Data(contentsOf: dumpURL))
             guard !rawFrames.isEmpty else { throw CaptureError.message("Rust emitted no frames for \(name)") }
             let rustCount = min(maxFrames, rawFrames.count)
@@ -63,6 +64,16 @@ internal enum CaptureError: LocalizedError {
                 try autoreleasepool { try rustWriter.append(rasterizer.pixels(rawFrame)) }
             }
             try rustWriter.finish()
+            let cliDumpURL = directory.appendingPathComponent("swift-cli.frames")
+            try ansiDump(binary: swiftCLI, name: name, text: text, fps: fps, seed: seed, cap: maxFrames + 1, output: cliDumpURL, label: "Swift CLI")
+            let cliFrames = try parseFrames(Data(contentsOf: cliDumpURL))
+            guard !cliFrames.isEmpty else { throw CaptureError.message("Swift CLI emitted no frames for \(name)") }
+            let cliCount = min(maxFrames, cliFrames.count)
+            let cliWriter = try VideoWriter(output: directory.appendingPathComponent("swift-cli.mp4"), width: columns * 16, height: rows * 24, fps: fps, ffmpeg: ffmpeg)
+            for frame in cliFrames.prefix(maxFrames) {
+                try autoreleasepool { try cliWriter.append(rasterizer.pixels(frame)) }
+            }
+            try cliWriter.finish()
             let canvas = try Canvas(columns: columns, rows: rows)
             let input = canvas.ingest(text)
             var effect = EffectRegistry.makeEffect(named: name, configuration: EffectConfiguration(text: text, seed: seed, frameRate: fps), canvas: canvas, input: input, seed: seed)!
@@ -85,6 +96,7 @@ internal enum CaptureError: LocalizedError {
             manifest.effects.append(.init(name: name,
                 rust: .init(path: "\(name)/rust.mp4", frames: rustCount, completed: rawFrames.count <= maxFrames, provenance: "Rust terminal ANSI output replayed with CoreText (Menlo). Deterministic export, not a screen recording."),
                 swiftUI: .init(path: "\(name)/swiftui.mp4", frames: swiftCount, completed: status == .complete, provenance: "Swift effect engine rendered by the app's SwiftUI fallback frame view with a colored fixed-cell Menlo grid."),
+                swiftCLI: .init(path: "\(name)/swift-cli.mp4", frames: cliCount, completed: cliFrames.count <= maxFrames, provenance: "Actual pure-Swift CLI executable ANSI output replayed with CoreText (Menlo). Not SwiftUI or Metal."),
                 metal: .init(path: "\(name)/metal.mp4", frames: swiftCount, completed: status == .complete, provenance: "Swift effect engine rendered by the gallery’s production Metal atlas and shaders to GPU textures.")))
             manifest.effects.sort { $0.name < $1.name }
             try encoder.encode(manifest).write(to: output.appendingPathComponent("manifest.json"), options: .atomic)
@@ -155,25 +167,29 @@ internal enum CaptureError: LocalizedError {
         guard process.terminationStatus == 0 else { return nil }
         return String(decoding: data, as: UTF8.self)
     }
-    static func rustDump(binary: String, name: String, text: String, fps: Int, seed: UInt64, cap: Int, output: URL) throws {
+    static func ansiDump(binary: String, name: String, text: String, fps: Int, seed: UInt64, cap: Int, output: URL, label: String) throws {
         FileManager.default.createFile(atPath: output.path, contents: nil)
         let file = try FileHandle(forWritingTo: output)
         defer { try? file.close() }
         let process = Process(), input = Pipe()
         process.executableURL = URL(fileURLWithPath: binary)
-        process.arguments = ["--parity-dump", "--seed", "\(seed)", "--frame-rate", "\(fps)", "--max-frames", "\(cap)", "--ignore-terminal-dimensions", "--canvas-width", "24", "--canvas-height", "8", "--anchor-text", "sw", "--anchor-canvas", "sw", name]
+        process.arguments = dumpArguments(name: name, fps: fps, seed: seed, cap: cap)
         process.standardOutput = file; process.standardInput = input
         try process.run(); try input.fileHandleForWriting.write(contentsOf: Data(text.utf8)); try input.fileHandleForWriting.close()
         process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw CaptureError.message("Rust capture failed: \(name)") }
+        guard process.terminationStatus == 0 else { throw CaptureError.message("\(label) capture failed: \(name) (exit \(process.terminationStatus))") }
     }
+    static func dumpArguments(name: String, fps: Int, seed: UInt64, cap: Int) -> [String] {
+        ["--parity-dump", "--virtual-clock", "--seed", "\(seed)", "--frame-rate", "\(fps)", "--max-frames", "\(cap)", "--ignore-terminal-dimensions", "--canvas-width", "24", "--canvas-height", "8", "--anchor-text", "sw", "--anchor-canvas", "sw", name]
+    }
+
     static func parseFrames(_ data: Data) throws -> [String] {
         var offset = 0, frames: [String] = []
         while offset < data.count {
             guard let newline = data[offset...].firstIndex(of: 10),
                   let length = Int(String(decoding: data[offset..<newline], as: UTF8.self)), length >= 0 else { throw CaptureError.message("Invalid frame length") }
             let start = newline + 1, end = start + length
-            guard end < data.count, data[end] == 10, let frame = String(data: data[start..<end], encoding: .utf8) else { throw CaptureError.message("Truncated or invalid Rust frame") }
+            guard end < data.count, data[end] == 10, let frame = String(data: data[start..<end], encoding: .utf8) else { throw CaptureError.message("Truncated or invalid ANSI frame") }
             frames.append(frame); offset = end + 1
         }
         return frames

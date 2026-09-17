@@ -14,11 +14,12 @@ public struct ComparisonVideo: Codable, Equatable, Sendable {
 public struct ComparisonEffect: Codable, Equatable, Identifiable, Sendable {
     public var name: String
     public var rust: ComparisonVideo
+    public var swiftCLI: ComparisonVideo?
     public var swiftUI: ComparisonVideo?
     public var metal: ComparisonVideo
     public var id: String { name }
-    public init(name: String, rust: ComparisonVideo, swiftUI: ComparisonVideo? = nil, metal: ComparisonVideo) {
-        self.name = name; self.rust = rust; self.swiftUI = swiftUI; self.metal = metal
+    public init(name: String, rust: ComparisonVideo, swiftUI: ComparisonVideo? = nil, swiftCLI: ComparisonVideo? = nil, metal: ComparisonVideo) {
+        self.name = name; self.rust = rust; self.swiftUI = swiftUI; self.swiftCLI = swiftCLI; self.metal = metal
     }
 }
 
@@ -66,7 +67,7 @@ public struct ComparisonManifest: Codable, Equatable, Sendable {
 
 public extension ComparisonEffect {
     var videos: [ComparisonVideo] {
-        [rust] + (swiftUI.map { [$0] } ?? []) + [metal]
+        [rust] + (swiftCLI.map { [$0] } ?? []) + (swiftUI.map { [$0] } ?? []) + [metal]
     }
 
     var maximumFrames: Int {

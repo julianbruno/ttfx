@@ -11,6 +11,8 @@ artifacts/video-comparison/
 └── <effect>/
     ├── rust.frames
     ├── rust.mp4
+    ├── swift-cli.frames
+    ├── swift-cli.mp4
     ├── swiftui.mp4
     └── metal.mp4
 ```
@@ -138,6 +140,7 @@ ComparisonEffect
 |---|---:|---|---|
 | `name` | string | Effect name from `EffectRegistry.names`. | Used as the stable ID and folder name convention. |
 | `rust` | `ComparisonVideo` | Rust terminal ANSI replay video. | Always required. |
+| `swiftCLI` | `ComparisonVideo?` | Pure-Swift executable ANSI replay video. | Optional for legacy two/three-track libraries. |
 | `swiftUI` | `ComparisonVideo?` | SwiftUI fallback video. | Optional for backward compatibility with old two-track libraries. |
 | `metal` | `ComparisonVideo` | Swift Metal renderer video. | Always required. |
 
@@ -191,6 +194,7 @@ ComparisonVideo
 | Surface | File | Meaning |
 |---|---|---|
 | Rust terminal | `<effect>/rust.mp4` | Rust `--parity-dump` ANSI frames replayed through CoreText/Menlo. |
+| Swift CLI | `<effect>/swift-cli.mp4` | Actual pure-Swift CLI ANSI frames replayed through CoreText/Menlo. |
 | SwiftUI | `<effect>/swiftui.mp4` | Swift effect frames drawn by the SwiftUI fallback frame view. |
 | Swift Metal | `<effect>/metal.mp4` | Swift effect frames drawn by the Metal glyph atlas/shader renderer. |
 
@@ -221,6 +225,8 @@ Swift shape:
 | Field | Meaning | How to use it |
 |---|---|---|
 | `rustBinary` | Absolute path used for the Rust oracle binary. | Check when capture fails with missing `ttfx`. Override with `--rust`. |
+| `swiftCLIBinary` | Actual pure-Swift CLI executable path. | Override with `--swift-cli`. |
+| `swiftCLICommand` | Same arguments as Rust, including `--virtual-clock`. | Reproduce the executable dump. |
 | `ffmpegBinary` | Path used for video encoding. | Override with `--ffmpeg` when Homebrew is not under `/opt/homebrew`. |
 | `rustCommand` | Template command used for Rust frame dumps. `EFFECT` is replaced per effect. | Reproduce or debug Rust capture. |
 | `workingTreeStatus` | `git status --porcelain` output, or `unavailable: not a git repository`. | Audit whether videos came from dirty sources. |
@@ -343,3 +349,7 @@ After generating or editing a library:
 4. Toggle **Show SwiftUI** off and on.
 5. Scrub the timeline to the end; shorter videos should hold their final frame.
 6. If debugging Rust, inspect `<effect>/rust.frames` before inspecting `rust.mp4`.
+
+## Optional Swift CLI track
+
+Version 1 additionally permits `swiftCLI` with the same validation as every `ComparisonVideo`. Missing, escaping, or zero-frame declared tracks are rejected; absent tracks remain backward compatible. `swift-cli.frames` uses the exact length-prefixed UTF-8 format described for `rust.frames`. The pane reports missing recording for old libraries.
