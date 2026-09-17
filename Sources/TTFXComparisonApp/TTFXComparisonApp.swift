@@ -1,4 +1,6 @@
 import SwiftUI
+
+#if os(macOS)
 import AppKit
 
 @main
@@ -19,3 +21,14 @@ struct TTFXComparisonApp: App {
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
+#else
+@main
+struct TTFXComparisonApp: App {
+    var body: some Scene {
+        WindowGroup("TTFX Video Comparison") {
+            Text("TTFXComparisonApp is available on macOS only.")
+                .padding()
+        }
+    }
+}
+#endif

@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import AVKit
 import AppKit
@@ -155,3 +156,4 @@ private struct ComparisonVideoSurface: NSViewRepresentable {
     }
     func updateNSView(_ view: AVPlayerView, context: Context) { view.player = player }
 }
+#endif
