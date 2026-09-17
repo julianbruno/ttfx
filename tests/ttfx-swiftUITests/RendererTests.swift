@@ -198,3 +198,40 @@ import MetalKit
     #expect(upper > lower)
 }
 #endif
+
+@Test func metalUploadResolvesDefaultWhiteExplicitBlackAndGenuineBackgrounds() throws {
+    var frame = try Frame(columns: 3, rows: 1)
+    frame[column: 1, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0)
+    frame[column: 2, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0xffff_fffe)
+    frame[column: 3, row: 1] = Cell(codepoint: 70, foreground: 0x112233, background: 0x445566)
+    let plan = TTFXMetalFrameUploadPlan(snapshot: .init(frame: frame), cellSize: .init(width: 16, height: 24))
+    #expect(plan.cells.map(\.foregroundRGB) == [0xffffff, 0, 0x112233])
+    #expect(plan.cells.map(\.backgroundRGB) == [0, 0, 0x445566])
+}
+
+#if canImport(MetalKit)
+@Test func metalGPURendersExplicitBlackWithoutWhiteBoxesAndPreservesDefaultWhite() throws {
+    let device = try #require(MTLCreateSystemDefaultDevice(), "GPU required for production color regression")
+    var frame = try Frame(columns: 4, rows: 1)
+    frame[column: 1, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0)
+    frame[column: 2, row: 1] = Cell(codepoint: 70, foreground: 0, background: 0xffff_fffe)
+    frame[column: 3, row: 1] = Cell(codepoint: 32, foreground: 0, background: 0xffff_fffe)
+    frame[column: 4, row: 1] = Cell(codepoint: 32, foreground: 0, background: 0x112233)
+    let renderer = TTFXMetalRenderer(device: device)
+    let pixels = try renderer.exportBGRA(snapshot: .init(frame: frame), cellWidth: 16, cellHeight: 24)
+    var whiteGlyphPixels = 0
+    var blackRegionMismatches = 0
+    var backgroundMismatches = 0
+    for y in 0..<24 {
+        for x in 0..<64 {
+            let offset = (y * 64 + x) * 4
+            if x < 16, pixels[offset + 2] > 100 { whiteGlyphPixels += 1 }
+            if (16..<48).contains(x), Array(pixels[offset..<(offset + 4)]) != [0, 0, 0, 255] { blackRegionMismatches += 1 }
+            if x >= 48, Array(pixels[offset..<(offset + 4)]) != [0x33, 0x22, 0x11, 255] { backgroundMismatches += 1 }
+        }
+    }
+    #expect(whiteGlyphPixels > 25)
+    #expect(blackRegionMismatches == 0)
+    #expect(backgroundMismatches == 0)
+}
+#endif

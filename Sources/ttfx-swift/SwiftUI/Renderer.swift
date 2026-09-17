@@ -86,8 +86,11 @@ public struct TTFXMetalGlyphCell: Equatable, Sendable {
 
     public init(cell: TTFXRenderableCell, cellSize: TTFXMetalCellSize) {
         self.codepoint = cell.codepoint
-        self.foregroundRGB = cell.foreground & 0x00ff_ffff
-        self.backgroundRGB = cell.background & 0x00ff_ffff
+        // Native effects use the background sentinel as explicit-black metadata,
+        // not as an RGB background. Match terminal-default white otherwise.
+        let explicitBlack = cell.background == 0xffff_fffe
+        self.foregroundRGB = cell.foreground == 0 && !explicitBlack ? 0xffffff : cell.foreground & 0x00ff_ffff
+        self.backgroundRGB = explicitBlack ? 0 : cell.background & 0x00ff_ffff
         self.column = UInt16(clamping: cell.column - 1)
         self.row = UInt16(clamping: cell.row - 1)
         self.cellOriginX = Float(cell.column - 1) * cellSize.width
