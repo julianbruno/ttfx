@@ -71,7 +71,6 @@ struct ComparisonRootView: View {
                         Spacer()
                         VStack(alignment: .trailing, spacing: 5) {
                             Text("Captured \(manifest.generatedAt)")
-                            Text("Source \(manifest.revision)").lineLimit(1)
                         }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     }
                     Spacer(minLength: 0)
