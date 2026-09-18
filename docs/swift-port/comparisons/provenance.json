@@ -23,6 +23,15 @@
       "sourceSHA256": {
         "rust": "c56d0130c6e53a8ab523d3d48c3287adbe8f150ddd9173aa11653b2955a0ea3f",
         "metal": "cd2ce26fcb903b6642ca60535297a0deef2991d159af7bbfa96ca169ac66e987"
+      },
+      "preview": {
+        "file": "beams-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 1450599,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -33,6 +42,15 @@
       "sourceSHA256": {
         "rust": "383136d1cf9b51c335e7ebaa21c6b8d3dc90be3569b58ebc757fae451923c852",
         "metal": "3b650b56a0021f8967cc7026c3548f37d189056fa94e0fcabcfd439f95df53ce"
+      },
+      "preview": {
+        "file": "binarypath-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 610868,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -43,6 +61,15 @@
       "sourceSHA256": {
         "rust": "659dbb309a7764bb804c496fa95e7d55c55e60638746fa94f1301663d9c1a455",
         "metal": "eed360be60c401c5ee26f5e5fcfeab44cb2c461c710dfba38638ede9dd7ab73d"
+      },
+      "preview": {
+        "file": "blackhole-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 143968,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -53,6 +80,15 @@
       "sourceSHA256": {
         "rust": "65c20df045ef1b6ca9f472fb9c46650172b214ef25bc166bea48b7f8c4682006",
         "metal": "8ff062617485e528c0481e6e5e09aa387dd65a55404733ddc84ae01a84b082c7"
+      },
+      "preview": {
+        "file": "bouncyballs-preview.gif",
+        "frames": 131,
+        "durationSeconds": 5.24,
+        "bytes": 423299,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -63,6 +99,15 @@
       "sourceSHA256": {
         "rust": "be37411264d66f6bba0d9d8e3cdb00a3ef449a38d41d146b57c6eda76ba43c07",
         "metal": "7369634291abab0b63161ffe204406fca60a177357e5e951c27e651a85ddde1f"
+      },
+      "preview": {
+        "file": "bubbles-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 344206,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -73,6 +118,15 @@
       "sourceSHA256": {
         "rust": "3c6513e444b42227b9269a067e4ff11f1cd5c8498a70f6d9931e890a025fadf2",
         "metal": "d928fb7ecc5405e67de92ff665089e2c6fac68d6215056ad8eb5c2e15ad0074f"
+      },
+      "preview": {
+        "file": "burn-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 566842,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -83,6 +137,15 @@
       "sourceSHA256": {
         "rust": "51327853d50e4eeb82c2795293aabc5fb8612c459c53b9125b39af981bcb78fc",
         "metal": "df4192d41f05107fff3bf4895cd3cb67bb643ce572a9541998c54b23de061ff0"
+      },
+      "preview": {
+        "file": "colorshift-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 884795,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -93,6 +156,15 @@
       "sourceSHA256": {
         "rust": "9836673f018fe6a4bec00e791a4685f0504a37941e451a296632e699608588cc",
         "metal": "f0fb45b1b23ba8f653ea5826ec12faa2caed0b005c5ca2e0375d95c42008158b"
+      },
+      "preview": {
+        "file": "crumble-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 168073,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -103,6 +175,15 @@
       "sourceSHA256": {
         "rust": "b14753947cd653b1980312987f8b2182b8409baa501126e69cf69770be44454c",
         "metal": "a944cf20075d6a4f5103344072432d10f9b12ee1da7c4f6570866d945ccf1c2c"
+      },
+      "preview": {
+        "file": "decrypt-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 1035639,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -113,6 +194,15 @@
       "sourceSHA256": {
         "rust": "0c12ee7c861bed9c0c62589eb1ddd8ba74d53593faed68bf8ab3e627a4efa068",
         "metal": "f295ac3b8c731333b46bde0e0c9bfd37036e145a14992b53eb641edecc0f227c"
+      },
+      "preview": {
+        "file": "errorcorrect-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 271894,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -123,6 +213,15 @@
       "sourceSHA256": {
         "rust": "6aaf312496c6704be99a43f3de2db7cfe4ed9bcf4c86bdf72c56d8fc01d3b556",
         "metal": "7c04474cef53887e98daa176bf4d7c1cdb3599f40d9a0e287ca1c0a973f13623"
+      },
+      "preview": {
+        "file": "expand-preview.gif",
+        "frames": 36,
+        "durationSeconds": 1.44,
+        "bytes": 103645,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -133,6 +232,15 @@
       "sourceSHA256": {
         "rust": "dc492446cb2cd444020560779746763daea1cf378644516760a77b7f34f6f12c",
         "metal": "2f5691d561dd5658c614afec0bf5995715111c867a8cb159e0c7cea42634dbd1"
+      },
+      "preview": {
+        "file": "fireworks-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 131569,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -143,6 +251,15 @@
       "sourceSHA256": {
         "rust": "33835448c83a8ac5e8bae10f8ff64a9f4fc910107793c892585c83d550441144",
         "metal": "dee57e1d313d5b089126cadb9240be805e6355e207c0ed3f4bd3b658d84a7a3d"
+      },
+      "preview": {
+        "file": "highlight-preview.gif",
+        "frames": 129,
+        "durationSeconds": 5.16,
+        "bytes": 163175,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -153,6 +270,15 @@
       "sourceSHA256": {
         "rust": "f292bc3d3a45efaf2699852bc5afc840351c6b4d2909c4307a7558afec48bfd2",
         "metal": "ea8bca07448c1811d854d529518c548d6c23945bcbc4e695a5aa3e7933909e4f"
+      },
+      "preview": {
+        "file": "laseretch-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 734782,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -163,6 +289,15 @@
       "sourceSHA256": {
         "rust": "d9a93b02921ffc39531ea55c6e43ca79839d94e238aded4b161b4af2b32bfff1",
         "metal": "a72980b269a3399d1aa8050285f47cc3a9fd4549e1e89c4efef453dcb7dcdcce"
+      },
+      "preview": {
+        "file": "matrix-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 466358,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -173,6 +308,15 @@
       "sourceSHA256": {
         "rust": "2d9a94116b86203e1a126de6e185a54b458fad91cace103717d8f7a9c0143841",
         "metal": "9c8278419092566e551015d2a5b8ddb3b017f5d777f9e114a311b913fd5a6880"
+      },
+      "preview": {
+        "file": "middleout-preview.gif",
+        "frames": 84,
+        "durationSeconds": 3.36,
+        "bytes": 231091,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -183,6 +327,15 @@
       "sourceSHA256": {
         "rust": "933b81a15518b7eebf73b5f5267ac1b716d5fd23b02bb76b914c03625c16168a",
         "metal": "d66bb1bc34b7f4931b0e2efb8bff7be4ec1672eed70eda555a37e98be26c3ca8"
+      },
+      "preview": {
+        "file": "orbittingvolley-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 411879,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -193,6 +346,15 @@
       "sourceSHA256": {
         "rust": "ded047748187374f842e0e96a134fbc386f39c81945e104082e70326d51fbaeb",
         "metal": "e5beb2ff71632dbdb48fbfe1a8579c9456c96af095624222d136a59e43f9a846"
+      },
+      "preview": {
+        "file": "overflow-preview.gif",
+        "frames": 19,
+        "durationSeconds": 0.76,
+        "bytes": 153305,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -203,6 +365,15 @@
       "sourceSHA256": {
         "rust": "f0ed6e0e0b3cdee41ea334fbce840a304be8ba22caaa7fc6db4a1ce8e8f050f6",
         "metal": "2c13adc03d4adca4bad1604fc17ae5d6ead2e7da6291bb4890e124e0f35423e1"
+      },
+      "preview": {
+        "file": "pour-preview.gif",
+        "frames": 106,
+        "durationSeconds": 4.24,
+        "bytes": 330485,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -213,6 +384,15 @@
       "sourceSHA256": {
         "rust": "0c844ca159ac4211f7f1b676755cfd7448dd877b0663c6aa12b14e5df2f590ee",
         "metal": "e02d09c64e5cc2db96735f910bf6f7bf8ddaf29bb4adabc3822cc8665290239e"
+      },
+      "preview": {
+        "file": "print-preview.gif",
+        "frames": 53,
+        "durationSeconds": 2.12,
+        "bytes": 165480,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -223,6 +403,15 @@
       "sourceSHA256": {
         "rust": "5141b1308db09a97b4b7c0b2d797df21748934fd7278affc27d26cb48799aba4",
         "metal": "a01326f61825894105a8becff711b84037d1e1358db35df5070bfe01afdb194e"
+      },
+      "preview": {
+        "file": "rain-preview.gif",
+        "frames": 76,
+        "durationSeconds": 3.04,
+        "bytes": 244041,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -233,6 +422,15 @@
       "sourceSHA256": {
         "rust": "1f64236910ccb086b896d701c14d398043dbe37dfdee63cd3b6e5c053e8d0e46",
         "metal": "c2e73a7e95f08e7ad702fbff3796eab0cdb7c87a0ec7b836ee08a185d862a9d6"
+      },
+      "preview": {
+        "file": "randomsequence-preview.gif",
+        "frames": 93,
+        "durationSeconds": 3.72,
+        "bytes": 175281,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -243,6 +441,15 @@
       "sourceSHA256": {
         "rust": "1f98ba520b8e29ae8df6f7058da50c196d289a538d84ad92b60cfbf7abc6cf00",
         "metal": "903214961974f887ae5c4aa67fe6498dbfd0c17da1e1bbd6facacf2b38f03476"
+      },
+      "preview": {
+        "file": "rings-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 277301,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -253,6 +460,15 @@
       "sourceSHA256": {
         "rust": "c2e5c43729bc72d0d61c9ff22cf255d8f995b199c05fac0b3475cbe169336842",
         "metal": "e8aaebcab22a6e16f5341391c8bf699244936665e793c73615fd8a51eb38f081"
+      },
+      "preview": {
+        "file": "scattered-preview.gif",
+        "frames": 73,
+        "durationSeconds": 2.92,
+        "bytes": 266776,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -263,6 +479,15 @@
       "sourceSHA256": {
         "rust": "af3fddce777096b301ecf1d819f36c3395bcf9e0ff9c90db162cd03c089d877f",
         "metal": "f7a9ebc8d8d01159fa7d12ffc62a21116a1d586637384d478768870e794c7642"
+      },
+      "preview": {
+        "file": "slice-preview.gif",
+        "frames": 64,
+        "durationSeconds": 2.56,
+        "bytes": 118302,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -273,6 +498,15 @@
       "sourceSHA256": {
         "rust": "670b7b9a5dab548555d960e0f8133f3d98a4f7a3bf05a01bf33d5ee8e366f45a",
         "metal": "c277d01ea9f04db67eb013f0cf29b1d817da47677b2e6a75ce6e868a0ee2062c"
+      },
+      "preview": {
+        "file": "slide-preview.gif",
+        "frames": 89,
+        "durationSeconds": 3.56,
+        "bytes": 327555,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -283,6 +517,15 @@
       "sourceSHA256": {
         "rust": "9309a44d5380c9cb8c7e3115679f27a78ec61bade9695dffc57f9cf7451af23c",
         "metal": "c73843c29ecc436f0c3606e5bac618500f51e927111dff1565d9c3c0a9cbaf91"
+      },
+      "preview": {
+        "file": "smoke-preview.gif",
+        "frames": 149,
+        "durationSeconds": 5.96,
+        "bytes": 907041,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -293,6 +536,15 @@
       "sourceSHA256": {
         "rust": "83b26ab6c801691ed9f241a6cfdfa4072c5400e1cd8c63b40b7647f78898e02f",
         "metal": "db8fe6864d8941d1fae4be528e66777487d46419750a62590a77da4af0e0d97f"
+      },
+      "preview": {
+        "file": "spotlights-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 150744,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -303,6 +555,15 @@
       "sourceSHA256": {
         "rust": "9ee48eea4ee43386f657fb9e370fcbd107b68fa534ec4885b7d3a9343b918621",
         "metal": "c58c09c30dfe74a8ebfbc7a5ae88ed323ea3182eb7ec9843ce3ac7d5969cedcd"
+      },
+      "preview": {
+        "file": "spray-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 374505,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -313,6 +574,15 @@
       "sourceSHA256": {
         "rust": "497757a6a0245ebecd5b29ba38cacf4fd6076b3484e1d70aa04b8608eac0d9cf",
         "metal": "4e467dae7c17ceadd88e36bed94edad4e826365cce38479061adb0a0e4786704"
+      },
+      "preview": {
+        "file": "swarm-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 95694,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -323,6 +593,15 @@
       "sourceSHA256": {
         "rust": "eb058a2bee6f858bf69a60b140a7cc4d26d480135a120c5fc5beff419ee92cfa",
         "metal": "7d86195171b09942dc25caca2a7741694947aab9504720d16e4043cd2e607a86"
+      },
+      "preview": {
+        "file": "sweep-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 581703,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -333,6 +612,15 @@
       "sourceSHA256": {
         "rust": "4848607080352a560527f4c2476d71bda79e351c0a73503605d3d47ede0cdb67",
         "metal": "7144319b6fac6e7eff1fcaeb3bcf1b9234ee92769a82bf1b0e63eab1a4766f32"
+      },
+      "preview": {
+        "file": "synthgrid-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 792019,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -343,6 +631,15 @@
       "sourceSHA256": {
         "rust": "0363a1a8805c58e7478703e7c53c496205440bd3014ec6031e473cfa53250382",
         "metal": "ed939c27f23c2e580d167155c25d84036e5e4e1eb27680f02de0258a4ecca365"
+      },
+      "preview": {
+        "file": "thunderstorm-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 391967,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -353,6 +650,15 @@
       "sourceSHA256": {
         "rust": "aafefbebeca2c65dbd3d9f8f029ce407781090c8bf987d8235131b96d9299151",
         "metal": "db0b13671a4a5d1eae3b6e46f9a2f7b20b3d0b4312811049f14a0d6fd25340c8"
+      },
+      "preview": {
+        "file": "unstable-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 703344,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -363,6 +669,15 @@
       "sourceSHA256": {
         "rust": "e43d97c78a23df7e449943a651f996e0a4c6e6b1dc00d3f30365d4960451f7e9",
         "metal": "f93251c71ace52c290d8123d0a263f40544e3fd7be809daa273e92a0975dd103"
+      },
+      "preview": {
+        "file": "vhstape-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 618571,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -373,6 +688,15 @@
       "sourceSHA256": {
         "rust": "8adae157c8248b0d24c111ce02991356f7c3118b0e1d864b4d75360fa85a1b4e",
         "metal": "ba6146892242e8603af4a56244736b45ebbe0d92189541bd621111381345b343"
+      },
+      "preview": {
+        "file": "waves-preview.gif",
+        "frames": 150,
+        "durationSeconds": 6.0,
+        "bytes": 821933,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     },
     {
@@ -383,7 +707,22 @@
       "sourceSHA256": {
         "rust": "227ce001194134da4936006437ca05e2e2c8e22541260e6031e7353db0e1df12",
         "metal": "5709255f885ef1557cae31ccdc29da4f0dec16b94b852f6904a4188cae2e5239"
+      },
+      "preview": {
+        "file": "wipe-preview.gif",
+        "frames": 138,
+        "durationSeconds": 5.52,
+        "bytes": 265241,
+        "width": 576,
+        "height": 174,
+        "fullDecode": "passed"
       }
     }
-  ]
+  ],
+  "inlinePreviews": {
+    "description": "First at most six seconds of each full comparison, original 25 fps; GIF centisecond timing is exact at 40 ms per frame; scaled to 576 x 174; infinite preview loop does not change source effect playback.",
+    "encoding": "FFmpeg scale lanczos; palettegen/paletteuse; loop 0",
+    "validation": "37 previews: expected min(source frames, 150), 576 x 174 dimensions, original duration and full error-fatal decode passed.",
+    "totalBytes": 15903970
+  }
 }

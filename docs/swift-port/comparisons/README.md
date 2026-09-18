@@ -1,7 +1,7 @@
 # Rust versus Swift Metal video comparisons
 
 These 37 full-length videos place **Rust on the left** and **Swift Metal on the right**.
-The README features a six-second `decrypt-preview.gif` excerpt; `decrypt.mp4` contains the full animation.
+The root README displays all 37 labeled GIF previews inline. Each is the first at most six seconds at the original 25 fps, scaled to 576 × 174. Shorter effects appear in full; the MP4 files retain each complete animation.
 
 ## What was recorded
 
@@ -31,9 +31,11 @@ for dir in artifacts/video-comparison/*/; do
     -pix_fmt yuv420p -movflags +faststart \
     "docs/swift-port/comparisons/$effect.mp4"
 done
-ffmpeg -v error -y -i docs/swift-port/comparisons/decrypt.mp4 -t 6 \
-  -filter_complex '[0:v]split[a][b];[a]palettegen[p];[b][p]paletteuse' \
-  -loop 0 docs/swift-port/comparisons/decrypt-preview.gif
+for video in docs/swift-port/comparisons/*.mp4; do
+  ffmpeg -v error -y -i "$video" -t 6 \
+    -filter_complex '[0:v]scale=576:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse' \
+    -loop 0 "${video%.mp4}-preview.gif"
+done
 ```
 
 Before stacking, verify source pairs have identical fps, frame counts and duration; `shortest=1` is safe for this captured set only. For a future mismatched set, resolve the mismatch rather than silently truncating either track. Reuse the tracked label strip (Arial 18, white text, dark background); no `drawtext` support is required.
@@ -47,4 +49,6 @@ ffprobe -v error -count_frames -show_streams -of json docs/swift-port/comparison
 ffmpeg -v error -xerror -i docs/swift-port/comparisons/decrypt.mp4 -f null -
 ```
 
-Relative MP4 links allow opening/downloading the full comparison. GitHub README inline MP4 playback is not assumed or verified; the animated GIF is the inline preview. Original capture artifacts remain ignored and are not duplicated in this folder.
+Relative MP4 links allow opening/downloading the full comparison. GitHub README inline MP4 playback is not assumed or verified; the 37 animated GIFs provide inline previews. GIF timing uses 40 ms per frame, representing 25 fps exactly; preview looping does not imply the source effect loops. The preview catalog adds a download cost; `provenance.json` records actual per-file and total sizes. Original capture artifacts remain ignored and are not duplicated in this folder.
+
+All 37 GIF previews passed dimensions, expected frame count (`min(source frames, 150)`), duration (`frames / 25`) and complete error-fatal decoding. No source frames were interpolated or sped up. GIF scaling/palette encoding remains lossy. GitHub-hosted rendering is not independently verified.

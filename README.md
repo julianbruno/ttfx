@@ -1,4 +1,7 @@
-# ttfx
+# ttfx — native Swift port of Rust ttfx
+
+A work-in-progress **Swift port of the Rust ttfx version**, itself a parity port of Python TerminalTextEffects.
+The animations below compare actual Rust output with the native Swift engine rendered through Metal.
 
 ## Rust versus Swift Metal — decrypt
 
@@ -30,8 +33,6 @@ fortune | ttfx --random-effect
 git log --oneline -10 | ttfx matrix
 ```
 
-<img src="docs/effects/decrypt.gif" width="588" alt="the decrypt effect resolving the Omarchy logo">
-
 ## Credit where it's due
 
 **The art and behavior begin upstream with [TerminalTextEffects](https://github.com/ChrisBuilds/terminaltexteffects)
@@ -50,7 +51,7 @@ Rust binary as its local oracle, and the Rust binary traces back to TTE.
 TTE is MIT licensed and so are these ports; the original copyright is preserved in
 [LICENSE](LICENSE) and [NOTICE](NOTICE). Please file *effect* ideas upstream, where they belong.
 
-## Why a port
+## Rust background: why a port
 
 TTE is a Python package. That's the right call for a library, but for a shell toy that lives in
 your prompt pipeline it means an interpreter, an install step, and ~65 ms of import before the
@@ -78,39 +79,7 @@ Reproduce it with `python3 tools/tests/bench_full.py`, or set `TTFX_BENCH_COLS`,
 and `TTFX_BENCH_FILL=1` for the fullscreen numbers above. Both sides run their real user-facing
 command, best of five.
 
-## The effects
-
-All 37, each animating the Omarchy logo. Every frame below came out of the Rust binary — and is
-byte-identical to what the Python original produces from the same input and seed.
-
-|     |     |
-|:---:|:---:|
-| <b>beams</b><br><img src="docs/effects/beams.gif" width="400" alt="beams"><br><sub>Create beams which travel over the canvas illuminating the characters behind them</sub> | <b>binarypath</b><br><img src="docs/effects/binarypath.gif" width="400" alt="binarypath"><br><sub>Binary representations of each character move towards the home coordinate of the character</sub> |
-| <b>blackhole</b><br><img src="docs/effects/blackhole.gif" width="400" alt="blackhole"><br><sub>Characters are consumed by a black hole and explode outwards</sub> | <b>bouncyballs</b><br><img src="docs/effects/bouncyballs.gif" width="400" alt="bouncyballs"><br><sub>Characters are bouncy balls falling from the top of the canvas</sub> |
-| <b>bubbles</b><br><img src="docs/effects/bubbles.gif" width="400" alt="bubbles"><br><sub>Characters are formed into bubbles that float down and pop</sub> | <b>burn</b><br><img src="docs/effects/burn.gif" width="400" alt="burn"><br><sub>Burns vertically in the canvas</sub> |
-| <b>colorshift</b><br><img src="docs/effects/colorshift.gif" width="400" alt="colorshift"><br><sub>Display a gradient that shifts colors across the terminal</sub> | <b>crumble</b><br><img src="docs/effects/crumble.gif" width="400" alt="crumble"><br><sub>Characters lose color and crumble into dust, vacuumed up, and reformed</sub> |
-| <b>decrypt</b><br><img src="docs/effects/decrypt.gif" width="400" alt="decrypt"><br><sub>Display a movie style decryption effect</sub> | <b>errorcorrect</b><br><img src="docs/effects/errorcorrect.gif" width="400" alt="errorcorrect"><br><sub>Some characters start in the wrong position and are corrected in sequence</sub> |
-| <b>expand</b><br><img src="docs/effects/expand.gif" width="400" alt="expand"><br><sub>Expands the text from a single point</sub> | <b>fireworks</b><br><img src="docs/effects/fireworks.gif" width="400" alt="fireworks"><br><sub>Characters launch and explode like fireworks and fall into place</sub> |
-| <b>highlight</b><br><img src="docs/effects/highlight.gif" width="400" alt="highlight"><br><sub>Run a specular highlight across the text</sub> | <b>laseretch</b><br><img src="docs/effects/laseretch.gif" width="400" alt="laseretch"><br><sub>A laser etches characters onto the terminal</sub> |
-| <b>matrix</b><br><img src="docs/effects/matrix.gif" width="400" alt="matrix"><br><sub>Matrix digital rain effect</sub> | <b>middleout</b><br><img src="docs/effects/middleout.gif" width="400" alt="middleout"><br><sub>Text expands in a single row or column in the middle of the canvas then out</sub> |
-| <b>orbittingvolley</b><br><img src="docs/effects/orbittingvolley.gif" width="400" alt="orbittingvolley"><br><sub>Four launchers orbit the canvas firing volleys of characters inward to build the input text from the center out</sub> | <b>overflow</b><br><img src="docs/effects/overflow.gif" width="400" alt="overflow"><br><sub>Input text overflows and scrolls the terminal in a random order until eventually appearing ordered</sub> |
-| <b>pour</b><br><img src="docs/effects/pour.gif" width="400" alt="pour"><br><sub>Pours the characters into position from the given direction</sub> | <b>print</b><br><img src="docs/effects/print.gif" width="400" alt="print"><br><sub>Lines are printed one at a time following a print head. Print head performs line feed, carriage return</sub> |
-| <b>rain</b><br><img src="docs/effects/rain.gif" width="400" alt="rain"><br><sub>Rain characters from the top of the canvas</sub> | <b>randomsequence</b><br><img src="docs/effects/randomsequence.gif" width="400" alt="randomsequence"><br><sub>Prints the input data in a random sequence</sub> |
-| <b>rings</b><br><img src="docs/effects/rings.gif" width="400" alt="rings"><br><sub>Characters are dispersed and form into spinning rings</sub> | <b>scattered</b><br><img src="docs/effects/scattered.gif" width="400" alt="scattered"><br><sub>Text is scattered across the canvas and moves into position</sub> |
-| <b>slice</b><br><img src="docs/effects/slice.gif" width="400" alt="slice"><br><sub>Slices the input in half and slides it into place from opposite directions</sub> | <b>slide</b><br><img src="docs/effects/slide.gif" width="400" alt="slide"><br><sub>Slide characters into view from outside the terminal</sub> |
-| <b>smoke</b><br><img src="docs/effects/smoke.gif" width="400" alt="smoke"><br><sub>Smoke floods the canvas colorizing any characters it crosses</sub> | <b>spotlights</b><br><img src="docs/effects/spotlights.gif" width="400" alt="spotlights"><br><sub>Spotlights search the text area, illuminating characters, before converging in the center and expanding</sub> |
-| <b>spray</b><br><img src="docs/effects/spray.gif" width="400" alt="spray"><br><sub>Draws the characters spawning at varying rates from a single point</sub> | <b>swarm</b><br><img src="docs/effects/swarm.gif" width="400" alt="swarm"><br><sub>Characters are grouped into swarms and move around the terminal before settling into position</sub> |
-| <b>sweep</b><br><img src="docs/effects/sweep.gif" width="400" alt="sweep"><br><sub>Sweep across the canvas to reveal uncolored text, reverse sweep to color the text</sub> | <b>synthgrid</b><br><img src="docs/effects/synthgrid.gif" width="400" alt="synthgrid"><br><sub>Create a grid which fills with characters dissolving into the final text</sub> |
-| <b>thunderstorm</b><br><img src="docs/effects/thunderstorm.gif" width="400" alt="thunderstorm"><br><sub>Create a thunderstorm in the terminal</sub> | <b>unstable</b><br><img src="docs/effects/unstable.gif" width="400" alt="unstable"><br><sub>Spawn characters jumbled, explode them to the edge of the canvas, then reassemble them in the correct layout</sub> |
-| <b>vhstape</b><br><img src="docs/effects/vhstape.gif" width="400" alt="vhstape"><br><sub>Lines of characters glitch left and right and lose detail like an old VHS tape</sub> | <b>waves</b><br><img src="docs/effects/waves.gif" width="400" alt="waves"><br><sub>Waves travel across the terminal leaving behind the characters</sub> |
-| <b>wipe</b><br><img src="docs/effects/wipe.gif" width="400" alt="wipe"><br><sub>Wipes the text across the terminal to reveal characters</sub> |  |
-
-Every effect takes its own options — `ttfx <effect> --help`. A few of the GIFs above shorten a
-timed phase so the loop stays watchable (`matrix --rain-time 3`, `thunderstorm --storm-time 3`,
-`vhstape --total-glitch-time 250`, `spotlights --search-duration 80`, `errorcorrect
---error-pairs 0.5`); everything else is stock.
-
-## Fidelity
+## Rust fidelity
 
 This is a *parity port*, not a reimplementation-in-spirit. Given the same input, config, and
 random draws, ttfx produces **byte-identical frames** to the Python original — verified
@@ -331,7 +300,7 @@ specification's T01–T08 remain pending; macOS evidence does not certify Window
 |---|---|
 | Core/effects | Native Swift core plus all 37 effect counterparts; measured full-run default cases are scoped above, not every configuration. |
 | CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. All 37 have parity-dump smoke coverage; the 37 existing CLI capture pairs match exactly for their recorded sample. Complete terminal/CLI parity remains pending. |
-| SwiftUI/Metal | Optional `TTFXSwiftUI` library plus `TTFXGalleryApp.xcodeproj` for macOS and iOS Simulator. Headless CI proves command planning; visual Metal presentation still needs an interactive check. |
+| SwiftUI/Metal | Optional `TTFXSwiftUI` library plus `TTFXGalleryApp.xcodeproj` for macOS and iOS Simulator. Production Metal presentation is implemented; local interactive gallery/comparison checks are recorded in the Swift port docs. Headless CI proves command planning, not visual appearance. |
 | Product scope | The Rust binary remains the production authority in this README. The Swift port is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
 
 ```sh
@@ -359,46 +328,229 @@ TerminalTextEffects copyright, and [NOTICE](NOTICE) for the attribution in full.
 
 ## All 37 Rust versus Metal comparisons
 
-Full animations at 25 fps, with permanent **Rust left / Swift Metal right** labels.
-These use the same small seeded input as the featured comparison, not the Rust-only Omarchy GIFs above.
-[Provenance, scope, and regeneration](docs/swift-port/comparisons/README.md).
+**Rust left · Swift Metal right**, displayed inline below. Each labeled GIF is the first **up to six seconds**
+of a real captured animation at its original **25 fps**, looping only for the preview. Shorter effects are shown
+in full; longer effects have a secondary full-length MP4 link. These are seeded visual samples, not universal
+parity proof. [Provenance, scope, and regeneration](docs/swift-port/comparisons/README.md).
 
-| Effect | Full comparison |
-|---|---|
-| `beams` | [beams — Rust vs Metal](docs/swift-port/comparisons/beams.mp4) |
-| `binarypath` | [binarypath — Rust vs Metal](docs/swift-port/comparisons/binarypath.mp4) |
-| `blackhole` | [blackhole — Rust vs Metal](docs/swift-port/comparisons/blackhole.mp4) |
-| `bouncyballs` | [bouncyballs — Rust vs Metal](docs/swift-port/comparisons/bouncyballs.mp4) |
-| `bubbles` | [bubbles — Rust vs Metal](docs/swift-port/comparisons/bubbles.mp4) |
-| `burn` | [burn — Rust vs Metal](docs/swift-port/comparisons/burn.mp4) |
-| `colorshift` | [colorshift — Rust vs Metal](docs/swift-port/comparisons/colorshift.mp4) |
-| `crumble` | [crumble — Rust vs Metal](docs/swift-port/comparisons/crumble.mp4) |
-| `decrypt` | [decrypt — Rust vs Metal](docs/swift-port/comparisons/decrypt.mp4) |
-| `errorcorrect` | [errorcorrect — Rust vs Metal](docs/swift-port/comparisons/errorcorrect.mp4) |
-| `expand` | [expand — Rust vs Metal](docs/swift-port/comparisons/expand.mp4) |
-| `fireworks` | [fireworks — Rust vs Metal](docs/swift-port/comparisons/fireworks.mp4) |
-| `highlight` | [highlight — Rust vs Metal](docs/swift-port/comparisons/highlight.mp4) |
-| `laseretch` | [laseretch — Rust vs Metal](docs/swift-port/comparisons/laseretch.mp4) |
-| `matrix` | [matrix — Rust vs Metal](docs/swift-port/comparisons/matrix.mp4) |
-| `middleout` | [middleout — Rust vs Metal](docs/swift-port/comparisons/middleout.mp4) |
-| `orbittingvolley` | [orbittingvolley — Rust vs Metal](docs/swift-port/comparisons/orbittingvolley.mp4) |
-| `overflow` | [overflow — Rust vs Metal](docs/swift-port/comparisons/overflow.mp4) |
-| `pour` | [pour — Rust vs Metal](docs/swift-port/comparisons/pour.mp4) |
-| `print` | [print — Rust vs Metal](docs/swift-port/comparisons/print.mp4) |
-| `rain` | [rain — Rust vs Metal](docs/swift-port/comparisons/rain.mp4) |
-| `randomsequence` | [randomsequence — Rust vs Metal](docs/swift-port/comparisons/randomsequence.mp4) |
-| `rings` | [rings — Rust vs Metal](docs/swift-port/comparisons/rings.mp4) |
-| `scattered` | [scattered — Rust vs Metal](docs/swift-port/comparisons/scattered.mp4) |
-| `slice` | [slice — Rust vs Metal](docs/swift-port/comparisons/slice.mp4) |
-| `slide` | [slide — Rust vs Metal](docs/swift-port/comparisons/slide.mp4) |
-| `smoke` | [smoke — Rust vs Metal](docs/swift-port/comparisons/smoke.mp4) |
-| `spotlights` | [spotlights — Rust vs Metal](docs/swift-port/comparisons/spotlights.mp4) |
-| `spray` | [spray — Rust vs Metal](docs/swift-port/comparisons/spray.mp4) |
-| `swarm` | [swarm — Rust vs Metal](docs/swift-port/comparisons/swarm.mp4) |
-| `sweep` | [sweep — Rust vs Metal](docs/swift-port/comparisons/sweep.mp4) |
-| `synthgrid` | [synthgrid — Rust vs Metal](docs/swift-port/comparisons/synthgrid.mp4) |
-| `thunderstorm` | [thunderstorm — Rust vs Metal](docs/swift-port/comparisons/thunderstorm.mp4) |
-| `unstable` | [unstable — Rust vs Metal](docs/swift-port/comparisons/unstable.mp4) |
-| `vhstape` | [vhstape — Rust vs Metal](docs/swift-port/comparisons/vhstape.mp4) |
-| `waves` | [waves — Rust vs Metal](docs/swift-port/comparisons/waves.mp4) |
-| `wipe` | [wipe — Rust vs Metal](docs/swift-port/comparisons/wipe.mp4) |
+### beams
+
+![beams animation: Rust left, Swift Metal right](docs/swift-port/comparisons/beams-preview.gif)
+
+[Full beams comparison](docs/swift-port/comparisons/beams.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### binarypath
+
+![binarypath animation: Rust left, Swift Metal right](docs/swift-port/comparisons/binarypath-preview.gif)
+
+[Full binarypath comparison](docs/swift-port/comparisons/binarypath.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### blackhole
+
+![blackhole animation: Rust left, Swift Metal right](docs/swift-port/comparisons/blackhole-preview.gif)
+
+[Full blackhole comparison](docs/swift-port/comparisons/blackhole.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### bouncyballs
+
+![bouncyballs animation: Rust left, Swift Metal right](docs/swift-port/comparisons/bouncyballs-preview.gif)
+
+[Full bouncyballs comparison](docs/swift-port/comparisons/bouncyballs.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### bubbles
+
+![bubbles animation: Rust left, Swift Metal right](docs/swift-port/comparisons/bubbles-preview.gif)
+
+[Full bubbles comparison](docs/swift-port/comparisons/bubbles.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### burn
+
+![burn animation: Rust left, Swift Metal right](docs/swift-port/comparisons/burn-preview.gif)
+
+[Full burn comparison](docs/swift-port/comparisons/burn.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### colorshift
+
+![colorshift animation: Rust left, Swift Metal right](docs/swift-port/comparisons/colorshift-preview.gif)
+
+[Full colorshift comparison](docs/swift-port/comparisons/colorshift.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### crumble
+
+![crumble animation: Rust left, Swift Metal right](docs/swift-port/comparisons/crumble-preview.gif)
+
+[Full crumble comparison](docs/swift-port/comparisons/crumble.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### decrypt
+
+![decrypt animation: Rust left, Swift Metal right](docs/swift-port/comparisons/decrypt-preview.gif)
+
+[Full decrypt comparison](docs/swift-port/comparisons/decrypt.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### errorcorrect
+
+![errorcorrect animation: Rust left, Swift Metal right](docs/swift-port/comparisons/errorcorrect-preview.gif)
+
+[Full errorcorrect comparison](docs/swift-port/comparisons/errorcorrect.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### expand
+
+![expand animation: Rust left, Swift Metal right](docs/swift-port/comparisons/expand-preview.gif)
+
+[Full expand comparison](docs/swift-port/comparisons/expand.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### fireworks
+
+![fireworks animation: Rust left, Swift Metal right](docs/swift-port/comparisons/fireworks-preview.gif)
+
+[Full fireworks comparison](docs/swift-port/comparisons/fireworks.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### highlight
+
+![highlight animation: Rust left, Swift Metal right](docs/swift-port/comparisons/highlight-preview.gif)
+
+[Full highlight comparison](docs/swift-port/comparisons/highlight.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### laseretch
+
+![laseretch animation: Rust left, Swift Metal right](docs/swift-port/comparisons/laseretch-preview.gif)
+
+[Full laseretch comparison](docs/swift-port/comparisons/laseretch.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### matrix
+
+![matrix animation: Rust left, Swift Metal right](docs/swift-port/comparisons/matrix-preview.gif)
+
+[Full matrix comparison](docs/swift-port/comparisons/matrix.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### middleout
+
+![middleout animation: Rust left, Swift Metal right](docs/swift-port/comparisons/middleout-preview.gif)
+
+[Full middleout comparison](docs/swift-port/comparisons/middleout.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### orbittingvolley
+
+![orbittingvolley animation: Rust left, Swift Metal right](docs/swift-port/comparisons/orbittingvolley-preview.gif)
+
+[Full orbittingvolley comparison](docs/swift-port/comparisons/orbittingvolley.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### overflow
+
+![overflow animation: Rust left, Swift Metal right](docs/swift-port/comparisons/overflow-preview.gif)
+
+[Full overflow comparison](docs/swift-port/comparisons/overflow.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### pour
+
+![pour animation: Rust left, Swift Metal right](docs/swift-port/comparisons/pour-preview.gif)
+
+[Full pour comparison](docs/swift-port/comparisons/pour.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### print
+
+![print animation: Rust left, Swift Metal right](docs/swift-port/comparisons/print-preview.gif)
+
+[Full print comparison](docs/swift-port/comparisons/print.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### rain
+
+![rain animation: Rust left, Swift Metal right](docs/swift-port/comparisons/rain-preview.gif)
+
+[Full rain comparison](docs/swift-port/comparisons/rain.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### randomsequence
+
+![randomsequence animation: Rust left, Swift Metal right](docs/swift-port/comparisons/randomsequence-preview.gif)
+
+[Full randomsequence comparison](docs/swift-port/comparisons/randomsequence.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### rings
+
+![rings animation: Rust left, Swift Metal right](docs/swift-port/comparisons/rings-preview.gif)
+
+[Full rings comparison](docs/swift-port/comparisons/rings.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### scattered
+
+![scattered animation: Rust left, Swift Metal right](docs/swift-port/comparisons/scattered-preview.gif)
+
+[Full scattered comparison](docs/swift-port/comparisons/scattered.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### slice
+
+![slice animation: Rust left, Swift Metal right](docs/swift-port/comparisons/slice-preview.gif)
+
+[Full slice comparison](docs/swift-port/comparisons/slice.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### slide
+
+![slide animation: Rust left, Swift Metal right](docs/swift-port/comparisons/slide-preview.gif)
+
+[Full slide comparison](docs/swift-port/comparisons/slide.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### smoke
+
+![smoke animation: Rust left, Swift Metal right](docs/swift-port/comparisons/smoke-preview.gif)
+
+[Full smoke comparison](docs/swift-port/comparisons/smoke.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### spotlights
+
+![spotlights animation: Rust left, Swift Metal right](docs/swift-port/comparisons/spotlights-preview.gif)
+
+[Full spotlights comparison](docs/swift-port/comparisons/spotlights.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### spray
+
+![spray animation: Rust left, Swift Metal right](docs/swift-port/comparisons/spray-preview.gif)
+
+[Full spray comparison](docs/swift-port/comparisons/spray.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### swarm
+
+![swarm animation: Rust left, Swift Metal right](docs/swift-port/comparisons/swarm-preview.gif)
+
+[Full swarm comparison](docs/swift-port/comparisons/swarm.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### sweep
+
+![sweep animation: Rust left, Swift Metal right](docs/swift-port/comparisons/sweep-preview.gif)
+
+[Full sweep comparison](docs/swift-port/comparisons/sweep.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### synthgrid
+
+![synthgrid animation: Rust left, Swift Metal right](docs/swift-port/comparisons/synthgrid-preview.gif)
+
+[Full synthgrid comparison](docs/swift-port/comparisons/synthgrid.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### thunderstorm
+
+![thunderstorm animation: Rust left, Swift Metal right](docs/swift-port/comparisons/thunderstorm-preview.gif)
+
+[Full thunderstorm comparison](docs/swift-port/comparisons/thunderstorm.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### unstable
+
+![unstable animation: Rust left, Swift Metal right](docs/swift-port/comparisons/unstable-preview.gif)
+
+[Full unstable comparison](docs/swift-port/comparisons/unstable.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### vhstape
+
+![vhstape animation: Rust left, Swift Metal right](docs/swift-port/comparisons/vhstape-preview.gif)
+
+[Full vhstape comparison](docs/swift-port/comparisons/vhstape.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### waves
+
+![waves animation: Rust left, Swift Metal right](docs/swift-port/comparisons/waves-preview.gif)
+
+[Full waves comparison](docs/swift-port/comparisons/waves.mp4) · Inline preview: up to 6 seconds, original speed.
+
+### wipe
+
+![wipe animation: Rust left, Swift Metal right](docs/swift-port/comparisons/wipe-preview.gif)
+
+[Full wipe comparison](docs/swift-port/comparisons/wipe.mp4) · Inline preview: up to 6 seconds, original speed.
