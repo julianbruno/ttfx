@@ -59,11 +59,20 @@ struct ComparisonRootView: View {
                         Button { player.isPlaying ? player.pause() : player.play() } label: {
                             Label(player.isPlaying ? "Pause" : "Play", systemImage: player.isPlaying ? "pause.fill" : "play.fill")
                         }.keyboardShortcut(.space, modifiers: [])
+                        Picker("Speed", selection: Binding(get: { player.playbackSpeed }, set: { player.setPlaybackSpeed($0) })) {
+                            ForEach(ComparisonPlayer.playbackSpeeds, id: \.self) { speed in
+                                Text("\(speed.formatted())×").tag(speed)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                        .accessibilityLabel("Playback speed")
+                        .help("Change playback speed for all videos, including hidden panes")
                         Slider(value: Binding(get: { player.position }, set: { player.seek($0) }), in: 0...max(0.001, player.duration))
                         Text(String(format: "%.2f / %.2f s", player.position, player.duration))
                             .monospacedDigit().frame(width: 130, alignment: .trailing)
                     }
-                    Text("All present videos use the same timeline. Shorter videos hold their final frame; durations are never stretched.")
+                    Text("All present videos use the same timeline. Shorter videos hold their final frame; times show source-media seconds.")
                         .font(.caption).foregroundStyle(.secondary)
                     Divider()
                     HStack(alignment: .top) {

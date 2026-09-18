@@ -25,4 +25,14 @@ Revert only speed state/rebase/picker/tests/guide additions; keep prior toggle/s
 - REFACTOR: extracted shared scheduling and pure media-position calculation; tests green.
 - RDD disabled; ordinary verification, no review lifecycle.
 - Runtime rollback: remove speed state/rebase/scheduling additions and their tests, leaving footer and prior UX intact.
-- S01 commit: recorded in S02 evidence after commit creation.
+- S01 commit: `d32cea1` (124 additions, 8 deletions including task document); footer checkpoint `94d55a0`.
+
+## S02 implementation and checks
+- Native menu picker beside Play offers eight labeled speeds with accessibility label and help; shared selected state drives validated setter. Guide updated with paused/live semantics and source-media time meaning.
+- `swift test --filter TTFXComparisonTests`: 23 passed after UI wiring.
+- `swift build --product TTFXComparisonApp`: passed.
+- `./script/build_and_run.sh --compare --verify`: exit 0; app launched for parent UI smoke.
+- `git diff --check`: passed.
+- Parent actual UI smoke pending; no visual or VoiceOver result claimed by writer. S02 remains open until parent observation.
+- Rollback: revert picker/caption/guide additions only; runtime can be separately reverted via S01.
+- Next step: parent UI smoke and independent verification, then update full Engram mirror. No push/merge/PR performed.
