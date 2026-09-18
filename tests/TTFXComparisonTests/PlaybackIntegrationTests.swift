@@ -144,3 +144,17 @@ private var generatedComparisonLibraryExists: Bool {
     #expect(!player.isPlaying)
     player.clear()
 }
+
+@Test @MainActor func slowingAtEndpointKeepsFinalPositionBeforeTimerUpdate() {
+    // Simulate the clock reaching the endpoint before the next timer tick.
+    let player = ComparisonPlayer(uptime: { 1 })
+    let video = ComparisonVideo(path: "unused.mp4", frames: 75, completed: true, provenance: "test")
+    player.effect = .init(name: "endpoint", rust: video, swiftUI: video, swiftCLI: video, metal: video)
+    player.setPlaybackSpeed(3)
+    player.isPlaying = true
+    player.setPlaybackSpeed(0.5)
+    #expect(player.position == 3)
+    #expect(player.playbackSpeed == 0.5)
+    #expect(!player.isPlaying)
+    #expect([player.rust, player.swiftCLI, player.swiftUI, player.metal].allSatisfy { $0.rate == 0 })
+}

@@ -36,3 +36,14 @@ Revert only speed state/rebase/picker/tests/guide additions; keep prior toggle/s
 - Parent actual UI smoke pending; no visual or VoiceOver result claimed by writer. S02 remains open until parent observation.
 - Rollback: revert picker/caption/guide additions only; runtime can be separately reverted via S01.
 - Next step: parent UI smoke and independent verification, then update full Engram mirror. No push/merge/PR performed.
+
+## TDD evidence and endpoint correction
+- Initial RED: speed tests failed for missing speed state/setter/media-clock APIs; GREEN: 23 tests. REFACTOR: shared scheduling and pure media-position calculation.
+- Independent verification found endpoint ordering: an old-rate snapshot at duration was recomputed by pause with the new slower rate against the old anchor, moving position backward.
+- Regression `slowingAtEndpointKeepsFinalPositionBeforeTimerUpdate`: minimal injected uptime fixes elapsed at 1 second with duration 3 and old speed 3×. Observed RED: `player.position` was 0.5 instead of 3; 24 tests failed with one issue. A test argument-order typo was corrected before this behavioral RED.
+- Fix: pause at the sampled endpoint while the old speed is still active, then assign the new speed. No reschedule or auto-play at the endpoint.
+- GREEN: `swift test --filter TTFXComparisonTests` passed 24 tests, including deterministic regression and generated four-track integration. `swift build --product TTFXComparisonApp` passed; `git diff --check` passed.
+- REFACTOR: the injected uptime closure defaults to real monotonic uptime; no new dependencies or scheduling abstraction.
+- UI commit: `b938822`. Parent observed actual active 0.5×→3× picker change and paused 1× change preserving position; VoiceOver narration and every shorter-track/rate combination remain untested.
+- TDD guide: `docs/swift-port/video-comparison-tdd.md`; historical toggle/selector RED/GREEN are attributed to their existing task records, footer removal is explicitly diff-only.
+- Correction commit identity and final independent verification: parent records after commit. No remote operation.

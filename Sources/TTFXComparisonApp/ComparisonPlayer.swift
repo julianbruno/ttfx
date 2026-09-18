@@ -18,7 +18,9 @@ import TTFXComparisonKit
     private var startedAt: TimeInterval = 0
     private var startPosition = 0.0
     private var timer: Timer?
-    init() {
+    private let uptime: () -> TimeInterval
+    init(uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
+        self.uptime = uptime
         // Scheduled host-clock playback requires disabling AVPlayer's automatic stall waits.
         // Otherwise setRate(time:atHostTime:) raises an Objective-C exception mid-action.
         rust.automaticallyWaitsToMinimizeStalling = false
@@ -68,24 +70,25 @@ import TTFXComparisonKit
     }
     func setPlaybackSpeed(_ speed: Double) {
         guard speed.isFinite, (0.5...3).contains(speed), speed != playbackSpeed else { return }
-        if isPlaying { position = clockPosition() }
-        playbackSpeed = speed
         if isPlaying {
+            position = clockPosition()
+            // Stop at the old-rate endpoint before changing the clock scale.
             if position >= duration { pause() }
-            else { schedulePlayback() }
         }
+        playbackSpeed = speed
+        if isPlaying { schedulePlayback() }
     }
     nonisolated static func mediaPosition(start: Double, elapsed: Double, speed: Double, duration: Double) -> Double {
         min(duration, start + max(0, elapsed) * speed)
     }
     private func clockPosition() -> Double {
-        Self.mediaPosition(start: startPosition, elapsed: ProcessInfo.processInfo.systemUptime - startedAt, speed: playbackSpeed, duration: duration)
+        Self.mediaPosition(start: startPosition, elapsed: uptime() - startedAt, speed: playbackSpeed, duration: duration)
     }
     private func schedulePlayback() {
         startPosition = position
         // All present players use the same host-clock deadline.
         let hostTime = CMClockGetTime(CMClockGetHostTimeClock()) + CMTime(seconds: 0.1, preferredTimescale: 600)
-        startedAt = ProcessInfo.processInfo.systemUptime + 0.1
+        startedAt = uptime() + 0.1
         start(rust, video: effect!.rust, hostTime: hostTime)
         if let video = effect!.swiftCLI { start(swiftCLI, video: video, hostTime: hostTime) }
         if let video = effect!.swiftUI { start(swiftUI, video: video, hostTime: hostTime) }

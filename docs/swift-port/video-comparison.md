@@ -166,6 +166,8 @@ All 148 videos passed ffprobe frame-count, dimensions, and FPS checks plus full 
 
 ## Related docs
 
+- [Video comparison TDD evidence](video-comparison-tdd.md)
+
 - [How TTFX video comparison recordings are made](video-recording.md)
 - [Video comparison schemas](video-comparison-schemas.md)
 - [Metal toolchain for the Swift port](metal-toolchain.md)
