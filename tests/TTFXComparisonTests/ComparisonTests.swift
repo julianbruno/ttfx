@@ -176,3 +176,28 @@ import Foundation
     #expect(cli.detail.contains("ANSI"))
     #expect(ui.detail.contains("fallback"))
 }
+
+@Test func selectorFiltersTrimmedQueryWithoutChangingRegistryIDsOrOrder() {
+    let names = ["print", "waves", "wave", "rings"]
+    let selector = ComparisonEffectSelector(names: names, effects: [])
+    #expect(selector.filtered("  WaV  ").map(\.id) == ["waves", "wave"])
+    #expect(selector.filtered(" \n ").map(\.id) == names)
+    #expect(selector.filtered("unknown").isEmpty)
+    #expect(selector.summary(query: "wav") == "2 of 4 effects · 0 recorded")
+    #expect(selector.acceptsSelection(nil, query: "wav") == false)
+    #expect(selector.acceptsSelection("print", query: "wav") == false)
+    #expect(selector.acceptsSelection("waves", query: "wav") == true)
+}
+
+@Test func selectorDistinguishesMissingPartialAndLimitedRecordings() {
+    let video = ComparisonVideo(path: "test.mp4", frames: 10, completed: true, provenance: "test")
+    var limited = video; limited.completed = false
+    let effects = [
+        ComparisonEffect(name: "print", rust: video, swiftUI: video, swiftCLI: video, metal: video),
+        ComparisonEffect(name: "rings", rust: limited, metal: video),
+        ComparisonEffect(name: "wave", rust: video, metal: video)
+    ]
+    let selector = ComparisonEffectSelector(names: ["print", "rings", "wave", "waves"], effects: effects)
+    #expect(selector.filtered("").map(\.status) == ["Recorded · 4 tracks", "Capture limited · 2 tracks", "Recorded · 2 tracks", "Not recorded"])
+    #expect(selector.summary(query: " WAVE ") == "2 of 4 effects · 1 recorded")
+}

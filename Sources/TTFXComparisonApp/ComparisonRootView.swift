@@ -9,12 +9,10 @@ struct ComparisonRootView: View {
     @State private var manifest: ComparisonManifest?
     @State private var directory: URL?
     @State private var selection: String? = "print"
-    @State private var search = ""
     @State private var error: String?
     @SceneStorage("comparison.showSwiftCLI") private var showSwiftCLI = true
     @SceneStorage("comparison.showSwiftUI") private var showSwiftUI = true
     @State private var player = ComparisonPlayer()
-    private var names: [String] { EffectRegistry.names.filter { search.isEmpty || $0.localizedCaseInsensitiveContains(search) } }
     var body: some View {
         GeometryReader { geometry in
             splitView.frame(width: geometry.size.width, height: geometry.size.height)
@@ -23,22 +21,10 @@ struct ComparisonRootView: View {
     }
     private var splitView: some View {
         NavigationSplitView {
-            List(names, id: \.self, selection: $selection) { name in
-                HStack {
-                    Text(name)
-                    Spacer()
-                    if manifest?.effects.contains(where: { $0.name == name }) == true {
-                        Image(systemName: "film").foregroundStyle(.secondary)
-                    }
-                }.tag(name)
-            }
-            .navigationTitle("Effects")
-            .searchable(text: $search)
-            .safeAreaInset(edge: .bottom) {
-                Text("\(manifest?.effects.count ?? 0) / \(EffectRegistry.names.count) video sets")
-                    .font(.caption).foregroundStyle(.secondary).padding()
-            }
-            .navigationSplitViewColumnWidth(min: 170, ideal: 210)
+            ComparisonEffectSidebar(
+                selector: ComparisonEffectSelector(names: EffectRegistry.names, effects: manifest?.effects ?? []),
+                selection: $selection
+            )
         } detail: {
             ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -89,6 +75,8 @@ struct ComparisonRootView: View {
                         }.font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                     }
                     Spacer(minLength: 0)
+                } else if manifest != nil, let selection {
+                    ContentUnavailableView("Recording missing", systemImage: "film", description: Text("No recordings for \(selection) in this library. Run ./tools/video-comparison/capture.sh --effect \(selection), then Reload."))
                 } else {
                     ContentUnavailableView("Choose a video library", systemImage: "film.stack", description: Text("Open the generated video-comparison folder to compare Rust, Swift CLI, SwiftUI, and Swift Metal effect by effect."))
                 }

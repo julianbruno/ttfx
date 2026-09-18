@@ -35,6 +35,8 @@ The recordings and their manifest live in `artifacts/video-comparison/`. That di
 
 The comparison app opens `artifacts/video-comparison/` automatically when launched through `./script/build_and_run.sh --compare`. **Open Library…** can load another generated folder.
 
+Use **Search effects** to find an effect by name (case-insensitive; surrounding spaces are ignored). The native sidebar keeps registry order and shows recording status: **Not recorded**, **Recorded** with its track count, or **Capture limited** when any present track is incomplete. The footer counts matching effects and how many have recordings. No results? Use **Clear search**. Searching does not change the current effect or reset playback, even when its row disappears. Missing effects remain selectable; the detail provides an exact single-effect capture command, followed by **Reload**. Row selection supports native keyboard navigation.
+
 For each selected effect, the app shows four synchronized panes:
 
 | Position | Pane | Source |
