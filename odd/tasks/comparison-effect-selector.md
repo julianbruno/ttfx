@@ -8,7 +8,7 @@ ODD strict TDD from session/config/user, swift test with observed RED/GREEN. RDD
 
 ## Tasks
 - [x] E01: Native searchable sidebar with accessible one-icon/two-line rows, recording status and filtered counts. Trim case-insensitive queries; useful empty state with clear-search action. Preserve selection/search behavior and explicit selected-effect missing-recording guidance. RED/GREEN tests for filtering/order/status/stable identifiers.
-- [ ] E02: Build/test/app smoke and actual selector UI interaction where available, update guide and capture proof/rollback/commit.
+- [x] E02: Build/test/app smoke and actual selector UI interaction where available, update guide and capture proof/rollback/commit.
 
 ## Checks
 swift test --filter TTFXComparisonTests; swift build --product TTFXComparisonApp; ./script/build_and_run.sh --compare --verify. No unrelated changes. Native sidebar backgrounds/highlight, labels and accessibility, no card grid or multiple inline utility buttons. Actual CUA search/no-results/clear/selection check; disclose unavailable keyboard/VoiceOver scenarios.
@@ -30,3 +30,6 @@ Commit identity and actual authored line count: parent records commit returned b
 
 ## Rollback and next step
 Selector component/presentation tests/root integration/guide/task evidence can be reverted without touching track controls or video capture. Parent independent check, actual CUA interaction, commit identity/count and full Engram mirror remain before E02 closure.
+
+## Final evidence
+Commit c3916cf: 176 authored added/deleted lines. Parent CUA verified query "  RINGS  " matches one effect while current Print playback remains unchanged; unknown query shows no-results and Clear search, zero count; Clear restores all37 and Print selection. Click Rings loads1398 frames; Down selects Scattered73frames. Actual screenshot inspected. Independent verifier repeated all21 comparison tests and diff check, source inspection found no defect. Actual missing-recording/narrow-window/VoiceOver runtime untested. No merge or push.
