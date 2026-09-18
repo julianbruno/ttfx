@@ -25,4 +25,4 @@ Exploration: Cargo Rust CI includes Ubuntu/macOS; Swift package CI configures Li
 - RDD remains off per parent; passive structural readback. Rollback boundary: remove new guide and two README links together; source/media unchanged.
 
 ## Next step
-Parent structural readback and one conventional documentation work-unit commit; record commit identity here. Both completed tasks await that commit closure. No push/merge authorized.
+Parent structural readback and git diff --check passed. T01/T02 share work-unit commit 960fd44209e7d92241b4ccb66d5c84438f20c343. No push/merge performed.
