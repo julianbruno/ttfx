@@ -163,7 +163,11 @@ Upstream is not vendored here — the harness fetches it, because it's their cod
 
 ## Native Swift port
 
-The native Swift work is **WIP** and intentionally a **port of a port**:
+**Swift implements all 37 Rust effect counterparts (37/37 registry names match).** It remains WIP:
+registered effects are not a claim of complete CLI or cross-platform parity. The measured Rust comparison
+and its limits are below; the Rust/Python fidelity and benchmark sections above describe Rust, not Swift.
+
+The native Swift work is intentionally a **port of a port**:
 
 ```text
 TerminalTextEffects (Python, ChrisBuilds)
@@ -199,7 +203,7 @@ There are two native Swift app workflows in this repo:
 | App | What it shows | How to run |
 |---|---|---|
 | `TTFXGalleryApp` | Live SwiftUI/Metal preview of one Swift effect at a time. You can change text, seed, canvas, effect, playback, and renderer. | `xcodegen generate && open TTFXGalleryApp.xcodeproj`, then run scheme **TTFXGalleryApp** on **My Mac** or an iOS Simulator. |
-| `TTFX Video Comparison` | Three synchronized panes for each effect: Rust terminal replay, Swift Metal, and an optional SwiftUI pane on the right. This is the visual parity review tool. | `./tools/video-comparison/capture.sh` once, then `./script/build_and_run.sh --compare`. |
+| `TTFX Video Comparison` | Four synchronized tracks: Rust terminal replay, Swift Metal, optional pure-Swift CLI, and optional SwiftUI. This is the visual parity review tool. | `./tools/video-comparison/capture.sh` once, then `./script/build_and_run.sh --compare`. |
 
 Open the Xcode **app** project for the gallery, not the SwiftPM executable:
 
@@ -232,6 +236,8 @@ artifacts/video-comparison/
 └── print/
     ├── rust.frames
     ├── rust.mp4
+    ├── swift-cli.frames
+    ├── swift-cli.mp4
     ├── swiftui.mp4
     └── metal.mp4
 ```
@@ -247,17 +253,21 @@ That command creates real local videos you can inspect outside the app too:
 
 ```sh
 open artifacts/video-comparison/print/rust.mp4
+open artifacts/video-comparison/print/swift-cli.mp4
 open artifacts/video-comparison/print/swiftui.mp4
 open artifacts/video-comparison/print/metal.mp4
 ```
 
-For a full visual sweep, omit `--effect print`; that produces Rust/SwiftUI/Metal videos for all 37
-effects. The comparison app opens `artifacts/video-comparison` automatically when launched through
-`./script/build_and_run.sh --compare`. Inside the app, choose an effect, press **Play** or Space, and
-scrub the shared timeline. The layout is **Rust terminal** on the left, **Swift Metal** in the middle,
-and optional **SwiftUI** on the right. The **Show SwiftUI** toggle hides that right pane when you want
-to compare only Rust terminal replay against Swift Metal. If an older two-track library has no
-`swiftui.mp4` entries, the right pane stays visible as a missing-recording notice until you regenerate.
+For a full visual sweep, omit `--effect print`; that produces four videos for each of all 37 effects
+(148 videos). Capture integrity checks are not proof of effect equivalence. The app opens
+`artifacts/video-comparison` automatically through `./script/build_and_run.sh --compare`.
+
+Search and select an effect, press **Play** or Space, and scrub the shared timeline. Rust terminal and
+Swift Metal always stay visible; the **Optional panes** buttons independently show/hide **Swift CLI**
+(⌘1) and **SwiftUI** (⌘2). Older libraries remain loadable and show missing-recording notices for
+absent optional tracks. **Speed** selects 0.5×–3× and applies to all four videos, including hidden panes,
+and the shared timeline. Changing speed preserves position and pause state; timestamps remain media
+seconds. Only the capture date is shown in the footer; source revision remains in the manifest.
 
 If the app says `manifest.json` could not be opened, it means the selected/default library folder does
 not contain a generated comparison library. Usually one of these happened:
@@ -278,15 +288,42 @@ Fix it with:
 More detail: [`docs/swift-port/video-comparison.md`](docs/swift-port/video-comparison.md),
 [`docs/swift-port/video-recording.md`](docs/swift-port/video-recording.md), and
 [`docs/swift-port/video-comparison-schemas.md`](docs/swift-port/video-comparison-schemas.md).
+Behavior changes require RED → GREEN → REFACTOR; see the observed toggle, selector, and playback-speed
+[TDD evidence and remaining limits](docs/swift-port/video-comparison-tdd.md).
+
+### Measured Swift parity against Rust
+
+Verified on **2026-09-17, macOS 26.6.2 arm64, Swift 6.3.3**, at repository commit
+`11e587ba781f14ea42ad929f0467ab3a6a732ea6`. Rust sources and Cargo files are unchanged from reference
+`0f24d88408c8b815761c2c07da7dc9b411f63016`; the suite runs that local Rust checkout, not Python.
+
+| Evidence | Observed result | Scope |
+|---|---|---|
+| `swift test --filter CompleteEffectParityTests` | **117/117 parameterized cases passed** (111 default runs + 6 timed runs; 2 test functions). | Every frame's ANSI bytes, frame count, and completion, with a 10,000-tick truncation guard. |
+| Existing executable capture dumps | **37/37 Rust/Swift CLI pairs byte-identical**. | Recorded multiline sample, seed 42, 24×8 canvas, 25 FPS, virtual clock; not a full terminal session. |
+
+The 111 runs use all 37 effects at defaults with three input/seed/canvas combinations: `TTFX\nRust + Swift\nVisual comparison` / 42 / 24×8; `Native Swift\n A B C\nParity!` / 7 / 16×6;
+`Parity 2026\nSWIFT + RUST\n  Two spaces` / 123 / 18×7, all at 25 FPS. Six additional runs test
+`matrix` and `thunderstorm` at 60, 17, and 0 FPS with seed 23, input `Clock test\nRust Swift`,
+and a 16×6 canvas. Rust parity-dump mode and Swift effect ticks use deterministic frame-based time.
+See [`CompleteEffectParityTests.swift`](tests/ttfx-effectsTests/CompleteEffectParityTests.swift).
+
+This is **sampled default-effect parity**, not universal 37/37 parity. The full non-default configuration
+corpus, Unicode/layout/ANSI preprocessing, random-selection continuation, and real terminal pacing,
+resize, cancellation, and teardown still need comprehensive Rust-backed proof. The cross-platform CLI
+specification's T01–T08 remain pending; macOS evidence does not certify Windows or Linux. See
+[`cross-platform-cli-spec.md`](docs/swift-port/cross-platform-cli-spec.md) and
+[`ODD task status`](odd/tasks/cross-platform-cli.md).
 
 | Area | Current status |
 |---|---|
-| Core/effects | Native Swift core plus all 37 effect counterparts, each with a TTE-shaped configuration. Effect parity is covered by the Swift test suite's Rust-backed effect matrix. |
-| CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. Focused byte parity is documented for `print`, `wipe`, and `expand`; all 37 effects have CLI parity-dump smoke coverage. |
+| Core/effects | Native Swift core plus all 37 effect counterparts; measured full-run default cases are scoped above, not every configuration. |
+| CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. All 37 have parity-dump smoke coverage; the 37 existing CLI capture pairs match exactly for their recorded sample. Complete terminal/CLI parity remains pending. |
 | SwiftUI/Metal | Optional `TTFXSwiftUI` library plus `TTFXGalleryApp.xcodeproj` for macOS and iOS Simulator. Headless CI proves command planning; visual Metal presentation still needs an interactive check. |
 | Product scope | The Rust binary remains the production authority in this README. The Swift port is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
 
 ```sh
+swift test --filter CompleteEffectParityTests
 swift test --filter EffectFrameParityTests
 swift test --filter CLIParityDumpTests
 swift test --filter CLIParsingTests
@@ -295,7 +332,7 @@ swift test --filter galleryXcodeAppDeclaresBundleIdentifierAndIOSDestinations
 swift test
 ```
 
-## Scope
+## Rust production scope
 
 Linux and macOS. Built for [Omarchy](https://omarchy.org) originally; nothing targets a
 specific libc, and CI runs the tests and CLI corpus on both platforms. The byte-exact
