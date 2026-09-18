@@ -78,3 +78,69 @@ private var generatedComparisonLibraryExists: Bool {
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
     return FileManager.default.fileExists(atPath: root.appendingPathComponent("artifacts/video-comparison/manifest.json").path)
 }
+
+@Test @MainActor func playbackSpeedRejectsInvalidRatesAndScalesMediaClock() {
+    let player = ComparisonPlayer()
+    #expect(player.playbackSpeed == 1)
+    for speed in [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3] {
+        player.setPlaybackSpeed(speed)
+        #expect(player.playbackSpeed == speed)
+        #expect(!player.isPlaying)
+    }
+    for speed in [0, 0.49, 3.01, Double.nan, Double.infinity] {
+        player.setPlaybackSpeed(speed)
+        #expect(player.playbackSpeed == 3)
+    }
+    #expect(ComparisonPlayer.mediaPosition(start: 2, elapsed: 4, speed: 0.5, duration: 20) == 4)
+    #expect(ComparisonPlayer.mediaPosition(start: 2, elapsed: 4, speed: 3, duration: 20) == 14)
+    #expect(ComparisonPlayer.mediaPosition(start: 2, elapsed: -1, speed: 3, duration: 20) == 2)
+    #expect(ComparisonPlayer.mediaPosition(start: 2, elapsed: 10, speed: 3, duration: 20) == 20)
+}
+
+@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@MainActor func playbackSpeedKeepsFourTracksSynchronizedAcrossLiveChange() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let directory = root.appendingPathComponent("artifacts/video-comparison")
+    let manifest = try ComparisonManifest.load(from: directory)
+    let effect = try #require(manifest.effects.first(where: { $0.name == "rings" }))
+    let player = ComparisonPlayer()
+    try player.load(effect, directory: directory, fps: manifest.fps)
+    let tracks = [player.rust, player.swiftCLI, player.swiftUI, player.metal]
+    for _ in 0..<100 {
+        if tracks.allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    player.setPlaybackSpeed(0.5)
+    #expect(tracks.allSatisfy { $0.rate == 0 })
+    player.play()
+    try await Task.sleep(for: .milliseconds(700))
+    #expect(player.position > 0.2 && player.position < 0.5)
+    #expect(tracks.allSatisfy { $0.rate == 0.5 })
+    let before = player.position
+    player.setPlaybackSpeed(3)
+    #expect(player.position >= before && player.position - before < 0.1)
+    let rebased = player.position
+    player.setPlaybackSpeed(3)
+    #expect(player.position == rebased)
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(player.position - rebased > 1.2 && player.position - rebased < 1.9)
+    #expect(tracks.allSatisfy { $0.rate == 3 })
+    for track in tracks {
+        #expect(abs(track.currentTime().seconds - player.position) < 0.15)
+    }
+    player.pause()
+    let paused = player.position
+    player.setPlaybackSpeed(0.5)
+    try await Task.sleep(for: .milliseconds(150))
+    #expect(player.position == paused)
+    #expect(!player.isPlaying)
+    #expect(tracks.allSatisfy { $0.rate == 0 })
+    player.seek(player.duration - 0.4)
+    try await Task.sleep(for: .milliseconds(250))
+    player.setPlaybackSpeed(3)
+    player.play()
+    try await Task.sleep(for: .milliseconds(400))
+    #expect(player.position == player.duration)
+    #expect(!player.isPlaying)
+    player.clear()
+}

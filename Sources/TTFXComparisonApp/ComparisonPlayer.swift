@@ -12,6 +12,8 @@ import TTFXComparisonKit
     var fps = 25
     var position = 0.0
     var isPlaying = false
+    private(set) var playbackSpeed = 1.0
+    static let playbackSpeeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
     var error: String?
     private var startedAt: TimeInterval = 0
     private var startPosition = 0.0
@@ -44,6 +46,7 @@ import TTFXComparisonKit
         seek(0)
     }
     func pause() {
+        if isPlaying { position = clockPosition() }
         rust.pause(); swiftCLI.pause(); swiftUI.pause(); metal.pause(); timer?.invalidate(); timer = nil; isPlaying = false
     }
     func clear() {
@@ -51,13 +54,35 @@ import TTFXComparisonKit
         rust.replaceCurrentItem(with: nil); swiftCLI.replaceCurrentItem(with: nil); swiftUI.replaceCurrentItem(with: nil); metal.replaceCurrentItem(with: nil)
     }
     func play() {
-        guard effect != nil else { return }
+        guard effect != nil, !isPlaying else { return }
         if position >= duration { seek(0) }
         guard loadedPlayers.allSatisfy({ $0.currentItem?.status == .readyToPlay }) else {
             error = "Videos are loading. Press Play when they are ready."; return
         }
         error = nil
-        isPlaying = true; startPosition = position
+        isPlaying = true
+        schedulePlayback()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.update() }
+        }
+    }
+    func setPlaybackSpeed(_ speed: Double) {
+        guard speed.isFinite, (0.5...3).contains(speed), speed != playbackSpeed else { return }
+        if isPlaying { position = clockPosition() }
+        playbackSpeed = speed
+        if isPlaying {
+            if position >= duration { pause() }
+            else { schedulePlayback() }
+        }
+    }
+    nonisolated static func mediaPosition(start: Double, elapsed: Double, speed: Double, duration: Double) -> Double {
+        min(duration, start + max(0, elapsed) * speed)
+    }
+    private func clockPosition() -> Double {
+        Self.mediaPosition(start: startPosition, elapsed: ProcessInfo.processInfo.systemUptime - startedAt, speed: playbackSpeed, duration: duration)
+    }
+    private func schedulePlayback() {
+        startPosition = position
         // All present players use the same host-clock deadline.
         let hostTime = CMClockGetTime(CMClockGetHostTimeClock()) + CMTime(seconds: 0.1, preferredTimescale: 600)
         startedAt = ProcessInfo.processInfo.systemUptime + 0.1
@@ -65,17 +90,14 @@ import TTFXComparisonKit
         if let video = effect!.swiftCLI { start(swiftCLI, video: video, hostTime: hostTime) }
         if let video = effect!.swiftUI { start(swiftUI, video: video, hostTime: hostTime) }
         start(metal, video: effect!.metal, hostTime: hostTime)
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.update() }
-        }
     }
     private func start(_ player: AVPlayer, video: ComparisonVideo, hostTime: CMTime) {
-        guard position < video.duration(fps: fps) else { return }
-        player.setRate(1, time: CMTime(seconds: position, preferredTimescale: 600), atHostTime: hostTime)
+        guard position < video.duration(fps: fps) else { player.pause(); return }
+        player.setRate(Float(playbackSpeed), time: CMTime(seconds: position, preferredTimescale: 600), atHostTime: hostTime)
     }
     private func update() {
         guard isPlaying else { return }
-        position = min(duration, startPosition + max(0, ProcessInfo.processInfo.systemUptime - startedAt))
+        position = clockPosition()
         if let item = loadedPlayers.compactMap({ $0.currentItem }).first(where: { $0.status == .failed }) {
             error = item.error?.localizedDescription ?? "Video playback failed."; pause()
         }
