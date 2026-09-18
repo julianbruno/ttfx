@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Local POSIX terminal lifecycle smoke (not Windows/Linux certification)."""
 import os
+import fcntl
+import struct
+import termios
 import pathlib
 import pty
 import select
@@ -65,3 +68,33 @@ with tempfile.TemporaryDirectory() as directory:
     process.wait(timeout=5)
     assert not process.stderr.read()
     print(f'broken pipe: quiet exit {process.returncode}')
+
+    master, slave = pty.openpty()
+    fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 4, 20, 0, 0))
+    environment = dict(os.environ)
+    environment.pop('COLUMNS', None)
+    environment.pop('LINES', None)
+    resize_args = ['--input-file', str(input_file), '--seed', '42', '--frame-rate', '20', '--canvas-width', '0', '--canvas-height', '0', 'print']
+    process = subprocess.Popen([SWIFT, *resize_args], stdout=slave, stderr=subprocess.PIPE, env=environment)
+    os.close(slave)
+    time.sleep(0.15)
+    fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('HHHH', 6, 24, 0, 0))
+    output = collect(master, process, timeout=10)
+    os.close(master)
+    assert b'\x1b[0J' in output, 'resize must clear and rebuild the old canvas'
+    assert b'\x1b[6A' in output, 'rebuilt canvas must use the new viewport height'
+    assert process.returncode == 0 and not process.stderr.read()
+    print('PTY settled resize: clear/rebuild at 24x6')
+    process = subprocess.Popen([SWIFT, *resize_args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=environment)
+    time.sleep(0.15)
+    process.send_signal(signal.SIGWINCH)
+    output, error = process.communicate(timeout=10)
+    assert b'\x1b[0J' not in output and not error and process.returncode == 0
+    print('redirected SIGWINCH: no clear/restart')
+    master, slave = pty.openpty()
+    process = subprocess.Popen([SWIFT, '--seed', '42', 'print'], stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    output, error = process.communicate(timeout=2)
+    os.close(slave)
+    os.close(master)
+    assert not output and not error and process.returncode == 0
+    print('interactive stdin: no EOF block, empty input exits quietly')

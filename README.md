@@ -9,7 +9,7 @@ This **work-in-progress port of Rust ttfx** carries forward the animations of Py
 - **A live SwiftUI/Metal gallery** and a Swift CLI, plus a macOS app comparing Rust terminal, Swift Metal, optional Swift CLI, and optional SwiftUI recordings.
 - **Evidence you can inspect:** real animations below and sampled full-run frame comparisons against Rust.
 
-The current focus is native Apple-platform exploration and verification. The gallery has macOS and iOS Simulator launch paths; the comparison app runs on macOS. Swift is not yet a replacement for the production Rust terminal binary: complete CLI parity and Windows/Linux portability remain pending.
+The current focus is native Apple-platform exploration and verification. The gallery has macOS and iOS Simulator launch paths; the comparison app runs on macOS. Swift is not yet a replacement for the production Rust terminal binary: native terminal adapters and a CLI-only build graph are implemented, but complete CLI parity and native Windows/Linux host validation remain pending.
 
 ## See it in motion
 
@@ -418,17 +418,23 @@ The 111 runs use all 37 effects at defaults with three input/seed/canvas combina
 and a 16×6 canvas. Rust parity-dump mode and Swift effect ticks use deterministic frame-based time.
 See [`CompleteEffectParityTests.swift`](tests/ttfx-effectsTests/CompleteEffectParityTests.swift).
 
-This is **sampled default-effect parity**, not universal 37/37 parity. The full non-default configuration
-corpus, Unicode/layout/ANSI preprocessing, random-selection continuation, and real terminal pacing,
-resize, cancellation, and teardown still need comprehensive Rust-backed proof. The cross-platform CLI
-specification's T01–T08 remain pending; macOS evidence does not certify Windows or Linux. See
-[`cross-platform-cli-spec.md`](docs/swift-port/cross-platform-cli-spec.md) and
-[`ODD task status`](odd/tasks/cross-platform-cli.md).
+This is **sampled default-effect parity**, not universal 37/37 parity. The native CLI now has
+seeded random selection, real FPS pacing, in-place repaint, cursor teardown, POSIX cancellation and
+settled resize with current RNG continuation. Native WinSDK console handling and a CLI-only package
+graph are implemented. Local macOS regressions and PTY smokes cover these paths; Windows/Linux
+native compilation and runtime checks are still unverified. Three-OS CI is defined, not yet run.
+
+T01 (CLI graph) and T05 (runtime) are complete with local macOS proof. The original missing runtime features are implemented with macOS proof, while full
+specification acceptance remains partial: parser/hidden-mode details, input ANSI `always`/`dynamic`
+colors, terminal-background mixing, exhaustive non-default effect cases, and other host evidence.
+See [native terminal implementation and checks](docs/swift-port/native-terminal-runtime.md),
+[cross-platform specification](docs/swift-port/cross-platform-cli-spec.md), and
+[ODD task status](odd/tasks/cross-platform-cli.md).
 
 | Area | Current status |
 |---|---|
 | Core/effects | Native Swift core plus all 37 effect counterparts; measured full-run default cases are scoped above, not every configuration. |
-| CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. All 37 have parity-dump smoke coverage; the 37 existing CLI capture pairs match exactly for their recorded sample. Complete terminal/CLI parity remains pending. |
+| CLI | Native `ttfx` executable with Rust-style terminal options, TTE per-effect flags after the effect name, random-effect filtering, completions, and hidden parity-dump support. All 37 have parity-dump smoke coverage; the 37 existing CLI capture pairs match exactly for their recorded sample. Real pacing, repaint, POSIX lifecycle and resize are locally verified; native Windows handling exists but remains host-unverified. Complete terminal/CLI parity remains pending. |
 | SwiftUI/Metal | Optional `TTFXSwiftUI` library plus `TTFXGalleryApp.xcodeproj` for macOS and iOS Simulator. Production Metal presentation is implemented; local interactive gallery/comparison checks are recorded in the Swift port docs. Headless CI proves command planning, not visual appearance. |
 | Product scope | The Rust binary remains the production authority in this README. The Swift port is tracked in `docs/swift-port/` and `openspec/changes/native-swift-port/`. |
 

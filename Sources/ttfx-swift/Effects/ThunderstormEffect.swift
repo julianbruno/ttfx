@@ -122,6 +122,8 @@ public struct ThunderstormEffect: Effect {
     private var rainDelay = 0
     private var phase = Phase.preStorm
     private var elapsed = 0.0
+    private let clock: EffectClock?
+    private let clockStart: Double
     private var stormStart = 0.0
     private var sparkColors: [UInt32] = []
 
@@ -129,6 +131,8 @@ public struct ThunderstormEffect: Effect {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, thunderstormConfiguration: .init())
     }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, thunderstormConfiguration: Configuration) {
+        self.clock = configuration.clock
+        self.clockStart = configuration.clock?.now() ?? 0
         self.canvas = canvas; self.options = thunderstormConfiguration; self.rng = configuration.makeRNG(seed: seed)
         self.frameDuration = 1 / Double(configuration.frameRate)
         guard !input.scalars.isEmpty else { phase = .complete; return }
@@ -283,6 +287,7 @@ public struct ThunderstormEffect: Effect {
         }
     }
     public mutating func tick(into frame: inout Frame) -> TickStatus {
+        if let clock { elapsed = clock.now() - clockStart }
         guard phase != .complete || glyphs.contains(where: \.active) else { return .complete }
         switch phase {
         case .preStorm:
@@ -334,7 +339,7 @@ public struct ThunderstormEffect: Effect {
                     foreground: glyph.foreground, background: glyph.foreground == 0 ? 0xFFFF_FFFE : 0)
             }
         }
-        elapsed += frameDuration
+        if clock == nil { elapsed += frameDuration }
         return phase == .complete && !glyphs.contains(where: \.active) ? .complete : .running
     }
     private static func rgb(_ color: Color) -> UInt32 { UInt32(color.red) << 16 | UInt32(color.green) << 8 | UInt32(color.blue) }

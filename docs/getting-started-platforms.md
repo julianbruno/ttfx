@@ -10,7 +10,7 @@ Start with a short text animation in your terminal. You do not need to know Swif
 | Ubuntu | **Rust CLI**, the reference implementation | Repository CI includes Rust Ubuntu tests/builds; this guide's installation was not rerun on Ubuntu. |
 | Windows | **Rust CLI inside Ubuntu/WSL**, not a native Windows app | Linux route based on Microsoft's WSL instructions; not locally verified on Windows/WSL. |
 
-**These are different implementations.** The Swift port is the focus of this repository's current Apple-platform work. Its full cross-platform CLI work remains pending. CI configures a Linux Swift CLI build/help check, but that is not certification of complete Linux parity or a beginner-ready native Windows Swift product. SwiftUI/Metal gallery and comparison apps are not Ubuntu or Windows apps.
+**These are different implementations.** The Swift port is the focus of this repository's current Apple-platform work. The CLI-only graph and POSIX/Windows terminal adapters are now implemented, with local macOS lifecycle proof. Native Ubuntu/Windows compilation and runtime verification remain pending, so the Rust/WSL reference paths stay the beginner defaults. A three-OS CI definition is not successful CI evidence. SwiftUI/Metal gallery and comparison apps are not Ubuntu or Windows apps.
 
 ## Before you start
 
@@ -46,6 +46,7 @@ Run in Terminal:
 cd ~
 git clone https://github.com/julianbruno/ttfx.git
 cd ttfx
+export TTFX_CLI_ONLY=1
 swift build --product ttfx
 ```
 
@@ -73,6 +74,8 @@ printf 'Hello\nTTFX' | ./.build/debug/ttfx --canvas-width 12 --canvas-height 6 p
 ```
 
 To return another day, open Terminal, run `cd ~/ttfx`, and reuse the animation command. Rebuild after changing or updating the source.
+
+Before building any graphical product in this terminal, run `unset TTFX_CLI_ONLY` to restore the default app package graph.
 
 **Want windows instead of a terminal animation?** Continue with the [gallery setup](swift-port/README.md#gallery-app-macos-and-ios-simulator) (full Xcode and XcodeGen), or the [macOS comparison app guide](swift-port/video-comparison.md). Those are separate, optional setup paths.
 
@@ -151,6 +154,36 @@ Run **all Ubuntu commands inside the Ubuntu terminal**, not PowerShell. Start wi
 
 Next time, open Ubuntu, run `cd ~/ttfx`, and run the Rust animation again. Native Windows and WSL installations were **not tested on this macOS documentation host**.
 
+## Experimental native Swift on Ubuntu and Windows
+
+**For contributors, not a verified beginner support promise.** Native terminal adapters exist; these hosts have not yet compiled or exercised this project locally. You can try the CLI-only graph without Apple GUI frameworks. Keep the Rust/WSL paths above if you want the reference implementation.
+
+First install Git and **Swift 6.2 or newer**, then check `git --version` and `swift --version`. Follow [Swift's Ubuntu installation guide](https://www.swift.org/install/linux/ubuntu/) for your Ubuntu release. On Windows, follow [Swift's official Windows installation guide](https://www.swift.org/install/windows/), including its Visual Studio C++ tools/Windows SDK prerequisites; installing only the Swift executable is not enough. Reopen your terminal after installation. No installer steps were executed for this guide.
+
+Use your existing checkout, or clone it once with the HTTPS command in the macOS section. Run the following from the `ttfx` folder:
+
+### macOS / Ubuntu terminal
+
+```sh
+export TTFX_CLI_ONLY=1
+swift build --product ttfx
+swift test --filter 'TerminalRuntimeTests|TerminalLayoutTests|NativeTerminalPolicyTests|PackageGraphTests'
+printf 'Hello Swift' | swift run --skip-build ttfx --seed 42 print
+```
+
+### Native Windows PowerShell
+
+```powershell
+$env:TTFX_CLI_ONLY = '1'
+swift build --product ttfx
+swift test --filter 'TerminalRuntimeTests|TerminalLayoutTests|NativeTerminalPolicyTests|PackageGraphTests'
+"Hello Swift" | swift run --skip-build ttfx --seed 42 print
+```
+
+Stop if the build fails; do not interpret a documented command as a tested Windows/Ubuntu result. Record your OS, Swift version, terminal and error when reporting it. These focused tests do not need Rust; the broader oracle suites require Rust/cargo. For GUI work on macOS, unset `TTFX_CLI_ONLY` or set it to `0`.
+
+The native CLI supports repaint, pacing, cursor cleanup, cancellation and settled resize, but full Rust CLI compatibility is still partial. Input ANSI `always`/`dynamic` colors, terminal-background mixing, hidden-mode/parser details and comprehensive non-default effect parity remain pending. Read the [native terminal status](swift-port/native-terminal-runtime.md) before treating it as a production replacement.
+
 ## If something goes wrong
 
 | Symptom | What to do |
@@ -162,8 +195,8 @@ Next time, open Ubuntu, run `cd ~/ttfx`, and run the Rust animation again. Nativ
 | `NO INPUT.` or no text | Supply text with the complete `printf ... | ...` example. Running only the effect name supplies no input. |
 | Escaped characters or strange layout | Run directly in a normal terminal, not a text editor or redirected output file. Enlarge the terminal and retry the small example. |
 | Clone asks for credentials | Confirm you copied the public `https://github.com/julianbruno/ttfx.git` URL; no SSH setup is needed. |
-| SwiftUI/Metal build errors on Ubuntu/Windows | Do not use the Apple app setup there. Use this guide's Rust terminal path; native Swift portability is still pending. |
+| SwiftUI/Metal build errors on Ubuntu/Windows | Do not use the Apple app setup there. Set the CLI-only variable shown below when experimenting with native Swift; GUI products are Apple-only. Native Ubuntu/Windows validation remains pending. |
 
 ## What was actually checked
 
-On **2026-09-17**, existing local macOS Rust and Swift binaries accepted `--help` and the exact `print` commands above, exited successfully, and emitted animation bytes. Output redirection checked execution, not visual appearance. Guide shell blocks were syntax-checked without running installers; repository links were checked. No fresh Ubuntu, Windows/WSL installation, or all-platform parity test was performed. See the [Swift status and measured parity scope](swift-port/README.md) for deeper technical evidence.
+On **2026-09-17**, existing local macOS Rust and Swift binaries accepted `--help` and the exact `print` commands above, exited successfully, and emitted animation bytes. Output redirection checked execution, not visual appearance. Guide shell blocks were syntax-checked without running installers; repository links were checked. Native macOS lifecycle/pacing/resize/cancellation and focused tests were subsequently checked as documented in the native terminal status. Experimental Ubuntu/Windows commands were reviewed, not run; no fresh installation or all-platform parity test was performed. See the [Swift status and measured parity scope](swift-port/README.md) for deeper technical evidence.

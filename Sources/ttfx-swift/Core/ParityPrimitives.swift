@@ -25,10 +25,18 @@ public enum PyCompat {
 
 public struct Xoshiro256PlusPlus: Equatable, Sendable {
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.state.0 == rhs.state.0 && lhs.state.1 == rhs.state.1
-            && lhs.state.2 == rhs.state.2 && lhs.state.3 == rhs.state.3
+        let a = lhs.snapshot().state, b = rhs.snapshot().state
+        return a.0 == b.0 && a.1 == b.1 && a.2 == b.2 && a.3 == b.3
     }
     private var state: (UInt64, UInt64, UInt64, UInt64)
+    private var continuation: RNGContinuation?
+
+    public func snapshot() -> Self { continuation?.snapshot() ?? self }
+    public func sharing(_ continuation: RNGContinuation) -> Self {
+        var result = snapshot()
+        result.continuation = continuation
+        return result
+    }
 
     public init(seed: UInt64) {
         var splitMix = seed
@@ -43,6 +51,7 @@ public struct Xoshiro256PlusPlus: Equatable, Sendable {
     }
 
     public mutating func nextUInt64() -> UInt64 {
+        if let continuation { return continuation.nextUInt64() }
         let result = (state.0 &+ state.3).rotatedLeft(by: 23) &+ state.0
         let temporary = state.1 << 17
         state.2 ^= state.0

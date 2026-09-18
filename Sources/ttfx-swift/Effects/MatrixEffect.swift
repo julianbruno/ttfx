@@ -82,6 +82,8 @@ public struct MatrixEffect: Effect {
     private let options: Configuration
     private let stepDuration: Double
     private var elapsed = 0.0
+    private let clock: EffectClock?
+    private let clockStart: Double
     private var rng: Xoshiro256PlusPlus
     private var glyphs: [Glyph] = []
     private var columns: [Column] = []
@@ -101,6 +103,8 @@ public struct MatrixEffect: Effect {
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
                 matrixConfiguration: Configuration) {
         self.canvas = canvas
+        self.clock = configuration.clock
+        self.clockStart = configuration.clock?.now() ?? 0
         self.options = matrixConfiguration
         self.resolveDelay = matrixConfiguration.resolveDelay
         self.stepDuration = 1 / Double(configuration.frameRate)
@@ -191,7 +195,8 @@ public struct MatrixEffect: Effect {
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
         guard !complete else { return .complete }
-        defer { elapsed += stepDuration }
+        if let clock { elapsed = clock.now() - clockStart }
+        defer { if clock == nil { elapsed += stepDuration } }
         if phase != .resolve {
             if columnDelay == 0 {
                 if phase == .rain {

@@ -8,7 +8,7 @@ Six-second excerpt of real captured output at its original speed. [Full decrypt 
 
 ## Quick path
 
-For first-time setup, see the [beginner platform guide](../getting-started-platforms.md): native Swift on macOS, the Rust reference on Ubuntu, and Rust inside Ubuntu/WSL on Windows. Full native Swift Linux/Windows CLI portability remains pending.
+For first-time setup, see the [beginner platform guide](../getting-started-platforms.md): native Swift on macOS, the Rust reference on Ubuntu, and Rust inside Ubuntu/WSL on Windows. Native CLI-only builds and platform adapters are implemented; Ubuntu/Windows compilation and runtime validation remain pending. Experimental native build commands are included in that guide.
 
 Run these commands from the repository root:
 
@@ -58,7 +58,7 @@ Generated libraries stay in the ignored `artifacts/video-comparison/` directory.
 |---|---|
 | Core engine | `TTFXCore` provides frames/canvas/input, deterministic effect initialization, Xoshiro-compatible primitives, motion/scene/runtime composition, ANSI frame rendering helpers, and parity diagnostics. |
 | Effects | `TTFXEffects` registers all 37 TTE/Rust effect names. Each effect has a typed configuration with TTE flag names and defaults; `print` is no longer hardcoded speed/easing/gradient constants. |
-| CLI | `TTFXCLI` parses Rust-style terminal options, TTE per-effect flags after the effect name, seed, input file, random-effect filters, hidden `--parity-dump`/`--max-frames`, and bash/zsh completions. Live output emits each animation frame; hidden parity-dump emits length-prefixed frames for oracle comparison. |
+| CLI | `TTFXCLI` parses Rust-style terminal options, TTE per-effect flags after the effect name, seed, input file, random-effect filters, hidden `--parity-dump`/`--max-frames`, and bash/zsh completions. Live output repaints in place with FPS pacing, cursor lifecycle, POSIX cancellation and settled resize; hidden parity-dump emits length-prefixed frames for oracle comparison. Native WinSDK handling is implemented but host-unverified. |
 | SwiftUI/Metal | Optional `TTFXSwiftUI` exposes frame snapshots, a deterministic 37-effect gallery model/view, scheduler, and a drawable-backed `MTKView` Metal renderer with glyph atlas and production shaders. The gallery uses Metal when available; **Use Metal** selects the SwiftUI fallback without restarting the effect. `TTFXGalleryApp.xcodeproj` is the iOS/macOS `.app` launch path. |
 | Comparison tooling | `TTFXVideoCapture` records four tracks; `TTFXComparisonApp` provides searchable effect selection, optional pane controls, synchronized speed and whole-timeline Loop. Rust subprocesses belong to testing/capture, not production Swift effect execution. |
 | Rust scope | Rust remains the production terminal product. Its Python parity and benchmark claims are not Swift claims. |
@@ -80,11 +80,11 @@ Generated libraries stay in the ignored `artifacts/video-comparison/` directory.
 
 ## Current limitations
 
-- The 117 native-effect cases and 37 recorded CLI streams establish sampled parity, not all inputs/configurations. Non-default settings, Unicode/layout/input-ANSI combinations, random-selection RNG continuation, terminal pacing, resize, cancellation, and teardown need broader CLI proof.
+- The 117 native-effect cases and 37 recorded CLI streams establish sampled parity, not all inputs/configurations. Non-default settings and comprehensive Unicode/layout/input-ANSI combinations need broader CLI proof. Random selection/current RNG continuation, pacing, resize, cancellation and teardown have focused unit/oracle/macOS PTY proof, not exhaustive session parity. Input ANSI always/dynamic colors, terminal-background mixing and full parser/hidden-mode compatibility remain pending.
 - Every TTE per-effect flag is accepted with the TTE/Rust default; changing a setting is proven to change frames for `print`, `rain`, and `wipe`. Other effects store and parse the matching fields; not every flag is proven to change pixels yet.
 - Metal presentation has been checked locally in a real app and offscreen GPU tests. That does not certify pixel-exact Rust/Metal parity, every glyph/platform, or drawable-backed presentation in headless CI.
 - The Swift core keeps a fixed-capacity/performance proxy; it does not claim measured zero heap allocations from an allocation counter.
-- Windows/Linux portability is not certified. The [cross-platform CLI specification](cross-platform-cli-spec.md) and its [pending work ledger](../../odd/tasks/cross-platform-cli.md) cover the portable package graph and terminal lifecycle work still to implement; the current package also contains Apple-framework GUI targets.
+- Windows/Linux portability is not certified. The [cross-platform CLI specification](cross-platform-cli-spec.md) and its [pending work ledger](../../odd/tasks/cross-platform-cli.md) track the implemented CLI-only graph and native adapters separately from remaining compatibility and native-host proof; the normal graph still includes Apple-framework GUI targets.
 - Python-style plugins and behavioral improvements over Rust/upstream quirks remain out of scope.
 
 ## Validation commands
@@ -123,7 +123,7 @@ swift build --product ttfx
 swift run --skip-build ttfx -- print --help
 ```
 
-On Linux, `bin/test` requests a Swift CLI build and help check, but this script intent is not evidence that the current mixed CLI/GUI package graph is portable. SwiftUI/Metal and comparison targets depend on Apple frameworks; Windows/Linux validation remains pending.
+The CLI-only graph below excludes Apple GUI products; a three-OS workflow now builds and tests it. Workflow definitions and `bin/test` intent are not execution proof: native Ubuntu/Windows compilation and lifecycle remain unverified. SwiftUI/Metal and comparison targets remain Apple-only.
 
 See [Swift Package Integration](spm.md) for product-level integration details, [architecture](swift-port-architecture.md) for module mapping.
 
@@ -155,4 +155,11 @@ Only the exact value `1` selects this graph. Unset the variable (or use `0`) for
 TTFX_CLI_ONLY=1 swift run ttfx --seed 42 --random-effect --include-effects decrypt rings print
 ```
 
-Focused oracle checks cover all 37 singleton candidates and four multi-candidate seeds, capped at 12 frames with virtual timing. These checks are not the full non-default corpus. A separate known small-input edge case remains: `errorcorrect` can emit one Swift frame when Rust emits none because no error pairs are generated. The oracle runner now uses Foundation Process on desktop targets, PATH/PATHEXT executable lookup, and file-backed streams/input; native Linux/Windows execution is still unverified. Terminal pacing, repaint, lifecycle, and resize are separate pending work.
+Focused oracle checks cover all 37 singleton candidates and four multi-candidate seeds, capped at 12 frames with virtual timing. These checks are not the full non-default corpus. A separate known small-input edge case remains: `errorcorrect` can emit one Swift frame when Rust emits none because no error pairs are generated. The oracle runner now uses Foundation Process on desktop targets, PATH/PATHEXT executable lookup, and file-backed streams/input; native Linux/Windows execution is still unverified. Terminal pacing, repaint, lifecycle and settled resize are implemented with local macOS proof; see [native terminal runtime](native-terminal-runtime.md). Full compatibility and native Ubuntu/Windows host validation remain pending.
+
+
+## Native terminal implementation and evidence
+
+The CLI prepares/repaints one canvas, enforces FPS, restores cursor state, handles POSIX cancellation/broken pipes, and rebuilds settled terminal layouts using the current RNG stream. Matrix/Thunderstorm use real monotonic time in normal CLI mode; virtual parity/gallery timing is preserved. The conditional Windows adapter uses native console mode, Unicode output and cooperative cancellation APIs.
+
+Local macOS evidence includes meaningful RED → GREEN tests, focused runtime/layout/policy checks, eight terminal smokes, a complete recorded Print transcript, and the repeated 117-case default/timed effect corpus. The native Linux/Windows adapters have not been compiled or exercised on their target hosts. See [runtime details, platform limits and TDD evidence](native-terminal-runtime.md) and the [full acceptance ledger](../../odd/tasks/cross-platform-cli.md). The 3-OS workflow has not run remotely.

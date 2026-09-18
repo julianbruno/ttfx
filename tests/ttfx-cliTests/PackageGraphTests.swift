@@ -1,26 +1,28 @@
 import Foundation
 import Testing
+import TTFXCore
 
 @Suite struct PackageGraphTests {
+    private func resolveSwift(environment: [String: String]) throws -> URL {
+        var portableEnvironment = environment
+        if portableEnvironment["PATH"] == nil {
+            portableEnvironment["PATH"] = environment.first { $0.key.uppercased() == "PATH" }?.value
+        }
+        return try ProcessRunner.resolveExecutable("swift", environment: portableEnvironment)
+    }
+
+    @Test func mixedCasePathResolvesSwiftForWindowsStyleEnvironment() throws {
+        let path = try #require(ProcessInfo.processInfo.environment.first { $0.key.uppercased() == "PATH" }?.value)
+        let executable = try resolveSwift(environment: ["Path": path])
+        #expect(FileManager.default.isExecutableFile(atPath: executable.path))
+    }
+
     private func graph(cliOnly: Bool) throws -> [String: Any] {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let process = Process()
-        #if os(Windows)
-        let executable = "swift.exe"
-        let separator: Character = ";"
-        #else
-        let executable = "swift"
-        let separator: Character = ":"
-        #endif
         let environment = ProcessInfo.processInfo.environment
-        let candidates = (environment["PATH"] ?? "").split(separator: separator)
-            .map { URL(fileURLWithPath: String($0)).appendingPathComponent(executable) }
-        guard let swiftExecutable = candidates.first(where: {
-            FileManager.default.isExecutableFile(atPath: $0.path)
-        }) else {
-            throw URLError(.fileDoesNotExist)
-        }
+        let swiftExecutable = try resolveSwift(environment: environment)
         process.executableURL = swiftExecutable
         process.currentDirectoryURL = root
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("ttfx-graph-" + UUID().uuidString)

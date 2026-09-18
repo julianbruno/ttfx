@@ -89,8 +89,24 @@ public struct Canvas: Equatable, Sendable {
         self.rows = rows
     }
 
-    public func ingest(_ text: String) -> InputText {
-        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+    public func ingest(_ text: String) -> InputText { ingest(text, wrap: false, anchor: "sw") }
+
+    public func ingest(_ text: String, wrap: Bool, anchor: String = "sw") -> InputText {
+        let rawLines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let lines: [[Unicode.Scalar]] = rawLines.flatMap { line in
+            let values = Array(line.unicodeScalars)
+            guard wrap, values.count > columns else { return [values] }
+            return stride(from: 0, to: values.count, by: columns).map { Array(values[$0..<min($0 + columns, values.count)]) }
+        }
+        let width = lines.map { line in line.lastIndex(where: { $0.value != 32 }).map { $0 + 1 } ?? 0 }.max() ?? 0
+        let height = lines.enumerated().filter { $0.element.contains(where: { $0.value != 32 }) }
+            .map { lines.count - $0.offset }.max() ?? 0
+        let centerColumn = max(1, columns / 2) + (columns > 1 && !columns.isMultiple(of: 2) ? 1 : 0)
+        let centerRow = max(1, rows / 2) + (rows > 1 && !rows.isMultiple(of: 2) ? 1 : 0)
+        let dx = width == columns ? 0 : ["s", "n", "c"].contains(anchor) ? centerColumn - PyCompat.floorDivide(width, 2)
+            : ["se", "e", "ne"].contains(anchor) ? columns - width : 0
+        let dy = height == rows ? 0 : ["w", "e", "c"].contains(anchor) ? centerRow - PyCompat.floorDivide(height, 2)
+            : ["nw", "n", "ne"].contains(anchor) ? rows - height : 0
         var scalars = ContiguousArray<UInt32>()
         var positions = ContiguousArray<InputPosition>()
         var characterIDs = ContiguousArray<Int>()
@@ -99,15 +115,15 @@ public struct Canvas: Equatable, Sendable {
         positions.reserveCapacity(text.unicodeScalars.count)
 
         for (lineIndex, line) in lines.enumerated() {
-            let row = lines.count - lineIndex
-            for (columnIndex, scalar) in line.unicodeScalars.enumerated() {
+            let row = lines.count - lineIndex + dy
+            for (columnIndex, scalar) in line.enumerated() {
                 defer { arenaID += 1 }
                 // Rust keeps plain spaces in its arena, but animates them only
                 // when an effect explicitly requests fill characters.
                 guard scalar.value != 32,
-                      columnIndex < columns, (1...rows).contains(row) else { continue }
+                      (1...columns).contains(columnIndex + 1 + dx), (1...rows).contains(row) else { continue }
                 scalars.append(scalar.value)
-                positions.append(InputPosition(column: columnIndex + 1, row: row))
+                positions.append(InputPosition(column: columnIndex + 1 + dx, row: row))
                 characterIDs.append(arenaID)
             }
         }
@@ -120,17 +136,27 @@ public struct EffectConfiguration: Equatable, Sendable {
     public let seed: UInt64
     public let frameRate: Int
     public let initialRNG: Xoshiro256PlusPlus?
+    public let rngContinuation: RNGContinuation?
+    public let clock: EffectClock?
 
     public func makeRNG(seed: UInt64) -> Xoshiro256PlusPlus {
-        initialRNG ?? Xoshiro256PlusPlus(seed: seed)
+        if let rngContinuation { return rngContinuation.snapshot().sharing(rngContinuation) }
+        return initialRNG ?? Xoshiro256PlusPlus(seed: seed)
     }
 
     public init(text: String = "", seed: UInt64 = 0, frameRate: Int = 60, initialRNG: Xoshiro256PlusPlus? = nil) {
+        self.init(text: text, seed: seed, frameRate: frameRate, initialRNG: initialRNG, rngContinuation: nil, clock: nil)
+    }
+
+    public init(text: String = "", seed: UInt64 = 0, frameRate: Int = 60, initialRNG: Xoshiro256PlusPlus? = nil,
+                rngContinuation: RNGContinuation? = nil, clock: EffectClock?) {
         precondition(frameRate >= 0, "frame rate must not be negative")
         self.text = text
         self.seed = seed
         self.frameRate = frameRate == 0 ? 60 : frameRate
         self.initialRNG = initialRNG
+        self.rngContinuation = rngContinuation
+        self.clock = clock
     }
 }
 

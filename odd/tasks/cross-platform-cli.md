@@ -16,16 +16,16 @@ Implement docs/swift-port/cross-platform-cli-spec.md using native Swift, reusing
 - [ ] T02: Portable oracle harness and strict input/parser/error/filter/help/completion semantics. Subprocess stdout/stderr/status comparisons against reference.
 - [ ] T03: Input preprocessing, dimensions, Unicode scalars, wrapping/anchors/clipping and ANSI foreground/background serialization. Unit and Rust byte comparisons.
 - [ ] T04: Entropy, shared continuation RNG, deterministic random selection and hidden modes including M0 and zero frame limits. Multi-seed complete sequence comparisons.
-- [ ] T05: Injectable clocks, repaint/pacing/teardown runtime. Fake adapter tests and real pacing smoke check.
+- [x] T05: Injectable clocks, repaint/pacing/teardown runtime. Fake adapter tests and real pacing smoke check, with local macOS proof.
 - [ ] T06: POSIX cancellation, broken pipes and settled resize. PTY lifecycle regressions.
 - [ ] T07: Windows console capability, restoration/cancellation/resize/Unicode/redirected handles. Native checks pending host availability.
 - [ ] T08: All 37 effects full default/non-default parity corpus, three-OS CI definitions, setup documentation and honest platform evidence. Report any mismatches independently from CLI parity.
 
 ## Progress and verification
-Resumed 2026-09-17 after explicit user authorization to implement the identified native CLI gaps. Scope includes package isolation, portable oracle/input semantics, random selection/entropy, terminal repaint/pacing, POSIX and Windows adapters, and honest three-platform checks. Existing effects and GUI products must remain intact. The full non-default specification corpus is not yet implemented or certified. T01 is the first bounded slice; T02–T08 remain pending.
+Resumed 2026-09-17 after explicit user authorization to implement the identified native CLI gaps. Scope includes package isolation, portable oracle/input semantics, random selection/entropy, terminal repaint/pacing, POSIX and Windows adapters, and honest three-platform checks. Existing effects and GUI products must remain intact. The full non-default specification corpus is not yet implemented or certified. T01 and T05 are complete with local macOS proof. T02/T03/T04/T06/T07/T08 remain partial or pending; implemented platform adapters do not certify other hosts.
 
 ## Slice evidence
-Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original Rust oracle reference remains 0f24d88408c8b815761c2c07da7dc9b411f63016. Running authored count: 415 (T01 + partial T02/T04). Record commits, focused checks, runtime scenario, rollback boundaries and slice bases as work completes.
+Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original Rust oracle reference remains 0f24d88408c8b815761c2c07da7dc9b411f63016. Running authored count: 750 through first runtime slice (T01 + partial T02/T04 + first T05/T06); second slice count pending parent commit. Record commits, focused checks, runtime scenario, rollback boundaries and slice bases as work completes.
 
 ## T01 evidence
 - Implementation: `TTFX_CLI_ONLY=1` filters the existing manifest declarations to two products (`ttfx`, `ttfx-swift`) and six shared CLI/Core/Effects targets including their tests. No engine duplication or extra dependency. Normal/unset/`0` keeps the GUI graph.
@@ -50,7 +50,7 @@ Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original R
 - Work-unit commit: pending parent verification/commit. RDD off.
 
 ## Next step
-Parent verifies and commits the bounded T02/T04 slice, recording identity/count and final runner build proof. Continue terminal runtime/adapters T05–T07 with strict TDD; resizing requires a public current RNG checkpoint/continuation boundary, since this slice only provides initial state. Keep full T02/T04/T08 acceptance pending.
+Parent commits the independently verified native environment slice and records its final proof. Native Ubuntu/Windows compilation and lifecycle checks, remaining parser/hidden-mode and ANSI-color compatibility, and the full non-default corpus remain pending. No remote delivery is authorized.
 
 Partial T02/T04 work-unit commit: 20ced14faa477ed83b5abbeb2bdca986ca96406d. Parent structural readback and diff check passed. Native review disabled; independent aggregate verification follows runtime work.
 
@@ -65,3 +65,42 @@ Partial T02/T04 work-unit commit: 20ced14faa477ed83b5abbeb2bdca986ca96406d. Pare
 - REFACTOR: small clock/runtime/native-write boundaries, single normal cancellation teardown, optional native signal disposition restoration; no effect rewrites and no GUI changes. Final focused tests/smoke/diff check recorded by writer handoff.
 - Rollback: runtime/NativeTerminal files, normal CLI integration, TerminalRuntimeTests, terminal-smoke.py, native-terminal-runtime.md together; hidden export/engine/GUI remain intact.
 - Work-unit commit: pending parent verification/commit; RDD off.
+
+
+First T05/T06 runtime work-unit commit: 5b5dad8. Parent structural readback/diff check passed; native review remains disabled.
+
+## T03/T04/T05/T06/T07 second native environment slice (partial)
+
+### Implemented
+- Native viewport query, independent COLUMNS/LINES integer overrides, and 80×24 fallback. Positive, zero and -1 canvas sizes remain distinct. Unicode-scalar input widths, wrapping, text/canvas anchors and clipping are supported.
+- Strict UTF-8 rejection and fixed-width tab expansion. Interactive stdin exits without waiting for EOF; empty/whitespace normal input exits quietly. Supported input SGR is currently stripped, not preserved by always/dynamic handling.
+- No-color and xterm serialization apply to actual frame foreground/background channels, including explicit black foreground. Terminal-background blending remains pending.
+- Optional RNGContinuation retains the current Xoshiro stream, including selection, constructor and tick draws. Resize rebuilds consume this continuation rather than the original seed. Ordinary configuration retains independent RNG value semantics.
+- Optional EffectClock gives normal CLI Matrix/Thunderstorm monotonic real time; gallery/parity defaults and --virtual-clock retain tick-based timing.
+- Terminal stdout polls dimensions, waits a 50 ms quiet window, compares layout, clears the old area and rebuilds with reuse disabled. Redirected output, ignored dimensions and unchanged layouts do not restart.
+- Conditional WinSDK adapter preserves/enables/restores console output mode, uses Unicode WriteConsoleW for consoles and UTF-8 WriteFile for redirected handles, retries partial writes, queries viewport size, and handles cooperative Ctrl-C/Break through a preallocated atomic flag. Detached redirected processes do not require a console-control channel. Close/logoff/shutdown leave default OS termination; cursor cleanup is not guaranteed.
+- Added .github/workflows/swift-cli.yml with CLI-only builds, portable checks and help on macOS, Ubuntu and Windows. Windows uses the dedicated Windows Swift setup action; macOS/Ubuntu use setup-swift v2. This workflow has not run remotely.
+
+### Verification
+- RED: four TerminalLayoutTests failures before implementation: invalid UTF-8 accepted, zero canvas dimension wrong, no-color ignored, and grapheme-count width. Optional environment seams then produced three NativeTerminalPolicyTests issues: current RNG snapshot/rebuild wrong and constant real clock incorrectly completed. Odd-center/trailing-space anchoring failed two assertions before correction. Harness macro and incremental linker failures are excluded from behavioral RED.
+- GREEN: final 15 functions in three runtime/layout/policy suites passed, zero skips (0.033 s). Required aggregate parser/parity/random/runner/graph command passed 21 functions in five suites (26.121 s), including 37 random singleton cases and four multi-seed cases. CLI build passed (0.15 s); normal comparison GUI build passed (1.66 s).
+- Extended native smoke passed: exact full recorded Rust/Swift Print transcript; real 10 FPS playback (4.622 s); SIGINT status 1 and SIGTERM signal -15 with cursor cleanup and quiet stderr; quiet broken pipe; PTY settled resize from 20×4 to 24×6; redirected SIGWINCH without clear/restart; interactive stdin without EOF blocking. Local macOS evidence only.
+- CompleteEffectParityTests ran once after RNG/clock/layout wiring: all 117 recorded cases passed (111 default + six timed), two functions, zero skips, 73.865 s. The subsequent odd/nonspace anchor correction has focused proof and leaves sw/default positions unchanged; the expensive corpus was not repeated. This is sampled default/timed evidence, not exhaustive non-default parity.
+- REFACTOR: forwarding overloads preserve original Canvas.ingest and EffectConfiguration initializer signatures; existing xterm palette is reused; test helper accepts injected dimensions rather than assuming host viewport. Rust and GUI source were not changed. git diff --check passed.
+
+### Remaining and rollback
+- Full T02 parser/diagnostic/help/M0/zero-cap semantics; T03 always/dynamic input-color handling and terminal-background mixing; comprehensive non-default effect corpus and known tiny-input mismatches; native Ubuntu/Windows execution and lifecycle proof remain pending. T03/T04/T06/T07/T08 remain unchecked; T05 closes on the combined runtime proof below.
+- Windows adapter is implemented but not compiled or exercised on this macOS host. CI definition is not CI PASS.
+- Rollback: second-slice TerminalLayout/Core environment/RNG opt-in/Matrix+Thunderstorm clock changes, CLI integration, WinSDK branch, new tests, extended smoke, CI and docs together. Retain the first runtime/pacing slice and GUI products.
+- Work-unit commit: pending parent independent verification/commit. RDD off. Full mirror updated and read back.
+
+
+## Accepted verification correction
+Independent verification reported all runtime/graph checks, parser/parity/random/runner checks, eight PTY smokes, complete 117-case parity, CLI runtime tests and CLI/GUI builds passing. One accepted harness finding: PackageGraphTests looked up the exact PATH key, while Windows can supply Path. Before the bounded fix, add a mixed-case environment regression; then reuse the portable ProcessRunner executable resolver. Recheck graph/runtime/layout/policy suites and CLI build. No effect rewrite or expensive parity rerun is required for this harness-only correction. Update existing docs to distinguish implemented terminal adapters from unverified native Ubuntu/Windows execution; full specification compatibility remains partial.
+
+
+## Bounded correction and documentation result
+- PackageGraphTests mixed-case Path regression observed meaningful RED: executable lookup threw file-not-found while both ordinary graph tests passed. GREEN: reuse ProcessRunner.resolveExecutable with a normalized PATH key; three graph tests and 15 runtime/layout/policy functions passed together (18 functions, four suites, zero skips, 0.160 s). CLI build passed (0.16 s). No effect/Core changes were needed for this correction.
+- Updated root README, Swift README and beginner platform guide: original missing runtime features are implemented and macOS-verified; Ubuntu/Windows native compilation and lifecycle are unverified; Rust/WSL remain beginner reference paths; experimental native CLI-only shell/PowerShell build commands are explicitly not tested host results. Official Swift installer/prerequisite documentation was checked; no installer or remote CI was run.
+- T05 now checked on observed injectable clock/repaint/pacing/teardown proof. T06 remains partial: local POSIX resize/cancellation smokes pass, but native Ubuntu/reference-wide lifecycle evidence is not certified. T02/T03/T04/T07/T08 remain partial.
+- Local Markdown links and git diff --check verified. Conventional commit remains parent-owned.

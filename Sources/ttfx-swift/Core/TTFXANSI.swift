@@ -117,7 +117,7 @@ private struct RGBChannels {
     }
 }
 
-private enum Xterm256 {
+public enum Xterm256 {
     private static let basicPalette: [(UInt8, UInt8, UInt8)] = [
         (0, 0, 0), (128, 0, 0), (0, 128, 0), (128, 128, 0),
         (0, 0, 128), (128, 0, 128), (0, 128, 128), (192, 192, 192),
@@ -127,7 +127,7 @@ private enum Xterm256 {
 
     private static let cubeLevels: [UInt8] = [0, 95, 135, 175, 215, 255]
 
-    static func closestCode(to rgb: UInt32) -> UInt8 {
+    public static func closestCode(to rgb: UInt32) -> UInt8 {
         let channels = RGBChannels(rgb)
         var bestCode: UInt8 = 0
         var bestDiff = Int.max

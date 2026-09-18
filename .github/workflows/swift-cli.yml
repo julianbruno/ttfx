@@ -1,0 +1,31 @@
+name: Native Swift CLI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  cli:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    env:
+      TTFX_CLI_ONLY: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: swift-actions/setup-swift@v2
+        if: runner.os != 'Windows'
+        with:
+          swift-version: '6.2'
+      - uses: compnerd/gha-setup-swift@main
+        if: runner.os == 'Windows'
+        with:
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
+      - name: Build native executable
+        run: swift build --product ttfx
+      - name: Portable runtime and policy regressions
+        run: swift test --filter 'TerminalRuntimeTests|TerminalLayoutTests|NativeTerminalPolicyTests|CLIParsingTests|CLIRuntimeTests|ProcessRunnerTests|PackageGraphTests'
+      - name: Help without animation input
+        run: swift run --skip-build ttfx --help

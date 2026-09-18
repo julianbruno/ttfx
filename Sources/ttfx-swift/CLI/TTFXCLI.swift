@@ -272,18 +272,20 @@ public struct TTFXCLI: ParsableCommand {
         return try cli.renderOutput(standardInput: standardInput)
     }
 
-    func renderOutput(standardInput: Data) throws -> Data {
+    func renderOutput(standardInput: Data) throws -> Data { try renderOutput(standardInput: standardInput, dimensions: nil) }
+
+    func renderOutput(standardInput: Data, dimensions: TerminalDimensions?) throws -> Data {
         let selection = try selectEffect()
 
         let text = try inputText(standardInput: standardInput)
-        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
-        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
+        let layout = TerminalLayout(text: text, options: terminalOptions, dimensions: dimensions ?? terminalDimensions())
+        let columns = layout.columns, rows = layout.rows
         let canvas = try Canvas(columns: columns, rows: rows)
         let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
-        let input = canvas.ingest(text)
+        let input = canvas.ingest(text, wrap: terminalOptions.wrapText, anchor: terminalOptions.anchorText.rawValue)
         var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var output = Data()
-        var runtime = TerminalRuntime(columns: columns, rows: rows, options: terminalOptions,
+        var runtime = TerminalRuntime(columns: layout.visibleColumns, rows: layout.visibleRows, options: terminalOptions,
             write: { output.append($0) })
         if !parityDump && !m0Dump { try runtime.prepare() }
         let limit = parityDump || m0Dump ? (maxFrames ?? UInt64.max) : UInt64.max
@@ -291,7 +293,7 @@ public struct TTFXCLI: ParsableCommand {
         while emitted < limit {
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
             let status = effect.tick(into: &frame)
-            let bytes = terminalBytes(for: frame)
+            let bytes = terminalBytes(for: try layout.project(frame))
             if parityDump || m0Dump {
                 output.append(Data("\(bytes.count)\n".utf8))
                 output.append(bytes)
@@ -344,25 +346,52 @@ private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
 extension TTFXCLI {
     func runTerminalStream(selection: Selection) throws {
         let text = try inputText()
-        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
-        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
-        let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
-        let input = canvas.ingest(text)
-        var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let terminal = NativeTerminal()
-        terminal.installHandlers()
+        try terminal.installHandlers()
         defer { terminal.restoreHandlers() }
-        var runtime = TerminalRuntime(columns: columns, rows: rows, options: terminalOptions, write: terminal.write)
+        let clock = TerminalClock.continuous
+        let continuation = RNGContinuation(selection.rng)
+        let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate,
+            initialRNG: selection.rng, rngContinuation: continuation, clock: virtualClock ? nil : .continuous)
+        var layout = TerminalLayout(text: text, options: terminalOptions, dimensions: terminalDimensions())
+        var canvas = try Canvas(columns: layout.columns, rows: layout.rows)
+        var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas,
+            input: canvas.ingest(text, wrap: terminalOptions.wrapText, anchor: terminalOptions.anchorText.rawValue))
+        var runtime = TerminalRuntime(columns: layout.visibleColumns, rows: layout.visibleRows, options: terminalOptions,
+            clock: clock, write: terminal.write)
         do { try runtime.prepare() }
         catch NativeTerminal.Error.brokenPipe { return }
         var finished = false
         defer { if !finished { try? runtime.finish() } }
+        var resize = SettledResize()
         while !terminal.cancelled {
+            if terminal.interactive && !terminalOptions.ignoreTerminalDimensions {
+                let dimensions = terminalDimensions()
+                if resize.poll(dimensions, now: clock.now()) {
+                    let next = TerminalLayout(text: text, options: terminalOptions, dimensions: dimensions)
+                    if next != layout {
+                        do { try terminal.write(Data(("\u{1B}8\u{1B}[\(layout.visibleRows)A\u{1B}[0J").utf8)) }
+                        catch NativeTerminal.Error.brokenPipe { return }
+                        layout = next
+                        canvas = try Canvas(columns: layout.columns, rows: layout.rows)
+                        // Configuration retains the current stream, including all tick draws.
+                        effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas,
+                            input: canvas.ingest(text, wrap: terminalOptions.wrapText, anchor: terminalOptions.anchorText.rawValue))
+                        var rebuiltOptions = terminalOptions
+                        rebuiltOptions.reuseCanvas = false
+                        runtime = TerminalRuntime(columns: layout.visibleColumns, rows: layout.visibleRows,
+                            options: rebuiltOptions, clock: clock, write: terminal.write)
+                        do { try runtime.prepare() }
+                        catch NativeTerminal.Error.brokenPipe { return }
+                    }
+                }
+            }
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
             let status = effect.tick(into: &frame)
             if terminal.cancelled { break }
-            do { try runtime.printFrame(terminalBytes(for: frame), virtualClock: virtualClock, cancelled: { terminal.cancelled }) }
+            do { try runtime.printFrame(terminalBytes(for: try layout.project(frame)), virtualClock: virtualClock,
+                cancelled: { terminal.cancelled }) }
             catch NativeTerminal.Error.brokenPipe { return }
             if status == .complete { break }
         }
@@ -376,18 +405,18 @@ extension TTFXCLI {
 
     func dumpParity(selection: Selection) throws {
         let text = try inputText()
-        let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
-        let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
+        let layout = TerminalLayout(text: text, options: terminalOptions, dimensions: terminalDimensions())
+        let columns = layout.columns, rows = layout.rows
         let canvas = try Canvas(columns: columns, rows: rows)
         let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
-        let input = canvas.ingest(text)
+        let input = canvas.ingest(text, wrap: terminalOptions.wrapText, anchor: terminalOptions.anchorText.rawValue)
         var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var emitted: UInt64 = 0
         let limit = maxFrames ?? UInt64.max
         while emitted < limit {
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
             let status = effect.tick(into: &frame)
-            writeParityFrame(frame)
+            writeParityFrame(try layout.project(frame))
             emitted += 1
             if status == .complete { break }
         }
@@ -396,9 +425,9 @@ extension TTFXCLI {
 
     func inputText(standardInput: Data) throws -> String {
         if let inputFile {
-            return String(decoding: try Data(contentsOf: URL(fileURLWithPath: inputFile)), as: UTF8.self)
+            return try decodeInput(Data(contentsOf: URL(fileURLWithPath: inputFile)))
         }
-        return String(decoding: standardInput, as: UTF8.self)
+        return try decodeInput(standardInput)
     }
 
     func inputText() throws -> String {
@@ -406,9 +435,10 @@ extension TTFXCLI {
         if let inputFile {
             data = try Data(contentsOf: URL(fileURLWithPath: inputFile))
         } else {
+            guard !NativeTerminal.inputIsInteractive else { return "" }
             data = FileHandle.standardInput.readDataToEndOfFile()
         }
-        return String(decoding: data, as: UTF8.self)
+        return try decodeInput(data)
     }
 
     func makeEffect(named name: String, configuration: EffectConfiguration, canvas: Canvas, input: InputText) throws -> any Effect {
@@ -441,21 +471,37 @@ extension TTFXCLI {
         FileHandle.standardOutput.write(Data("\n".utf8))
     }
 
+    func terminalDimensions() -> TerminalDimensions {
+        TerminalDimensions.resolve(environment: ProcessInfo.processInfo.environment, native: NativeTerminal().dimensions())
+    }
+
+    func decodeInput(_ data: Data) throws -> String {
+        guard let text = String(data: data, encoding: .utf8) else { throw ValidationError("Input is not valid UTF-8.") }
+        // The reference expands each tab to a fixed count, not tab stops.
+        let expanded = text.replacingOccurrences(of: "\t", with: String(repeating: " ", count: terminalOptions.tabWidth))
+        return expanded.replacingOccurrences(of: "\u{1B}\\[[0-9;]*m", with: "", options: .regularExpression)
+    }
+
     func terminalBytes(for frame: Frame) -> Data {
         var output = Data()
         for row in stride(from: frame.rows, through: 1, by: -1) {
             for column in 1...frame.columns {
                 let cell = frame[column: column, row: row]
-                if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
-                    let red = cell.foreground >> 16
-                    let green = (cell.foreground >> 8) & 0xFF
-                    let blue = cell.foreground & 0xFF
-                    output.append(Data("\u{1B}[38;2;\(red);\(green);\(blue)m".utf8))
+                var styled = false
+                if !terminalOptions.noColor {
+                    func style(_ rgb: UInt32, location: Int) -> String {
+                        if terminalOptions.xtermColors { return "\u{1B}[\(location);5;\(Xterm256.closestCode(to: rgb))m" }
+                        return "\u{1B}[\(location);2;\(rgb >> 16);\((rgb >> 8) & 255);\(rgb & 255)m"
+                    }
+                    if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
+                        output.append(Data(style(cell.foreground, location: 38).utf8)); styled = true
+                    }
+                    if cell.background != 0 && cell.background != explicitBlackForegroundSentinel {
+                        output.append(Data(style(cell.background, location: 48).utf8)); styled = true
+                    }
                 }
                 output.append(Data(String(UnicodeScalar(cell.codepoint) ?? " ").utf8))
-                if cell.foreground != 0 || cell.background == explicitBlackForegroundSentinel {
-                    output.append(Data("\u{1B}[0m".utf8))
-                }
+                if styled { output.append(Data("\u{1B}[0m".utf8)) }
             }
             if row != 1 { output.append(10) }
         }
