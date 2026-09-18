@@ -24,3 +24,6 @@ Next: parent mirror/readback and independent verification. Running behavior-unit
 
 ## Rollback
 Loop state/endpoint behavior/toggle/associated tests/docs only; preserve speed/toggle/selector/footer and capture behavior.
+
+## Final independent verification
+Independent verifier repeated swift test --filter TTFXComparisonTests:28 passed, zero skipped,3.835s. No endpoint/speed/failure/state defect found. Parent structural readback and diff-check passed; CUA proof above retained. No push or merge performed. Implementation bcbc4e5; commit-proof59a3e43.
