@@ -25,7 +25,7 @@ Implement docs/swift-port/cross-platform-cli-spec.md using native Swift, reusing
 Resumed 2026-09-17 after explicit user authorization to implement the identified native CLI gaps. Scope includes package isolation, portable oracle/input semantics, random selection/entropy, terminal repaint/pacing, POSIX and Windows adapters, and honest three-platform checks. Existing effects and GUI products must remain intact. The full non-default specification corpus is not yet implemented or certified. T01 is the first bounded slice; T02–T08 remain pending.
 
 ## Slice evidence
-Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original Rust oracle reference remains 0f24d88408c8b815761c2c07da7dc9b411f63016. Running authored count: 116 (T01). Record commits, focused checks, runtime scenario, rollback boundaries and slice bases as work completes.
+Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original Rust oracle reference remains 0f24d88408c8b815761c2c07da7dc9b411f63016. Running authored count: 415 (T01 + partial T02/T04). Record commits, focused checks, runtime scenario, rollback boundaries and slice bases as work completes.
 
 ## T01 evidence
 - Implementation: `TTFX_CLI_ONLY=1` filters the existing manifest declarations to two products (`ttfx`, `ttfx-swift`) and six shared CLI/Core/Effects targets including their tests. No engine duplication or extra dependency. Normal/unset/`0` keeps the GUI graph.
@@ -51,3 +51,17 @@ Resumed branch: codex/native-terminal-runtime. Branch point: 7eb558f. Original R
 
 ## Next step
 Parent verifies and commits the bounded T02/T04 slice, recording identity/count and final runner build proof. Continue terminal runtime/adapters T05–T07 with strict TDD; resizing requires a public current RNG checkpoint/continuation boundary, since this slice only provides initial state. Keep full T02/T04/T08 acceptance pending.
+
+Partial T02/T04 work-unit commit: 20ced14faa477ed83b5abbeb2bdca986ca96406d. Parent structural readback and diff check passed. Native review disabled; independent aggregate verification follows runtime work.
+
+## T05/T06 first runtime slice (partial)
+- Added injectable monotonic clock and byte sink; normal CLI canvas hide/allocation/save, restore/save/up repaint, frame pacing including first frame, single teardown respecting reuse/no-eol/no-restore flags. Testing helper now executes the full normal stream using virtual pacing; hidden dump bytes remain unchanged.
+- Native POSIX partial-write/EINTR loop, SIGPIPE ignore/quiet early or frame-write EPIPE, SIGINT flag/cleanup/status 1, TTY-only SIGTERM cleanup/default/re-raise, saved signal disposition restoration. Signal callbacks only write a `sig_atomic_t` flag. Cancellation is checked after effect tick and after frame pacing before painting.
+- RED: initial `TerminalRuntimeTests` lifecycle regression failed 2 assertions against prior raw frame stream. Cancellation-during-pacing behavioral RED emitted 13 bytes instead of empty; then guarded output after pacing. Compiler cache sandbox failures, absent seam compile failure, and an uninitialized ArgumentParser test default were environmental/harness failures, not behavioral RED.
+- Native smoke discovered SIG_DFL is a nil optional `sig_t` on Darwin; saved dispositions now explicitly optional, preventing an initial native SIGTRAP. Broken-pipe smoke then failed noisy prepare error; catching EPIPE during preparation fixed that boundary too.
+- GREEN: 5 TerminalRuntimeTests functions; focused CLIParityDumpTests isolated passed 2 functions including print/wipe/expand and all 37 framed exports (5.757 s). Combined required parser/parity/random command ran 19 functions; one oracle expand subprocess was killed with status 9, while parser/37 random singleton/four multi-seed cases passed. Isolated oracle rerun passed; retain combined failure rather than inventing proof. Normal comparison app build passed (1.68 s); CLI build passed.
+- Runtime harness: `python3 tools/swift-parity/terminal-smoke.py` exact full Rust/Swift redirected print transcript for recorded input, seed42/canvas24×8; real10fps runtime ~4.6s; SIGINT cursor/status1 and SIGTERM cursor/signal-15, empty stderr; early broken-pipe quiet status0. PTY cancellation/pacing observed on macOS only.
+- Pending: dimensions/layout/color/input strict semantics, effect real clocks, current RNG resize continuation and settled resize, Windows native adapter/host proof. T05/T06 remain unchecked until full acceptance. Tiny `Hi` inferred2×1 Print exposes pre-existing effect glyph/color mismatch (18 frames both, Swift1089 vs Rust1074 bytes); no silent certification.
+- REFACTOR: small clock/runtime/native-write boundaries, single normal cancellation teardown, optional native signal disposition restoration; no effect rewrites and no GUI changes. Final focused tests/smoke/diff check recorded by writer handoff.
+- Rollback: runtime/NativeTerminal files, normal CLI integration, TerminalRuntimeTests, terminal-smoke.py, native-terminal-runtime.md together; hidden export/engine/GUI remain intact.
+- Work-unit commit: pending parent verification/commit; RDD off.

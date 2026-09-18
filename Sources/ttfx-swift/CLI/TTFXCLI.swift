@@ -283,7 +283,10 @@ public struct TTFXCLI: ParsableCommand {
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var output = Data()
-        let limit = parityDump || m0Dump ? (maxFrames ?? UInt64.max) : 1
+        var runtime = TerminalRuntime(columns: columns, rows: rows, options: terminalOptions,
+            write: { output.append($0) })
+        if !parityDump && !m0Dump { try runtime.prepare() }
+        let limit = parityDump || m0Dump ? (maxFrames ?? UInt64.max) : UInt64.max
         var emitted: UInt64 = 0
         while emitted < limit {
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
@@ -294,12 +297,12 @@ public struct TTFXCLI: ParsableCommand {
                 output.append(bytes)
                 output.append(10)
             } else {
-                output.append(bytes)
-                if !terminalOptions.noEOL { output.append(10) }
+                try runtime.printFrame(bytes, virtualClock: true)
             }
             emitted += 1
             if status == .complete { break }
         }
+        if !parityDump && !m0Dump { try runtime.finish() }
         return output
     }
 
@@ -338,7 +341,7 @@ public struct TTFXCLI: ParsableCommand {
 
 private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
 
-private extension TTFXCLI {
+extension TTFXCLI {
     func runTerminalStream(selection: Selection) throws {
         let text = try inputText()
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
@@ -347,15 +350,27 @@ private extension TTFXCLI {
         let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
         let input = canvas.ingest(text)
         var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
-        var status = TickStatus.running
-        while true {
+        let terminal = NativeTerminal()
+        terminal.installHandlers()
+        defer { terminal.restoreHandlers() }
+        var runtime = TerminalRuntime(columns: columns, rows: rows, options: terminalOptions, write: terminal.write)
+        do { try runtime.prepare() }
+        catch NativeTerminal.Error.brokenPipe { return }
+        var finished = false
+        defer { if !finished { try? runtime.finish() } }
+        while !terminal.cancelled {
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
-            status = effect.tick(into: &frame)
-            FileHandle.standardOutput.write(terminalBytes(for: frame))
-            if !terminalOptions.noEOL {
-                FileHandle.standardOutput.write(Data("\n".utf8))
-            }
+            let status = effect.tick(into: &frame)
+            if terminal.cancelled { break }
+            do { try runtime.printFrame(terminalBytes(for: frame), virtualClock: virtualClock, cancelled: { terminal.cancelled }) }
+            catch NativeTerminal.Error.brokenPipe { return }
             if status == .complete { break }
+        }
+        if terminal.cancelled {
+            try? runtime.finish()
+            finished = true
+            terminal.terminateIfRequested()
+            throw ExitCode(1)
         }
     }
 
