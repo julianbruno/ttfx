@@ -107,7 +107,7 @@ public struct SweepEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = sweepConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

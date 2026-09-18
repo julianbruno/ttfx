@@ -146,3 +146,13 @@ Remove-Item Env:TTFX_CLI_ONLY
 ```
 
 Only the exact value `1` selects this graph. Unset the variable (or use `0`) for the existing graphical products. `TTFXCore`, `TTFXEffects`, and the CLI are shared, not duplicated. The portable graph retains Core, Effects, and CLI tests; full oracle/platform test portability is a separate pending task. Successful macOS graph checks do not certify Windows or Ubuntu runtime support.
+
+### Native random effect selection
+
+`--random-effect` now renders a filtered registry choice rather than a placeholder. Omitted seeds use Swift system entropy; explicit seeds retain deterministic behavior. Selection consumes the same Xoshiro stream that initializes the chosen effect, including rejection draws. Effect-specific arguments are ignored for random selection, matching the Rust reference.
+
+```sh
+TTFX_CLI_ONLY=1 swift run ttfx --seed 42 --random-effect --include-effects decrypt rings print
+```
+
+Focused oracle checks cover all 37 singleton candidates and four multi-candidate seeds, capped at 12 frames with virtual timing. These checks are not the full non-default corpus. A separate known small-input edge case remains: `errorcorrect` can emit one Swift frame when Rust emits none because no error pairs are generated. The oracle runner now uses Foundation Process on desktop targets, PATH/PATHEXT executable lookup, and file-backed streams/input; native Linux/Windows execution is still unverified. Terminal pacing, repaint, lifecycle, and resize are separate pending work.

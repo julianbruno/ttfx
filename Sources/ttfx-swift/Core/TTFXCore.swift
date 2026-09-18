@@ -119,12 +119,18 @@ public struct EffectConfiguration: Equatable, Sendable {
     public let text: String
     public let seed: UInt64
     public let frameRate: Int
+    public let initialRNG: Xoshiro256PlusPlus?
 
-    public init(text: String = "", seed: UInt64 = 0, frameRate: Int = 60) {
+    public func makeRNG(seed: UInt64) -> Xoshiro256PlusPlus {
+        initialRNG ?? Xoshiro256PlusPlus(seed: seed)
+    }
+
+    public init(text: String = "", seed: UInt64 = 0, frameRate: Int = 60, initialRNG: Xoshiro256PlusPlus? = nil) {
         precondition(frameRate >= 0, "frame rate must not be negative")
         self.text = text
         self.seed = seed
         self.frameRate = frameRate == 0 ? 60 : frameRate
+        self.initialRNG = initialRNG
     }
 }
 

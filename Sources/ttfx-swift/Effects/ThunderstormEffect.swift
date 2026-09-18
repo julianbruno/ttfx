@@ -129,7 +129,7 @@ public struct ThunderstormEffect: Effect {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, thunderstormConfiguration: .init())
     }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, thunderstormConfiguration: Configuration) {
-        self.canvas = canvas; self.options = thunderstormConfiguration; self.rng = .init(seed: seed)
+        self.canvas = canvas; self.options = thunderstormConfiguration; self.rng = configuration.makeRNG(seed: seed)
         self.frameDuration = 1 / Double(configuration.frameRate)
         guard !input.scalars.isEmpty else { phase = .complete; return }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }

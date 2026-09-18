@@ -58,7 +58,7 @@ public struct RandomSequenceEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = randomSequenceConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

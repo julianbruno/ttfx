@@ -89,7 +89,7 @@ public struct SprayEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = sprayConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

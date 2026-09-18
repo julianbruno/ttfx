@@ -104,7 +104,7 @@ public struct MatrixEffect: Effect {
         self.options = matrixConfiguration
         self.resolveDelay = matrixConfiguration.resolveDelay
         self.stepDuration = 1 / Double(configuration.frameRate)
-        self.rng = .init(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         guard !input.scalars.isEmpty else { complete = true; return }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
         let sources = Dictionary(uniqueKeysWithValues: zip(coordinates, input.scalars))

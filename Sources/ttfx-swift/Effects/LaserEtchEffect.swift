@@ -106,7 +106,7 @@ public struct LaserEtchEffect: Effect {
         self.laserEtchConfiguration = laserEtchConfiguration
         self.canvas = canvas
         self.input = input
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {

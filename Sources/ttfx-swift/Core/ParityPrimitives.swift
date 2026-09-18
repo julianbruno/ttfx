@@ -23,7 +23,11 @@ public enum PyCompat {
     }
 }
 
-public struct Xoshiro256PlusPlus: Sendable {
+public struct Xoshiro256PlusPlus: Equatable, Sendable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.state.0 == rhs.state.0 && lhs.state.1 == rhs.state.1
+            && lhs.state.2 == rhs.state.2 && lhs.state.3 == rhs.state.3
+    }
     private var state: (UInt64, UInt64, UInt64, UInt64)
 
     public init(seed: UInt64) {

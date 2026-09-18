@@ -92,7 +92,7 @@ public struct PourEffect: Effect {
     ) {
         self.canvas = canvas
         options = pourConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

@@ -83,7 +83,7 @@ public struct SmokeEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = smokeConfiguration
-        build(input: input, seed: seed)
+        build(input: input, initialRNG: configuration.makeRNG(seed: seed))
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {
@@ -106,7 +106,7 @@ public struct SmokeEffect: Effect {
         return .running
     }
 
-    private mutating func build(input: InputText, seed: UInt64) {
+    private mutating func build(input: InputText, initialRNG: Xoshiro256PlusPlus) {
         var sources: [(characterID: Int, symbol: UInt32, coordinate: Coordinate)] = []
         for (index, pair) in zip(input.scalars, input.positions).enumerated() {
             sources.append((index, pair.0, Coordinate(column: pair.1.column, row: pair.1.row)))
@@ -154,7 +154,7 @@ public struct SmokeEffect: Effect {
                 renderedVisual: Visual(symbol: source.symbol, foreground: rgb(options.startingColor), duration: 1)
             )
         }
-        releaseOrder = breadthFirstGroups(seed: seed, bounds: (left, right, bottom, top))
+        releaseOrder = breadthFirstGroups(initialRNG: initialRNG, bounds: (left, right, bottom, top))
     }
 
     private func distributedSmokeFrames(symbols: [UInt32], colors: [Color]) -> [Visual] {
@@ -167,8 +167,8 @@ public struct SmokeEffect: Effect {
         return pairs.map { Visual(symbol: $0.0, foreground: rgb($0.1), duration: 3) }
     }
 
-    private func breadthFirstGroups(seed: UInt64, bounds: (Int, Int, Int, Int)) -> [[Int]] {
-        var rng = Xoshiro256PlusPlus(seed: seed)
+    private func breadthFirstGroups(initialRNG: Xoshiro256PlusPlus, bounds: (Int, Int, Int, Int)) -> [[Int]] {
+        var rng = initialRNG
         let left = options.useWholeCanvas ? 1 : bounds.0
         let right = options.useWholeCanvas ? canvas.columns : bounds.1
         let bottom = options.useWholeCanvas ? 1 : bounds.2

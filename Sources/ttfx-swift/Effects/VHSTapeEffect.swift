@@ -103,7 +103,7 @@ public struct VHSTapeEffect: Effect {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, vhsTapeConfiguration: .init())
     }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, vhsTapeConfiguration: Configuration) {
-        self.canvas = canvas; self.options = vhsTapeConfiguration; self.rng = .init(seed: seed)
+        self.canvas = canvas; self.options = vhsTapeConfiguration; self.rng = configuration.makeRNG(seed: seed)
         guard !input.scalars.isEmpty else { phase = .complete; return }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
         bottom = coordinates.map(\.row).min()!; top = coordinates.map(\.row).max()!

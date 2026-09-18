@@ -17,6 +17,26 @@ public enum ProcessRunnerError: Error, Sendable {
 public struct ProcessRunner: Sendable {
     public init() {}
 
+    public static func resolveExecutable(_ name: String, environment: [String: String] = ProcessInfo.processInfo.environment) throws -> URL {
+        #if os(Windows)
+        let separator: Character = ";"
+        let path = environment.first { $0.key.uppercased() == "PATH" }?.value ?? ""
+        let pathExtensions = environment.first { $0.key.uppercased() == "PATHEXT" }?.value ?? ".EXE;.COM"
+        let extensions = name.contains(".") ? [""] : pathExtensions.split(separator: ";").map(String.init)
+        #else
+        let separator: Character = ":"
+        let path = environment["PATH"] ?? ""
+        let extensions = [""]
+        #endif
+        for directory in path.split(separator: separator) {
+            for suffix in extensions {
+                let candidate = URL(fileURLWithPath: String(directory)).appendingPathComponent(name + suffix)
+                if FileManager.default.isExecutableFile(atPath: candidate.path) { return candidate }
+            }
+        }
+        throw ProcessRunnerError.executableUnavailable(URL(fileURLWithPath: name))
+    }
+
     public func run(
         executable: URL,
         arguments: [String],
@@ -25,7 +45,7 @@ public struct ProcessRunner: Sendable {
         currentDirectory: URL?,
         timeout: TimeInterval
     ) throws -> ProcessResult {
-        #if os(macOS)
+        #if os(Linux) || os(Windows) || os(macOS)
         guard executable.isFileURL, FileManager.default.isExecutableFile(atPath: executable.path) else {
             throw ProcessRunnerError.executableUnavailable(executable)
         }
@@ -44,7 +64,10 @@ public struct ProcessRunner: Sendable {
         let stdout = try FileHandle(forWritingTo: stdoutURL)
         let stderr = try FileHandle(forWritingTo: stderrURL)
         defer { try? stdout.close(); try? stderr.close() }
-        let input = Pipe()
+        let stdinURL = directory.appendingPathComponent("stdin")
+        try stdin.write(to: stdinURL)
+        let input = try FileHandle(forReadingFrom: stdinURL)
+        defer { try? input.close() }
         process.executableURL = executable
         process.arguments = arguments
         process.standardOutput = stdout
@@ -58,8 +81,7 @@ public struct ProcessRunner: Sendable {
         } catch {
             throw ProcessRunnerError.launchFailed(error.localizedDescription)
         }
-        input.fileHandleForWriting.write(stdin)
-        try? input.fileHandleForWriting.close()
+
 
         let deadline = Date().addingTimeInterval(timeout)
         while process.isRunning && Date() < deadline {
@@ -102,10 +124,10 @@ public enum FixtureGenerator {
         let root = URL(fileURLWithPath: repositoryRoot).standardizedFileURL
         do {
             _ = try runner.run(
-                executable: URL(fileURLWithPath: "/usr/bin/git"),
+                executable: try ProcessRunner.resolveExecutable("git"),
                 arguments: ["-C", root.path, "rev-parse", "--git-dir"],
                 stdin: Data(),
-                environment: [:],
+                environment: ProcessInfo.processInfo.environment,
                 currentDirectory: nil,
                 timeout: 5
             )

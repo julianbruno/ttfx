@@ -148,7 +148,7 @@ public struct BubblesEffect: Effect {
     ) {
         self.canvas = canvas
         options = bubblesConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         rainbowSpectrum = (try! Gradient(stops: Self.rainbowStops, steps: 5)).spectrum
         popColorRGB = Self.rgb(bubblesConfiguration.popColor)
         build(input: input)

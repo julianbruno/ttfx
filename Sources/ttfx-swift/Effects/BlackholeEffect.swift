@@ -95,7 +95,7 @@ public struct BlackholeEffect: Effect {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, blackholeConfiguration: .init())
     }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, blackholeConfiguration: Configuration) {
-        self.canvas = canvas; self.options = blackholeConfiguration; self.rng = .init(seed: seed)
+        self.canvas = canvas; self.options = blackholeConfiguration; self.rng = configuration.makeRNG(seed: seed)
         guard !input.scalars.isEmpty else { phase = .complete; return }
         radius = max(min(PyCompat.roundHalfEven(Double(canvas.columns) * 0.3), PyCompat.roundHalfEven(Double(canvas.rows) * 0.2)), 3)
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }

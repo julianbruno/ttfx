@@ -67,7 +67,7 @@ public struct OverflowEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = overflowConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

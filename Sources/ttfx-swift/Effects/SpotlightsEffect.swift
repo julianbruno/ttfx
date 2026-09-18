@@ -70,7 +70,7 @@ public struct SpotlightsEffect: Effect {
                 spotlightsConfiguration: Configuration) {
         self.canvas = canvas
         self.options = spotlightsConfiguration
-        self.rng = .init(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         self.remaining = spotlightsConfiguration.searchDuration
         guard !input.scalars.isEmpty else { complete = true; return }
         for _ in 0..<options.spotlightCount {

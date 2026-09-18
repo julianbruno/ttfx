@@ -10,9 +10,17 @@ private func repositoryRoot() -> URL {
         .deletingLastPathComponent()
 }
 
+private var swiftCLIExecutableName: String {
+    #if os(Windows)
+    "ttfx.exe"
+    #else
+    "ttfx"
+    #endif
+}
+
 private func runSwiftCLI(_ arguments: [String], stdin: String = "Swift\nTTE", timeout: TimeInterval = 20) throws -> ProcessResult {
     try ProcessRunner().run(
-        executable: repositoryRoot().appendingPathComponent(".build/debug/ttfx"),
+        executable: repositoryRoot().appendingPathComponent(".build/debug/" + swiftCLIExecutableName),
         arguments: arguments,
         stdin: Data(stdin.utf8),
         environment: ProcessInfo.processInfo.environment,
@@ -23,8 +31,8 @@ private func runSwiftCLI(_ arguments: [String], stdin: String = "Swift\nTTE", ti
 
 private func runRustCLI(_ arguments: [String], stdin: String = "Swift\nTTE", timeout: TimeInterval = 60) throws -> ProcessResult {
     try ProcessRunner().run(
-        executable: URL(fileURLWithPath: "/usr/bin/env"),
-        arguments: ["cargo", "run", "--quiet", "--"] + arguments,
+        executable: try ProcessRunner.resolveExecutable("cargo"),
+        arguments: ["run", "--quiet", "--"] + arguments,
         stdin: Data(stdin.utf8),
         environment: ProcessInfo.processInfo.environment,
         currentDirectory: repositoryRoot(),

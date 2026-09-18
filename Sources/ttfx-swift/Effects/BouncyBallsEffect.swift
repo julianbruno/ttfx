@@ -105,7 +105,7 @@ public struct BouncyBallsEffect: Effect {
     ) {
         self.canvas = canvas
         options = bouncyBallsConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

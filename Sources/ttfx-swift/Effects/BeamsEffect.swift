@@ -63,7 +63,7 @@ public struct BeamsEffect: Effect {
         self.init(configuration: configuration, canvas: canvas, input: input, seed: seed, beamsConfiguration: .init())
     }
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, beamsConfiguration: Configuration) {
-        frames = Self.makeGenericFrames(canvas: canvas, input: input, seed: seed, options: beamsConfiguration)
+        frames = Self.makeGenericFrames(canvas: canvas, input: input, initialRNG: configuration.makeRNG(seed: seed), options: beamsConfiguration)
     }
     public mutating func tick(into frame: inout Frame) -> TickStatus {
         guard tickIndex < frames.count else { return .complete }
@@ -96,7 +96,7 @@ public struct BeamsEffect: Effect {
         var nextCharacterCounter = 0.0
     }
 
-    private static func makeGenericFrames(canvas: Canvas, input: InputText, seed: UInt64, options: Configuration) -> [[(Coordinate, Cell)]] {
+    private static func makeGenericFrames(canvas: Canvas, input: InputText, initialRNG: Xoshiro256PlusPlus, options: Configuration) -> [[(Coordinate, Cell)]] {
         guard !input.scalars.isEmpty else { return [] }
         let beamGradient = try! Gradient(stops: options.beamGradientStops, steps: options.beamGradientSteps)
         let finalGradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)
@@ -169,7 +169,7 @@ public struct BeamsEffect: Effect {
             }
         }
 
-        var rng = Xoshiro256PlusPlus(seed: seed)
+        var rng = initialRNG
         var groups: [GenericGroup] = []
         for row in stride(from: canvas.rows, through: 1, by: -1) {
             var ids = (1...canvas.columns).compactMap { idByCoordinate[Coordinate(column: $0, row: row)] }

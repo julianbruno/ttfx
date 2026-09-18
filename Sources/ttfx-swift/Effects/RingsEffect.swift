@@ -115,7 +115,7 @@ public struct RingsEffect: Effect {
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, ringsConfiguration: Configuration) {
         self.canvas = canvas
         self.options = ringsConfiguration
-        self.rng = .init(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         self.spinRemaining = ringsConfiguration.spinDuration
         self.disperseRemaining = ringsConfiguration.disperseDuration
         self.cyclesRemaining = ringsConfiguration.spinDisperseCycles

@@ -110,7 +110,7 @@ public struct RainEffect: Effect {
     ) {
         self.canvas = canvas
         options = rainConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

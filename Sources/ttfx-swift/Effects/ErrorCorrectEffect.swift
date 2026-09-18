@@ -86,7 +86,7 @@ public struct ErrorCorrectEffect: Effect {
                 correction: correction, final: final, coordinate: coordinates[index], origin: coordinates[index],
                 visual: .init(symbol: input.scalars[index], color: Self.rgb(color)))
         }
-        var rng = Xoshiro256PlusPlus(seed: seed)
+        var rng = configuration.makeRNG(seed: seed)
         var remaining = Array(glyphs.indices)
         for _ in 0..<min(Int(options.errorPairs * Double(remaining.count)), remaining.count / 2) {
             let first = remaining.remove(at: rng.integer(in: remaining.indices))

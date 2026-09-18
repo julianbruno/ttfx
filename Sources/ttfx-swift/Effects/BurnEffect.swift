@@ -64,7 +64,7 @@ public struct BurnEffect: Effect {
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, burnConfiguration: Configuration) {
         self.canvas = canvas
         self.options = burnConfiguration
-        self.rng = .init(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         guard !input.scalars.isEmpty else { complete = true; return }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
         let left = coordinates.map(\.column).min()!, right = coordinates.map(\.column).max()!

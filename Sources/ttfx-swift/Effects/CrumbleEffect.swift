@@ -95,7 +95,7 @@ public struct CrumbleEffect: Effect {
     ) {
         self.canvas = canvas
         options = crumbleConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

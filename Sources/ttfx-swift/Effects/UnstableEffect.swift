@@ -84,7 +84,7 @@ public struct UnstableEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = unstableConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

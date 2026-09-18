@@ -118,7 +118,7 @@ public struct BinaryPathEffect: Effect {
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64,
                 binaryPathConfiguration options: Configuration) {
         self.canvas = canvas
-        self.rng = .init(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         guard !input.scalars.isEmpty else { complete = true; return }
         let coordinates = input.positions.map { Coordinate(column: $0.column, row: $0.row) }
         let gradient = try! Gradient(stops: options.finalGradientStops, steps: options.finalGradientSteps)

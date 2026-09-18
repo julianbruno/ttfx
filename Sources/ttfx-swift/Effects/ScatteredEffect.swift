@@ -64,7 +64,7 @@ public struct ScatteredEffect: Effect {
     ) {
         self.canvas = canvas
         self.options = scatteredConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

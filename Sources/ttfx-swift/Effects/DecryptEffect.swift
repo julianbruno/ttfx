@@ -86,7 +86,7 @@ public struct DecryptEffect: Effect {
         self.canvas = canvas
         self.input = input
         self.options = decryptConfiguration
-        self.rng = Xoshiro256PlusPlus(seed: seed)
+        self.rng = configuration.makeRNG(seed: seed)
     }
 
     public mutating func tick(into frame: inout Frame) -> TickStatus {

@@ -137,7 +137,7 @@ public struct SwarmEffect: Effect {
     public init(configuration: EffectConfiguration, canvas: Canvas, input: InputText, seed: UInt64, swarmConfiguration: Configuration) {
         self.canvas = canvas
         options = swarmConfiguration
-        rng = Xoshiro256PlusPlus(seed: seed)
+        rng = configuration.makeRNG(seed: seed)
         build(input: input)
     }
 

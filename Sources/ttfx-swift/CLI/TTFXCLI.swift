@@ -194,26 +194,12 @@ public struct TTFXCLI: ParsableCommand {
             print(Self.completionScript(for: printCompletion))
             return
         }
-        if randomEffect {
-            let candidates = randomEffectCandidates()
-            guard !candidates.isEmpty else {
-                throw ValidationError("No effects available after filtering.")
-            }
-            if parityDump {
-                try dumpParity(effectName: candidates[0])
-                return
-            }
-            print("Swift renderer pending for random effect selection")
-            return
-        }
-        guard let effectName else {
-            throw ValidationError("No effect specified.")
-        }
+        let selection = try selectEffect()
         if parityDump {
-            try dumpParity(effectName: effectName)
+            try dumpParity(selection: selection)
             return
         }
-        try runTerminalStream(effectName: effectName)
+        try runTerminalStream(selection: selection)
     }
 
     public static let completionOptionNames: [String] = [
@@ -287,25 +273,15 @@ public struct TTFXCLI: ParsableCommand {
     }
 
     func renderOutput(standardInput: Data) throws -> Data {
-        let selected: String
-        if randomEffect {
-            guard let first = randomEffectCandidates().first else {
-                throw ValidationError("No effects available after filtering.")
-            }
-            selected = first
-        } else if let effectName {
-            selected = effectName
-        } else {
-            throw ValidationError("No effect specified.")
-        }
+        let selection = try selectEffect()
 
         let text = try inputText(standardInput: standardInput)
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
+        let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
         let input = canvas.ingest(text)
-        var effect = try makeEffect(named: selected, configuration: configuration, canvas: canvas, input: input)
+        var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var output = Data()
         let limit = parityDump || m0Dump ? (maxFrames ?? UInt64.max) : 1
         var emitted: UInt64 = 0
@@ -327,6 +303,27 @@ public struct TTFXCLI: ParsableCommand {
         return output
     }
 
+    struct Selection {
+        let name: String
+        let seed: UInt64
+        let rng: Xoshiro256PlusPlus
+    }
+
+    func selectEffect(entropy: () -> UInt64 = { UInt64.random(in: .min ... .max) }) throws -> Selection {
+        let resolvedSeed = seed ?? entropy()
+        var rng = Xoshiro256PlusPlus(seed: resolvedSeed)
+        if randomEffect {
+            let candidates = randomEffectCandidates()
+            guard !candidates.isEmpty else {
+                throw ValidationError("No effects available after filtering.")
+            }
+            let name = candidates[rng.integer(in: 0..<candidates.count)]
+            return Selection(name: name, seed: resolvedSeed, rng: rng)
+        }
+        guard let effectName else { throw ValidationError("No effect specified.") }
+        return Selection(name: effectName, seed: resolvedSeed, rng: rng)
+    }
+
     public func randomEffectCandidates() -> [String] {
         var names = TTFXEffectRegistry.names
         if !includeEffects.isEmpty {
@@ -342,14 +339,14 @@ public struct TTFXCLI: ParsableCommand {
 private let explicitBlackForegroundSentinel: UInt32 = 0xFFFF_FFFE
 
 private extension TTFXCLI {
-    func runTerminalStream(effectName: String) throws {
+    func runTerminalStream(selection: Selection) throws {
         let text = try inputText()
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
+        let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
         let input = canvas.ingest(text)
-        var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
+        var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var status = TickStatus.running
         while true {
             var frame = try Frame(columns: canvas.columns, rows: canvas.rows)
@@ -362,14 +359,14 @@ private extension TTFXCLI {
         }
     }
 
-    func dumpParity(effectName: String) throws {
+    func dumpParity(selection: Selection) throws {
         let text = try inputText()
         let columns = terminalOptions.canvasWidth > 0 ? terminalOptions.canvasWidth : inferredColumns(from: text)
         let rows = terminalOptions.canvasHeight > 0 ? terminalOptions.canvasHeight : inferredRows(from: text)
         let canvas = try Canvas(columns: columns, rows: rows)
-        let configuration = EffectConfiguration(text: text, seed: seed ?? 0, frameRate: terminalOptions.frameRate)
+        let configuration = EffectConfiguration(text: text, seed: selection.seed, frameRate: terminalOptions.frameRate, initialRNG: selection.rng)
         let input = canvas.ingest(text)
-        var effect = try makeEffect(named: effectName, configuration: configuration, canvas: canvas, input: input)
+        var effect = try makeEffect(named: selection.name, configuration: configuration, canvas: canvas, input: input)
         var emitted: UInt64 = 0
         let limit = maxFrames ?? UInt64.max
         while emitted < limit {
@@ -402,7 +399,7 @@ private extension TTFXCLI {
     func makeEffect(named name: String, configuration: EffectConfiguration, canvas: Canvas, input: InputText) throws -> any Effect {
         let settings: ParsedEffectSettings
         do {
-            settings = (name == effectName)
+            settings = (!randomEffect && name == effectName)
                 ? try ParsedEffectSettings.parse(effectName: name, arguments: effectArguments)
                 : .empty
         } catch let error as EffectOptionError {
