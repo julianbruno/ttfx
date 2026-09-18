@@ -8,6 +8,8 @@ Six-second excerpt of real captured output at its original speed. [Full decrypt 
 
 ## Quick path
 
+For first-time setup, see the [beginner platform guide](../getting-started-platforms.md): native Swift on macOS, the Rust reference on Ubuntu, and Rust inside Ubuntu/WSL on Windows. Full native Swift Linux/Windows CLI portability remains pending.
+
 Run these commands from the repository root:
 
 ```sh

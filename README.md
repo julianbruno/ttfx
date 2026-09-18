@@ -21,6 +21,8 @@ These recordings illustrate a seeded sample, not universal or pixel-exact parity
 
 ## Try it
 
+New to the command line? Follow the [beginner guide for macOS, Ubuntu, and Windows/WSL](docs/getting-started-platforms.md), with setup steps and clear Swift-versus-Rust platform limits.
+
 From the repository root, with the Swift toolchain installed:
 
 ```sh
