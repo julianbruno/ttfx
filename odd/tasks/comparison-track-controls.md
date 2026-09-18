@@ -34,3 +34,6 @@ Coherent UI/test/guide work-unit commit pending below; parent records its identi
 
 ## Next step
 Parent visual/interaction spot check, Engram mirror refresh and final outcome. No push, PR or merge authorized.
+
+## Final evidence
+Implementation commit: c838a0a (148 additions + 9 deletions = 157 authored lines). Parent CUA inspected the actual grouped controls screenshot; AX reports native toggle roles and Visible/Hidden values. Clicking Swift CLI off/on removed/restored only its pane; Cmd+2 off/on removed/restored only SwiftUI. Both restored visible. Independent verifier repeated 19 comparison tests and inspected committed code without defects. Narrow-window interaction, actual VoiceOver narration and SceneStorage restoration remain untested. No merge or push performed.
