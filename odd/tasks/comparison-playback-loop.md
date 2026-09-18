@@ -14,13 +14,13 @@ ODD strict TDD always by explicit user; swift test observed RED/GREEN/REFACTOR. 
 swift test --filter TTFXComparisonTests; swift build --product TTFXComparisonApp; ./script/build_and_run.sh --compare --verify; git diff --check. Generated print videos support multiple fast loops at3×; injected clock endpoint unit proof. Four actual AVPlayer media times/rates remain synchronized, legacy optional missing tracks supported. Do not infer visual or VoiceOver proof from compile; parent CUA.
 
 ## Progress and next step
-Implemented one shared endpoint restart using setRate(time:atHostTime:), with no asynchronous seek at loop boundaries. Both task outcomes form one cohesive work-unit commit (identity to be recorded after commit); no source/media parity changes. RDD off; no native review started.
+Implemented one shared endpoint restart using setRate(time:atHostTime:), with no asynchronous seek at loop boundaries. Both task outcomes form cohesive work-unit commit bcbc4e5 (feat(comparison): loop synchronized video playback), 204 additions +9 deletions =213 authored changed lines; no source/media parity changes. RDD off; no native review started.
 
 RED: swift test --filter TTFXComparisonTests failed compilation on missing isLooping before implementation (/tmp/ttfx-loop-red.log). A focused unavailable-loop endpoint regression then failed position0.5 versus3 after slowing, before correcting old-rate stopping (/tmp/ttfx-loop-endpoint-red.log).
 GREEN: swift test --filter TTFXComparisonTests passed28 tests, zero skipped, after final correction (3.826 seconds). swift build --product TTFXComparisonApp and ./script/build_and_run.sh --compare --verify exited0; git diff --check passed. Cache permission failures were environmental, not RED.
 Parent CUA: defaultoff; enablepaused retainedPlay/position0; speed3 with Loopon continuedPause after many2.12-second cycles at media0.40; turningLoopoff reached2.12/Play with speed3 retained. Not VoiceOver/frame-perfect proof.
 
-Next: local commit, then parent commit-identity recording/mirror/readback and independent verification. Running authored count to be recorded from commit, under250 forecast; stacked-to-main preference, no PR/push/merge authorized.
+Next: parent mirror/readback and independent verification. Running behavior-unit authored count213, under250 forecast; stacked-to-main preference, no PR/push/merge authorized.
 
 ## Rollback
 Loop state/endpoint behavior/toggle/associated tests/docs only; preserve speed/toggle/selector/footer and capture behavior.
