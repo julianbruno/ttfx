@@ -4,17 +4,15 @@ import AVFoundation
 @testable import TTFXComparisonKit
 @testable import TTFXComparisonApp
 
-@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable; run capture.sh first."))
-@MainActor func pairedPlayersAdvanceAndPauseOnGeneratedVideos() async throws {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let directory = root.appendingPathComponent("artifacts/video-comparison")
-    let exists = FileManager.default.fileExists(atPath: directory.appendingPathComponent("manifest.json").path)
-    try #require(exists, "Generated library missing; runtime integration unavailable.")
-    let manifest = try ComparisonManifest.load(from: directory)
-    let effect = try #require(manifest.effects.first(where: { $0.name == "print" }))
-    let cli = try #require(effect.swiftCLI, "Regenerate library with Swift CLI track before integration check.")
+@Test
+@MainActor func pairedPlayersAdvanceAndPauseOnFixtureVideos() async throws {
+    let fixture = try await PlaybackVideoFixture.make()
+    defer { try? fixture.remove() }
+    let directory = fixture.directory
+    let effect = fixture.shortEffect
+    let cli = try #require(effect.swiftCLI)
     let player = ComparisonPlayer()
-    try player.load(effect, directory: directory, fps: manifest.fps)
+    try player.load(effect, directory: directory, fps: fixture.fps)
     for _ in 0..<100 {
         if [player.rust, player.swiftUI, player.swiftCLI, player.metal].allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
         try await Task.sleep(for: .milliseconds(50))
@@ -37,10 +35,10 @@ import AVFoundation
     #expect(abs(player.swiftCLI.currentTime().seconds - cliTime) < 0.04)
     player.seek(1)
     try await Task.sleep(for: .milliseconds(250))
-    #expect(abs(player.swiftCLI.currentTime().seconds - ComparisonTimeline.time(1, frames: cli.frames, fps: manifest.fps)) < 0.04)
+    #expect(abs(player.swiftCLI.currentTime().seconds - ComparisonTimeline.time(1, frames: cli.frames, fps: fixture.fps)) < 0.04)
     player.seek(player.duration)
     try await Task.sleep(for: .milliseconds(250))
-    #expect(abs(player.swiftCLI.currentTime().seconds - ComparisonTimeline.time(player.duration, frames: cli.frames, fps: manifest.fps)) < 0.04)
+    #expect(abs(player.swiftCLI.currentTime().seconds - ComparisonTimeline.time(player.duration, frames: cli.frames, fps: fixture.fps)) < 0.04)
     player.clear()
     #expect(player.swiftCLI.currentItem == nil)
 }
@@ -80,11 +78,6 @@ import AVFoundation
     #expect(player.metal.currentItem == nil)
 }
 
-private var generatedComparisonLibraryExists: Bool {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    return FileManager.default.fileExists(atPath: root.appendingPathComponent("artifacts/video-comparison/manifest.json").path)
-}
-
 @Test @MainActor func playbackSpeedRejectsInvalidRatesAndScalesMediaClock() {
     let player = ComparisonPlayer()
     #expect(player.playbackSpeed == 1)
@@ -103,14 +96,14 @@ private var generatedComparisonLibraryExists: Bool {
     #expect(ComparisonPlayer.mediaPosition(start: 2, elapsed: 10, speed: 3, duration: 20) == 20)
 }
 
-@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@Test
 @MainActor func playbackSpeedKeepsFourTracksSynchronizedAcrossLiveChange() async throws {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let directory = root.appendingPathComponent("artifacts/video-comparison")
-    let manifest = try ComparisonManifest.load(from: directory)
-    let effect = try #require(manifest.effects.first(where: { $0.name == "rings" }))
+    let fixture = try await PlaybackVideoFixture.make()
+    defer { try? fixture.remove() }
+    let directory = fixture.directory
+    let effect = fixture.longEffect
     let player = ComparisonPlayer()
-    try player.load(effect, directory: directory, fps: manifest.fps)
+    try player.load(effect, directory: directory, fps: fixture.fps)
     let tracks = [player.rust, player.swiftCLI, player.swiftUI, player.metal]
     for _ in 0..<100 {
         if tracks.allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
@@ -176,14 +169,14 @@ private var generatedComparisonLibraryExists: Bool {
     #expect(player.playbackSpeed == 3)
 }
 
-@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@Test
 @MainActor func loopRepeatsFourTracksTogetherAndDisablesAtNextEndpoint() async throws {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let directory = root.appendingPathComponent("artifacts/video-comparison")
-    let manifest = try ComparisonManifest.load(from: directory)
-    let effect = try #require(manifest.effects.first(where: { $0.name == "print" }))
+    let fixture = try await PlaybackVideoFixture.make()
+    defer { try? fixture.remove() }
+    let directory = fixture.directory
+    let effect = fixture.shortEffect
     let player = ComparisonPlayer()
-    try player.load(effect, directory: directory, fps: manifest.fps)
+    try player.load(effect, directory: directory, fps: fixture.fps)
     let tracks = [player.rust, player.swiftCLI, player.swiftUI, player.metal]
     for _ in 0..<100 {
         if tracks.allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
@@ -225,16 +218,15 @@ private var generatedComparisonLibraryExists: Bool {
     player.clear()
 }
 
-@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@Test
 @MainActor func loopHoldsShorterLegacyTrackAndHandlesEndpointSpeedChange() async throws {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let directory = root.appendingPathComponent("artifacts/video-comparison")
-    let manifest = try ComparisonManifest.load(from: directory)
-    let printEffect = try #require(manifest.effects.first(where: { $0.name == "print" }))
-    // Reuse actual media with a longer shared timeline: the Rust track must hold, not loop independently.
-    let longer = ComparisonVideo(path: printEffect.metal.path, frames: 100, completed: true, provenance: "test")
+    let fixture = try await PlaybackVideoFixture.make()
+    defer { try? fixture.remove() }
+    let directory = fixture.directory
+    let printEffect = fixture.shortEffect
+    let longer = fixture.longVideo
     let player = ComparisonPlayer()
-    try player.load(.init(name: "legacy", rust: printEffect.rust, metal: longer), directory: directory, fps: manifest.fps)
+    try player.load(.init(name: "legacy", rust: printEffect.rust, metal: longer), directory: directory, fps: fixture.fps)
     for _ in 0..<100 {
         if [player.rust, player.metal].allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
         try await Task.sleep(for: .milliseconds(50))
@@ -243,7 +235,7 @@ private var generatedComparisonLibraryExists: Bool {
     player.setPlaybackSpeed(3)
     player.play()
     try await Task.sleep(for: .milliseconds(950))
-    #expect(player.position > printEffect.rust.duration(fps: manifest.fps))
+    #expect(player.position > printEffect.rust.duration(fps: fixture.fps))
     #expect(player.rust.currentTime().seconds > 2)
     #expect(player.rust.rate == 0)
     #expect(player.isPlaying)
@@ -256,7 +248,7 @@ private var generatedComparisonLibraryExists: Bool {
 
     var now = 0.0
     let endpoint = ComparisonPlayer(uptime: { now })
-    try endpoint.load(printEffect, directory: directory, fps: manifest.fps)
+    try endpoint.load(printEffect, directory: directory, fps: fixture.fps)
     for _ in 0..<100 {
         if [endpoint.rust, endpoint.swiftCLI, endpoint.swiftUI, endpoint.metal].allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
         try await Task.sleep(for: .milliseconds(50))

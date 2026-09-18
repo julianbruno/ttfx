@@ -36,14 +36,14 @@ import SwiftUI
     #expect(player.playbackProfile == .easeOut)
 }
 
-@Test(.enabled(if: profileVideoLibraryExists, "Generated video library unavailable."))
-@MainActor func playbackProfilesKeepGeneratedTracksTogetherAcrossChanges() async throws {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    let directory = root.appendingPathComponent("artifacts/video-comparison")
-    let manifest = try ComparisonManifest.load(from: directory)
-    let effect = try #require(manifest.effects.first(where: { $0.maximumFrames >= manifest.fps * 2 && $0.swiftCLI != nil && $0.swiftUI != nil }))
+@Test
+@MainActor func playbackProfilesKeepFixtureTracksTogetherAcrossChanges() async throws {
+    let fixture = try await PlaybackVideoFixture.make()
+    defer { try? fixture.remove() }
+    let directory = fixture.directory
+    let effect = fixture.longEffect
     let player = ComparisonPlayer()
-    try player.load(effect, directory: directory, fps: manifest.fps)
+    try player.load(effect, directory: directory, fps: fixture.fps)
     let tracks = [player.rust, player.swiftCLI, player.swiftUI, player.metal]
     for _ in 0..<100 {
         if tracks.allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
@@ -83,9 +83,4 @@ import SwiftUI
         #expect(abs(track.currentTime().seconds - player.position) < 0.15)
     }
     player.clear()
-}
-
-private var profileVideoLibraryExists: Bool {
-    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-    return FileManager.default.fileExists(atPath: root.appendingPathComponent("artifacts/video-comparison/manifest.json").path)
 }
