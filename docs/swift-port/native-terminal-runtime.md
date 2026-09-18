@@ -2,10 +2,31 @@
 
 The Swift CLI now prepares a canvas, repaints in place, and restores the cursor on completion. It deliberately emits the same ANSI lifecycle when stdout is redirected, rather than silently switching to an ANSI-free format.
 
+## Host status and quick path
+
+| Host | Development state | Observed verification |
+|---|---|---|
+| macOS arm64 | CLI-only graph, POSIX terminal adapter and runtime implemented | Local builds, focused tests, Rust oracle checks and eight terminal smoke scenarios passed. |
+| Ubuntu/Linux | CLI-only graph and POSIX adapter implemented | Native compilation and terminal behavior not yet verified. |
+| Windows | CLI-only graph and conditional WinSDK adapter implemented | Native compilation, console restoration, Unicode, cancellation and resize not yet verified. |
+
+For installation and first-time setup, use the [beginner platform guide](../getting-started-platforms.md). Requires Swift 6.2 or newer. Run from the repository root:
+
 ```sh
-TTFX_CLI_ONLY=1 swift build --product ttfx
-printf 'Hello Swift' | .build/debug/ttfx --seed 42 --frame-rate 25 print
+# macOS / Ubuntu
+export TTFX_CLI_ONLY=1
+swift build --product ttfx
+printf 'Hello Swift' | swift run --skip-build ttfx --seed 42 --frame-rate 25 print
 ```
+
+```powershell
+# Native Windows PowerShell: commands to try, not a verified host result
+$env:TTFX_CLI_ONLY = '1'
+swift build --product ttfx
+"Hello Swift" | swift run --skip-build ttfx --seed 42 --frame-rate 25 print
+```
+
+Before building Apple graphical products, unset `TTFX_CLI_ONLY` (or set it to `0`). Rust/WSL remain the guide's beginner reference paths for Ubuntu/Windows until native Swift host proof is available.
 
 `--frame-rate 0` and `--virtual-clock` skip real pacing. Normal pacing waits the remainder of one frame interval, including before the first frame; it does not try to catch up after a slow frame. `--reuse-canvas`, `--no-eol`, and `--no-restore-cursor` affect canvas preparation and teardown.
 
@@ -15,15 +36,25 @@ On macOS/Linux the native writer retries partial writes and EINTR, suppresses SI
 
 ## Verification and limits
 
-Observed on macOS arm64 only:
+Observed independently on **macOS arm64, 2026-09-17**, after the runtime implementation:
 
-- `TTFX_CLI_ONLY=1 swift test --filter TerminalRuntimeTests`: original lifecycle RED (two failed assertions), then GREEN. Additional cancellation-during-pacing RED produced 13 output bytes instead of none, then GREEN after checking cancellation after the wait.
-- `python3 tools/swift-parity/terminal-smoke.py`: exact full redirected Rust/Swift Print transcript for seed 42, 24×8 canvas, recorded comparison input; real pacing; PTY SIGINT/SIGTERM cleanup and status; quiet broken pipe.
-- Tiny two-character input at inferred 2×1 canvas exposes an existing Print effect frame mismatch (color/glyph), independently of matching frame counts and terminal lifecycle. This is not fixed or certified by runtime checks.
+| Check | Observed result |
+|---|---|
+| Graph/runtime/layout/policy | Final spot check: 18 functions in four suites passed, zero skips (1.093 s), including the Windows-style `Path` lookup regression. |
+| Parser/parity/random/portable runner | 19 functions passed (25.753 s). Random checks include all 37 singleton candidates and four seeded multi-candidate cases; capped checks are not full sequence certification. |
+| Complete effect parity and CLI runtime | 117/117 default/timed parameterized cases plus two CLI runtime functions passed, zero skips (74.436 s). |
+| Native terminal smoke | Eight scenarios passed: exact recorded Rust/Swift Print transcript, real 10 FPS pacing (4.597 s), SIGINT/SIGTERM cleanup/status, quiet broken pipe, settled PTY resize, redirected SIGWINCH and interactive stdin. |
+| Builds | CLI-only `ttfx` and normal `TTFXComparisonApp` builds passed. |
 
-The first slice left Windows, resize, dimensions and effect real-time injection pending; implementation progress is recorded below. Full input/layout/color compatibility and cross-platform execution evidence remain pending. The lifecycle smoke does not certify every effect or Linux/Windows behavior.
+Behavior changes followed observed **RED → GREEN → REFACTOR**. The [work ledger](../../odd/tasks/cross-platform-cli.md) preserves exact failing assertions, commands, work-unit commits (`0741766`, `20ced14`, `5b5dad8`, `6248009`) and final evidence (`ebbcf3e`). Initial lifecycle RED had two failed assertions; cancellation-during-pacing emitted 13 bytes instead of none. Layout, RNG/clock and mixed-case executable lookup regressions were also observed before their fixes. Cache/linker/scratch-lock failures are not behavioral RED.
 
-Rollback boundary: terminal runtime/adapter files, normal stream integration, runtime tests/smoke, and this document together. Hidden parity export, engine algorithms, and GUI products remain unchanged.
+An earlier combined oracle run lost its `expand` subprocess with status 9. Isolated reruns and the subsequent independent required suite passed; that history remains recorded, not erased.
+
+**Not certified:** Ubuntu/Windows host behavior, all inputs/settings, comprehensive non-default sequences or full CLI compatibility. Known pre-existing small-input mismatches remain: `errorcorrect` produces zero Rust frames versus one Swift frame in a short-input case; tiny inferred 2×1 Print differs in glyph/color despite matching frame counts. The recorded 24×8 Print transcript matches exactly.
+
+T01 (CLI graph) and T05 (runtime) are locally complete; other specification tasks remain partial. See [remaining compatibility work](#dimensions-input-and-settled-resize) and the work ledger. No Linux/Windows test outcome is inferred from macOS PASS.
+
+Rollback boundary: terminal/runtime adapters, CLI integration, related layout/RNG/clock changes, regression tests/smoke and their documentation together; keep the matching work-unit boundaries in the ledger. Hidden parity export and graphical products are preserved by the implementation.
 
 ## Dimensions, input, and settled resize
 
@@ -45,4 +76,4 @@ Primary references: [WriteConsole](https://learn.microsoft.com/en-us/windows/con
 
 ## Three-platform CI definition
 
-`.github/workflows/swift-cli.yml` defines CLI-only build, portable policy/parser/runtime tests, and help checks on macOS, Ubuntu and Windows. Windows uses the [Windows Swift setup action](https://github.com/compnerd/gha-setup-swift); macOS/Ubuntu reuse [setup-swift v2](https://github.com/swift-actions/setup-swift/tree/v2). The workflow is a definition, **not evidence of successful CI**. It has not been pushed or run remotely in this task.
+`.github/workflows/swift-cli.yml` defines CLI-only build, portable policy/parser/runtime tests, and help checks on macOS, Ubuntu and Windows. Windows uses the [Windows Swift setup action](https://github.com/compnerd/gha-setup-swift); macOS/Ubuntu reuse [setup-swift v2](https://github.com/swift-actions/setup-swift/tree/v2). The workflow is a definition, **not evidence of successful CI**. CI results are not yet confirmed; workflow presence does not prove host support.
