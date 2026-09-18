@@ -5,6 +5,18 @@ import TTFXEffects
 @testable import TTFXCLI
 
 @Suite struct NativeTerminalPolicyTests {
+    #if os(Windows)
+    @Test func windowsNativeAdapterCompilesWithWinSDKBooleanTypes() {
+        // Building this test also compiles the actual console-control callback
+        // against WinSDK. Keep detection read-only for redirected CI consoles.
+        let terminal = NativeTerminal()
+        let outputIsInteractive: Bool = terminal.interactive
+        let inputIsInteractive: Bool = NativeTerminal.inputIsInteractive
+        #expect(outputIsInteractive == terminal.interactive)
+        #expect(inputIsInteractive == NativeTerminal.inputIsInteractive)
+    }
+    #endif
+
     @Test func resizeRNGContinuesCurrentDraws() {
         var oracle = Xoshiro256PlusPlus(seed: 42)
         let stream = RNGContinuation(oracle)

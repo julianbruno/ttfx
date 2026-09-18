@@ -63,7 +63,7 @@ final class NativeTerminal {
 }
 #elseif os(Windows)
 private let consoleCancellation = Atomic<UInt32>(0)
-private let consoleControl: @convention(c) (DWORD) -> BOOL = { event in
+private let consoleControl: @convention(c) (DWORD) -> WindowsBool = { event in
     // Close/logoff/shutdown retain OS default termination: console writes are
     // not reliable from those callbacks. Ctrl-C/Break are cooperative only.
     guard event == DWORD(CTRL_C_EVENT) || event == DWORD(CTRL_BREAK_EVENT) else { return false }
