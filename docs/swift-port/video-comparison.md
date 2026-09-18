@@ -175,3 +175,15 @@ All 148 videos passed ffprobe frame-count, dimensions, and FPS checks plus full 
 ## Swift CLI track
 
 Capture builds and executes the pure-Swift `ttfx` binary with the same deterministic arguments and UTF-8 input as Rust. Override it with `--swift-cli /absolute/path/to/ttfx`. Its length-prefixed ANSI dump is saved as `swift-cli.frames` and replayed through CoreText into `swift-cli.mp4`; this is not a SwiftUI or Metal recording. Legacy libraries may omit the optional `swiftCLI` track. A max-frames-plus-one probe marks capped recordings without stretching their duration. This macOS capture tooling does not certify CLI portability or effect parity.
+
+## Playback timing profiles
+
+The **Profile** menu beside **Speed** defaults to **None**. **Linear**, **Ease In**,
+**Ease Out**, and **Ease In Out** use SwiftUI UnitCurve presets to vary playback
+rate on the shared source-media timeline, including hidden panes. Speed scales
+the curve's time; pause, seek, and live profile changes retain media position.
+Loop restarts the selected curve for all tracks together.
+
+These are playback profiles, not regenerated effect animations. Springs,
+bouncy/snappy/smooth spring families, and repeat/delay combinators are not offered:
+overshoot and reversal do not define a forward-only prerecorded-video timeline.

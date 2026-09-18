@@ -68,6 +68,15 @@ struct ComparisonRootView: View {
                         .fixedSize()
                         .accessibilityLabel("Playback speed")
                         .help("Change playback speed for all videos, including hidden panes")
+                        Picker("Profile", selection: Binding(get: { player.playbackProfile }, set: { player.setPlaybackProfile($0) })) {
+                            ForEach(PlaybackProfile.allCases, id: \.self) { profile in
+                                Text(profile.rawValue).tag(profile)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .fixedSize()
+                        .accessibilityLabel("Playback animation profile")
+                        .help("Apply a timing curve to all videos. None keeps constant speed.")
                         Toggle("Loop", isOn: Binding(get: { player.isLooping }, set: { player.isLooping = $0 }))
                             .toggleStyle(.button)
                             .accessibilityLabel("Loop playback")

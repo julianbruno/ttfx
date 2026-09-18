@@ -14,6 +14,8 @@ import TTFXComparisonKit
     var isPlaying = false
     var isLooping = false
     private(set) var playbackSpeed = 1.0
+    private(set) var playbackProfile = PlaybackProfile.none
+    private static let updateInterval = 1.0 / 30
     static let playbackSpeeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
     var error: String?
     private var startedAt: TimeInterval = 0
@@ -65,7 +67,7 @@ import TTFXComparisonKit
         error = nil
         isPlaying = true
         schedulePlayback()
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: Self.updateInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.update() }
         }
     }
@@ -82,11 +84,23 @@ import TTFXComparisonKit
             else { schedulePlayback() }
         }
     }
+    func setPlaybackProfile(_ profile: PlaybackProfile) {
+        guard profile != playbackProfile else { return }
+        if isPlaying {
+            position = clockPosition()
+            if position >= duration && !canLoop { pause() }
+        }
+        playbackProfile = profile
+        if isPlaying {
+            if position >= duration { completeEndpoint() }
+            else { schedulePlayback() }
+        }
+    }
     nonisolated static func mediaPosition(start: Double, elapsed: Double, speed: Double, duration: Double) -> Double {
         min(duration, start + max(0, elapsed) * speed)
     }
     private func clockPosition() -> Double {
-        Self.mediaPosition(start: startPosition, elapsed: uptime() - startedAt, speed: playbackSpeed, duration: duration)
+        playbackProfile.position(start: startPosition, elapsed: uptime() - startedAt, speed: playbackSpeed, duration: duration)
     }
     private func schedulePlayback() {
         startPosition = position
@@ -100,7 +114,7 @@ import TTFXComparisonKit
     }
     private func start(_ player: AVPlayer, video: ComparisonVideo, hostTime: CMTime) {
         guard position < video.duration(fps: fps) else { player.pause(); return }
-        player.setRate(Float(playbackSpeed), time: CMTime(seconds: position, preferredTimescale: 600), atHostTime: hostTime)
+        player.setRate(Float(playbackProfile.rate(start: startPosition, elapsed: 0, speed: playbackSpeed, duration: duration, interval: Self.updateInterval)), time: CMTime(seconds: position, preferredTimescale: 600), atHostTime: hostTime)
     }
     private func update() {
         guard isPlaying else { return }
@@ -109,6 +123,23 @@ import TTFXComparisonKit
             error = item.error?.localizedDescription ?? "Video playback failed."; pause(); return
         }
         if position >= duration { completeEndpoint() }
+        else if !playbackProfile.isConstant && uptime() >= startedAt {
+            let rate = Float(playbackProfile.rate(
+                start: startPosition, elapsed: uptime() - startedAt,
+                speed: playbackSpeed, duration: duration, interval: Self.updateInterval
+            ))
+            // Adjust rates together, without a seek on every frame.
+            if let effect {
+                updateRate(rust, video: effect.rust, rate: rate)
+                updateRate(metal, video: effect.metal, rate: rate)
+                if let video = effect.swiftCLI { updateRate(swiftCLI, video: video, rate: rate) }
+                if let video = effect.swiftUI { updateRate(swiftUI, video: video, rate: rate) }
+            }
+        }
+    }
+    private func updateRate(_ player: AVPlayer, video: ComparisonVideo, rate: Float) {
+        if position >= video.duration(fps: fps) { player.pause() }
+        else { player.rate = rate }
     }
     private var canLoop: Bool {
         isLooping && error == nil && loadedPlayers.allSatisfy { $0.currentItem?.status == .readyToPlay }
