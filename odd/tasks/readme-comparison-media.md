@@ -22,4 +22,7 @@ Only README/curateddocsmedia/generator+provenance/taskproof can be reverted with
 - Exact ordered 37 manifest effect names match bottom catalog; every comparison link exists. Original artifacts stay ignored; app behavior unchanged. Behavioral TDD RED/GREEN is N/A for passive media/prose, not represented as a test run.
 - FFmpeg 9.0.1 lacks drawtext; tracked PNG strip supplies permanent labels (bundled Pillow/system Arial). No runtime generator added.
 - Visual spot-check frame: `/tmp/ttfx-readme-hero.png` supplied to parent. Hosted playback not verified.
-- Local commit identity and Engram mirror will be recorded by parent after commit.
+- Work-unit commit: `d23aaf4297835d0956f995ff66e70ed8c09d207e` (`docs(readme): feature Rust versus Metal comparison videos`). Engram mirror handled by parent.
+- Parent visually verified readable Rust-left/Swift-Metal-right labels and real panels; independently probed decrypt: 768×232, 25/1 fps, 519 frames. Parent confirmed README hero/catalog and clean diff check.
+- Numeric source-placement spot check at 2s: left Rust and right Metal crops match their respective source frames with mean per-channel encoding error below 0.83/255.
+- Curated media: 41 files, 8,368,120 bytes; authored Markdown: 130 added lines before this proof update. No push/merge or hosted playback verification.
