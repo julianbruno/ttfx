@@ -8,7 +8,7 @@ User authorized implementation; ODD strict TDD explicit session/config, swift te
 
 ## Tasks
 - [x] S01: Validated speed state and shared-clock rebase/rate scheduling; all four tracks and timeline advance at selected rate, preserve paused/playing transitions and endpoint. Unit tests bounds/default/scaled elapsed/rebase and real generated-video integration at0.5×/3× including live change.
-- [ ] S02: Accessible compact native speed picker near playback controls (0.5,0.75,1,1.25,1.5,2,2.5,3×); guide, tests/build/launch and actual UI rate-change smoke. Record local commit/proof/rollback and honest limitations.
+- [x] S02: Accessible compact native speed picker near playback controls (0.5,0.75,1,1.25,1.5,2,2.5,3×); guide, tests/build/launch and actual UI rate-change smoke. Record local commit/proof/rollback and honest limitations.
 
 ## Checks and acceptance
 swift test --filter TTFXComparisonTests; swift build --product TTFXComparisonApp; ./script/build_and_run.sh --compare --verify; git diff --check. Real video assertions confirm AVPlayer rates and scaled timeline/position with tolerant wall-clock checks; pure deterministic elapsed calculation tests avoid timing flakiness. No visual/VoiceOver claim from compiler tests. Parent CUA when available.
@@ -47,3 +47,6 @@ Revert only speed state/rebase/picker/tests/guide additions; keep prior toggle/s
 - UI commit: `b938822`. Parent observed actual active 0.5×→3× picker change and paused 1× change preserving position; VoiceOver narration and every shorter-track/rate combination remain untested.
 - TDD guide: `docs/swift-port/video-comparison-tdd.md`; historical toggle/selector RED/GREEN are attributed to their existing task records, footer removal is explicitly diff-only.
 - Correction commit identity and final independent verification: parent records after commit. No remote operation.
+
+## Final observed evidence
+Correction commit11e587b; independent verifier reran24 comparison tests with no skips and confirmed endpoint ordering fixed. Parent CUA selected0.5× while paused (position0), pressedPlay, selected3× while playing (Pause remained active and media timeline advanced), paused then selected1× without moving18.76s or autoplay. Sparse UI samples prove interaction, not a universal no-jump measurement; live continuity/all4 rates are covered by automated rings regression. Parent diff-check passed. Actual VoiceOver/every shorter-track combination untested. No push or merge.
