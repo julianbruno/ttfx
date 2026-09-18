@@ -333,6 +333,15 @@ playback through the native SwiftUI snapshot path.
 
 ### Comparison capture and playback
 
+When running the `TTFXVideoCapture` scheme from Xcode, the Swift CLI is resolved from
+an executable `ttfx` beside the capture binary, then from the repository's
+`.build/debug/ttfx`. Build it with `swift build --product ttfx` after CLI changes;
+the capturer does not build dependencies or check their freshness automatically.
+Use `--swift-cli /path/to/ttfx` for another configuration (for example release) or
+custom build directory. An explicit override never falls back if invalid.
+Swift CLI, Rust CLI and ffmpeg paths are validated before output is created, and
+missing executables produce actionable errors rather than a top-level Swift trap.
+
 The comparison app uses real project outputs, but they are generated artifacts and are intentionally
 ignored by Git. A local capture library looks like this:
 

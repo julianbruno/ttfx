@@ -12,7 +12,16 @@ internal enum CaptureError: LocalizedError {
 }
 
 @main struct TTFXVideoCapture {
-    @MainActor static func main() throws {
+    @MainActor static func main() {
+        do {
+            try capture()
+        } catch {
+            FileHandle.standardError.write(Data("TTFXVideoCapture: \(error.localizedDescription)\n".utf8))
+            exit(EXIT_FAILURE)
+        }
+    }
+
+    @MainActor static func capture() throws {
         let arguments = Array(CommandLine.arguments.dropFirst())
         func option(_ name: String, _ fallback: String) -> String {
             guard let i = arguments.firstIndex(of: name), arguments.indices.contains(i + 1) else { return fallback }
@@ -26,7 +35,16 @@ internal enum CaptureError: LocalizedError {
         let root = projectRoot(currentDirectory: currentDirectory)
         let output = URL(fileURLWithPath: option("--output", root.appendingPathComponent("artifacts/video-comparison").path))
         let rust = option("--rust", root.appendingPathComponent("target/release/ttfx").path)
-        let swiftCLI = option("--swift-cli", URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent().appendingPathComponent("ttfx").path)
+        let swiftOverride: String?
+        if let index = arguments.firstIndex(of: "--swift-cli") {
+            guard arguments.indices.contains(index + 1), !arguments[index + 1].hasPrefix("--") else {
+                throw CaptureError.message("--swift-cli requires an executable path")
+            }
+            swiftOverride = arguments[index + 1]
+        } else {
+            swiftOverride = nil
+        }
+        let swiftCLI = try resolveSwiftCLI(override: swiftOverride, captureExecutable: URL(fileURLWithPath: CommandLine.arguments[0]), repository: root)
         let ffmpeg = option("--ffmpeg", "/opt/homebrew/bin/ffmpeg")
         guard let fps = Int(option("--fps", "25")), (1...120).contains(fps),
               let maxFrames = Int(option("--max-frames", "3000")), (1...100000).contains(maxFrames),
@@ -36,6 +54,8 @@ internal enum CaptureError: LocalizedError {
         let selected = option("--effect", "all")
         guard selected == "all" || EffectRegistry.contains(selected) else { throw CaptureError.message("Unknown effect: \(selected)") }
         let effects = selected == "all" ? EffectRegistry.names : [selected]
+        try validateExecutable(rust, label: "Rust CLI", guidance: "Run cargo build --release, or pass --rust /path/to/ttfx.")
+        try validateExecutable(ffmpeg, label: "ffmpeg", guidance: "Install ffmpeg, or pass --ffmpeg /path/to/ffmpeg.")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let git = gitMetadata(repository: root)
         var manifest = ComparisonManifest(generatedAt: ISO8601DateFormatter().string(from: Date()), revision: git.revision, text: text, seed: seed, columns: columns, rows: rows, fps: fps, maxFrames: maxFrames, effects: [])
@@ -123,6 +143,34 @@ internal enum CaptureError: LocalizedError {
             context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         }
         return pixels
+    }
+
+    static func resolveSwiftCLI(override: String?, captureExecutable: URL, repository: URL) throws -> String {
+        let guidance = "Run swift build --product ttfx in \(repository.path), or pass --swift-cli /path/to/ttfx."
+        if let override {
+            try validateExecutable(override, label: "Swift CLI (--swift-cli)", guidance: guidance)
+            return override
+        }
+        let candidates = [
+            captureExecutable.deletingLastPathComponent().appendingPathComponent("ttfx"),
+            repository.appendingPathComponent(".build/debug/ttfx")
+        ]
+        if let binary = candidates.first(where: { isExecutableFile($0.path) }) {
+            return binary.path
+        }
+        throw CaptureError.message("Swift CLI executable not found. Checked: \(candidates.map(\.path).joined(separator: ", ")). \(guidance)")
+    }
+
+    static func validateExecutable(_ path: String, label: String, guidance: String) throws {
+        guard isExecutableFile(path) else {
+            throw CaptureError.message("\(label) is missing or not an executable file: \(path). \(guidance)")
+        }
+    }
+
+    private static func isExecutableFile(_ path: String) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory)
+            && !isDirectory.boolValue && FileManager.default.isExecutableFile(atPath: path)
     }
 
     static func projectRoot(currentDirectory: URL, sourceFile: String = #filePath, environment: [String: String] = ProcessInfo.processInfo.environment) -> URL {
