@@ -1,5 +1,14 @@
 # ttfx
 
+## Rust versus Swift Metal — decrypt
+
+[![Decrypt comparison: Rust left, Swift Metal right](docs/swift-port/comparisons/decrypt-preview.gif)](docs/swift-port/comparisons/decrypt.mp4)
+
+**Rust left · Swift Metal right.** Six-second preview of real captured output, at its original speed.
+[Watch/download the full decrypt comparison](docs/swift-port/comparisons/decrypt.mp4) · [All 37 effect comparisons](#all-37-rust-versus-metal-comparisons).
+The Rust panel replays actual ANSI output; the Metal panel renders the Swift engine with production shaders.
+This seeded sample illustrates the port, not universal parity. [Capture details and reproduction](docs/swift-port/comparisons/README.md).
+
 Terminal text effects as a single static binary. Pipe text in, pick an effect.
 
 This repository now carries a three-generation port lineage:
@@ -347,3 +356,49 @@ would surface.
 
 MIT — see [LICENSE](LICENSE), which carries both this project's copyright and the original
 TerminalTextEffects copyright, and [NOTICE](NOTICE) for the attribution in full.
+
+## All 37 Rust versus Metal comparisons
+
+Full animations at 25 fps, with permanent **Rust left / Swift Metal right** labels.
+These use the same small seeded input as the featured comparison, not the Rust-only Omarchy GIFs above.
+[Provenance, scope, and regeneration](docs/swift-port/comparisons/README.md).
+
+| Effect | Full comparison |
+|---|---|
+| `beams` | [beams — Rust vs Metal](docs/swift-port/comparisons/beams.mp4) |
+| `binarypath` | [binarypath — Rust vs Metal](docs/swift-port/comparisons/binarypath.mp4) |
+| `blackhole` | [blackhole — Rust vs Metal](docs/swift-port/comparisons/blackhole.mp4) |
+| `bouncyballs` | [bouncyballs — Rust vs Metal](docs/swift-port/comparisons/bouncyballs.mp4) |
+| `bubbles` | [bubbles — Rust vs Metal](docs/swift-port/comparisons/bubbles.mp4) |
+| `burn` | [burn — Rust vs Metal](docs/swift-port/comparisons/burn.mp4) |
+| `colorshift` | [colorshift — Rust vs Metal](docs/swift-port/comparisons/colorshift.mp4) |
+| `crumble` | [crumble — Rust vs Metal](docs/swift-port/comparisons/crumble.mp4) |
+| `decrypt` | [decrypt — Rust vs Metal](docs/swift-port/comparisons/decrypt.mp4) |
+| `errorcorrect` | [errorcorrect — Rust vs Metal](docs/swift-port/comparisons/errorcorrect.mp4) |
+| `expand` | [expand — Rust vs Metal](docs/swift-port/comparisons/expand.mp4) |
+| `fireworks` | [fireworks — Rust vs Metal](docs/swift-port/comparisons/fireworks.mp4) |
+| `highlight` | [highlight — Rust vs Metal](docs/swift-port/comparisons/highlight.mp4) |
+| `laseretch` | [laseretch — Rust vs Metal](docs/swift-port/comparisons/laseretch.mp4) |
+| `matrix` | [matrix — Rust vs Metal](docs/swift-port/comparisons/matrix.mp4) |
+| `middleout` | [middleout — Rust vs Metal](docs/swift-port/comparisons/middleout.mp4) |
+| `orbittingvolley` | [orbittingvolley — Rust vs Metal](docs/swift-port/comparisons/orbittingvolley.mp4) |
+| `overflow` | [overflow — Rust vs Metal](docs/swift-port/comparisons/overflow.mp4) |
+| `pour` | [pour — Rust vs Metal](docs/swift-port/comparisons/pour.mp4) |
+| `print` | [print — Rust vs Metal](docs/swift-port/comparisons/print.mp4) |
+| `rain` | [rain — Rust vs Metal](docs/swift-port/comparisons/rain.mp4) |
+| `randomsequence` | [randomsequence — Rust vs Metal](docs/swift-port/comparisons/randomsequence.mp4) |
+| `rings` | [rings — Rust vs Metal](docs/swift-port/comparisons/rings.mp4) |
+| `scattered` | [scattered — Rust vs Metal](docs/swift-port/comparisons/scattered.mp4) |
+| `slice` | [slice — Rust vs Metal](docs/swift-port/comparisons/slice.mp4) |
+| `slide` | [slide — Rust vs Metal](docs/swift-port/comparisons/slide.mp4) |
+| `smoke` | [smoke — Rust vs Metal](docs/swift-port/comparisons/smoke.mp4) |
+| `spotlights` | [spotlights — Rust vs Metal](docs/swift-port/comparisons/spotlights.mp4) |
+| `spray` | [spray — Rust vs Metal](docs/swift-port/comparisons/spray.mp4) |
+| `swarm` | [swarm — Rust vs Metal](docs/swift-port/comparisons/swarm.mp4) |
+| `sweep` | [sweep — Rust vs Metal](docs/swift-port/comparisons/sweep.mp4) |
+| `synthgrid` | [synthgrid — Rust vs Metal](docs/swift-port/comparisons/synthgrid.mp4) |
+| `thunderstorm` | [thunderstorm — Rust vs Metal](docs/swift-port/comparisons/thunderstorm.mp4) |
+| `unstable` | [unstable — Rust vs Metal](docs/swift-port/comparisons/unstable.mp4) |
+| `vhstape` | [vhstape — Rust vs Metal](docs/swift-port/comparisons/vhstape.mp4) |
+| `waves` | [waves — Rust vs Metal](docs/swift-port/comparisons/waves.mp4) |
+| `wipe` | [wipe — Rust vs Metal](docs/swift-port/comparisons/wipe.mp4) |
