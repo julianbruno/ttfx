@@ -1,5 +1,6 @@
 // swift-tools-version: 6.2
 
+import Foundation
 import PackageDescription
 
 let package = Package(
@@ -101,3 +102,14 @@ let package = Package(
         )
     ]
 )
+
+// The CLI reuses the same engine sources without evaluating any graphical targets.
+// GUI products remain the default graph for existing macOS/Xcode workflows.
+if ProcessInfo.processInfo.environment["TTFX_CLI_ONLY"] == "1" {
+    let portableTargets: Set<String> = [
+        "TTFXCore", "TTFXEffects", "TTFXCLI",
+        "TTFXCoreTests", "TTFXEffectsTests", "TTFXCLITests"
+    ]
+    package.targets.removeAll { !portableTargets.contains($0.name) }
+    package.products.removeAll { !["ttfx", "ttfx-swift"].contains($0.name) }
+}

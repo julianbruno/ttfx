@@ -126,3 +126,23 @@ swift run --skip-build ttfx -- print --help
 On Linux, `bin/test` requests a Swift CLI build and help check, but this script intent is not evidence that the current mixed CLI/GUI package graph is portable. SwiftUI/Metal and comparison targets depend on Apple frameworks; Windows/Linux validation remains pending.
 
 See [Swift Package Integration](spm.md) for product-level integration details, [architecture](swift-port-architecture.md) for module mapping.
+
+## CLI-only package graph
+
+Use the same native engine without building the Apple graphical products or their tests:
+
+```sh
+# macOS / Ubuntu (requires a supported Swift 6.2+ toolchain)
+TTFX_CLI_ONLY=1 swift build --product ttfx
+TTFX_CLI_ONLY=1 swift test --filter PackageGraphTests
+```
+
+```powershell
+# Windows PowerShell (native host validation remains pending)
+$env:TTFX_CLI_ONLY = "1"
+swift build --product ttfx
+swift test --filter PackageGraphTests
+Remove-Item Env:TTFX_CLI_ONLY
+```
+
+Only the exact value `1` selects this graph. Unset the variable (or use `0`) for the existing graphical products. `TTFXCore`, `TTFXEffects`, and the CLI are shared, not duplicated. The portable graph retains Core, Effects, and CLI tests; full oracle/platform test portability is a separate pending task. Successful macOS graph checks do not certify Windows or Ubuntu runtime support.
