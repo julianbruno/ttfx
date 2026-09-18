@@ -57,6 +57,12 @@ import AVFoundation
     #expect(!player.swiftCLI.automaticallyWaitsToMinimizeStalling)
     #expect(player.swiftCLI.isMuted)
     #expect(player.swiftCLI.actionAtItemEnd == .pause)
+    player.isLooping = true
+    for _ in 0..<100 {
+        if player.swiftCLI.currentItem?.status == .failed { break }
+        try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(player.swiftCLI.currentItem?.status == .failed)
     player.play()
     #expect(!player.isPlaying)
     #expect(player.error != nil)
@@ -157,4 +163,129 @@ private var generatedComparisonLibraryExists: Bool {
     #expect(player.playbackSpeed == 0.5)
     #expect(!player.isPlaying)
     #expect([player.rust, player.swiftCLI, player.swiftUI, player.metal].allSatisfy { $0.rate == 0 })
+}
+
+@Test @MainActor func loopDefaultsOffAndNeverStartsPausedPlayback() {
+    let player = ComparisonPlayer()
+    #expect(!player.isLooping)
+    player.isLooping = true
+    player.setPlaybackSpeed(3)
+    player.seek(0)
+    #expect(player.isLooping)
+    #expect(!player.isPlaying)
+    #expect(player.playbackSpeed == 3)
+}
+
+@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@MainActor func loopRepeatsFourTracksTogetherAndDisablesAtNextEndpoint() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let directory = root.appendingPathComponent("artifacts/video-comparison")
+    let manifest = try ComparisonManifest.load(from: directory)
+    let effect = try #require(manifest.effects.first(where: { $0.name == "print" }))
+    let player = ComparisonPlayer()
+    try player.load(effect, directory: directory, fps: manifest.fps)
+    let tracks = [player.rust, player.swiftCLI, player.swiftUI, player.metal]
+    for _ in 0..<100 {
+        if tracks.allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    player.isLooping = true
+    player.setPlaybackSpeed(3)
+    player.play()
+    var boundaries = 0
+    var previous = player.position
+    for _ in 0..<400 {
+        try await Task.sleep(for: .milliseconds(25))
+        if player.position < previous { boundaries += 1 }
+        previous = player.position
+        if boundaries >= 2 && player.position > 0.4 { break }
+    }
+    #expect(boundaries >= 2)
+    #expect(player.isPlaying)
+    #expect(player.playbackSpeed == 3)
+    #expect(tracks.allSatisfy { $0.rate == 3 })
+    for track in tracks { #expect(abs(track.currentTime().seconds - player.position) < 0.15) }
+    player.isLooping = false
+    #expect(player.isPlaying)
+    try await Task.sleep(for: .seconds(player.duration / 3 + 0.3))
+    #expect(!player.isPlaying)
+    #expect(player.position == player.duration)
+    #expect(tracks.allSatisfy { $0.rate == 0 })
+    player.isLooping = true
+    player.play()
+    try await Task.sleep(for: .milliseconds(300))
+    player.pause()
+    let paused = player.position
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(player.position == paused)
+    player.seek(player.duration)
+    try await Task.sleep(for: .milliseconds(200))
+    #expect(!player.isPlaying)
+    #expect(player.position == player.duration)
+    player.clear()
+}
+
+@Test(.enabled(if: generatedComparisonLibraryExists, "Generated video library is unavailable."))
+@MainActor func loopHoldsShorterLegacyTrackAndHandlesEndpointSpeedChange() async throws {
+    let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+    let directory = root.appendingPathComponent("artifacts/video-comparison")
+    let manifest = try ComparisonManifest.load(from: directory)
+    let printEffect = try #require(manifest.effects.first(where: { $0.name == "print" }))
+    // Reuse actual media with a longer shared timeline: the Rust track must hold, not loop independently.
+    let longer = ComparisonVideo(path: printEffect.metal.path, frames: 100, completed: true, provenance: "test")
+    let player = ComparisonPlayer()
+    try player.load(.init(name: "legacy", rust: printEffect.rust, metal: longer), directory: directory, fps: manifest.fps)
+    for _ in 0..<100 {
+        if [player.rust, player.metal].allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    player.isLooping = true
+    player.setPlaybackSpeed(3)
+    player.play()
+    try await Task.sleep(for: .milliseconds(950))
+    #expect(player.position > printEffect.rust.duration(fps: manifest.fps))
+    #expect(player.rust.currentTime().seconds > 2)
+    #expect(player.rust.rate == 0)
+    #expect(player.isPlaying)
+    try await Task.sleep(for: .milliseconds(600))
+    #expect(player.position < 1)
+    #expect(player.rust.currentTime().seconds < 1)
+    #expect(player.swiftCLI.currentItem == nil)
+    #expect(player.swiftUI.currentItem == nil)
+    player.clear()
+
+    var now = 0.0
+    let endpoint = ComparisonPlayer(uptime: { now })
+    try endpoint.load(printEffect, directory: directory, fps: manifest.fps)
+    for _ in 0..<100 {
+        if [endpoint.rust, endpoint.swiftCLI, endpoint.swiftUI, endpoint.metal].allSatisfy({ $0.currentItem?.status == .readyToPlay }) { break }
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    endpoint.isLooping = true
+    endpoint.setPlaybackSpeed(3)
+    endpoint.play()
+    now = 10
+    endpoint.setPlaybackSpeed(0.5)
+    #expect(endpoint.isPlaying)
+    #expect(endpoint.position == 0)
+    #expect(endpoint.playbackSpeed == 0.5)
+    endpoint.pause()
+    #expect(!endpoint.isPlaying)
+    endpoint.clear()
+}
+
+@Test @MainActor func loopCannotRestartLoadingOrFailedPlayersAtEndpoint() {
+    let player = ComparisonPlayer(uptime: { 1 })
+    let video = ComparisonVideo(path: "unused.mp4", frames: 75, completed: true, provenance: "test")
+    player.effect = .init(name: "unready", rust: video, metal: video)
+    player.setPlaybackSpeed(3)
+    player.isLooping = true
+    player.isPlaying = true
+    player.setPlaybackSpeed(0.5)
+    #expect(!player.isPlaying)
+    #expect(player.position == player.duration)
+    #expect(player.rust.rate == 0 && player.metal.rate == 0)
+    player.play()
+    #expect(!player.isPlaying)
+    #expect(player.error != nil)
 }

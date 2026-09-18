@@ -209,3 +209,11 @@ ffmpeg -v error -i artifacts/video-comparison/print/swift-cli.mp4 -f null -
 ```
 
 Expect 384 × 192, configured FPS, and the `swiftCLI.frames` manifest count. Repeat decoding and metadata checks for every generated track. Inspect `swift-cli.frames` to separate executable output issues from replay issues. Libraries without `swiftCLI` still load and display a missing-recording notice; regenerate to add the track. Both optional panes have independent visibility toggles, but hiding a pane does not remove its player from the synchronized timeline.
+
+## Repeated playback
+
+In the comparison app, enable **Loop** beside **Speed** to repeat the selected effect. All present videos,
+including hidden panes, restart together after the longest track ends, preserving the selected 0.5×–3× speed.
+Loop defaults off. Shorter tracks hold their final frame until the shared boundary. Disable Loop to stop
+at the end of the current pass. Pause or seek explicitly leaves playback paused; enabling Loop while
+paused does not start playback. Loop changes playback only, not the recordings or parity evidence.

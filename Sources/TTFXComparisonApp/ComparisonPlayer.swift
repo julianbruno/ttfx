@@ -12,6 +12,7 @@ import TTFXComparisonKit
     var fps = 25
     var position = 0.0
     var isPlaying = false
+    var isLooping = false
     private(set) var playbackSpeed = 1.0
     static let playbackSpeeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3]
     var error: String?
@@ -57,7 +58,7 @@ import TTFXComparisonKit
     }
     func play() {
         guard effect != nil, !isPlaying else { return }
-        if position >= duration { seek(0) }
+        if position >= duration { position = 0 }
         guard loadedPlayers.allSatisfy({ $0.currentItem?.status == .readyToPlay }) else {
             error = "Videos are loading. Press Play when they are ready."; return
         }
@@ -73,10 +74,13 @@ import TTFXComparisonKit
         if isPlaying {
             position = clockPosition()
             // Stop at the old-rate endpoint before changing the clock scale.
-            if position >= duration { pause() }
+            if position >= duration && !canLoop { pause() }
         }
         playbackSpeed = speed
-        if isPlaying { schedulePlayback() }
+        if isPlaying {
+            if position >= duration { completeEndpoint() }
+            else { schedulePlayback() }
+        }
     }
     nonisolated static func mediaPosition(start: Double, elapsed: Double, speed: Double, duration: Double) -> Double {
         min(duration, start + max(0, elapsed) * speed)
@@ -102,9 +106,19 @@ import TTFXComparisonKit
         guard isPlaying else { return }
         position = clockPosition()
         if let item = loadedPlayers.compactMap({ $0.currentItem }).first(where: { $0.status == .failed }) {
-            error = item.error?.localizedDescription ?? "Video playback failed."; pause()
+            error = item.error?.localizedDescription ?? "Video playback failed."; pause(); return
         }
-        if position >= duration { pause() }
+        if position >= duration { completeEndpoint() }
+    }
+    private var canLoop: Bool {
+        isLooping && error == nil && loadedPlayers.allSatisfy { $0.currentItem?.status == .readyToPlay }
+    }
+    private func completeEndpoint() {
+        guard canLoop else { pause(); return }
+        position = 0
+        // setRate(time:atHostTime:) positions and starts each player on one deadline.
+        // Do not launch asynchronous seeks here: their completions can race the scheduled start.
+        schedulePlayback()
     }
     func seek(_ value: Double) {
         pause()

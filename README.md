@@ -266,7 +266,10 @@ Search and select an effect, press **Play** or Space, and scrub the shared timel
 Swift Metal always stay visible; the **Optional panes** buttons independently show/hide **Swift CLI**
 (⌘1) and **SwiftUI** (⌘2). Older libraries remain loadable and show missing-recording notices for
 absent optional tracks. **Speed** selects 0.5×–3× and applies to all four videos, including hidden panes,
-and the shared timeline. Changing speed preserves position and pause state; timestamps remain media
+and the shared timeline. **Loop** repeats all present tracks together at the longest track endpoint,
+retaining the selected speed; it defaults off. Shorter tracks hold until that shared boundary.
+Turning Loop off lets the current pass finish; pause and seek remain paused.
+Changing speed preserves position and pause state; timestamps remain media
 seconds. Only the capture date is shown in the footer; source revision remains in the manifest.
 
 If the app says `manifest.json` could not be opened, it means the selected/default library folder does
