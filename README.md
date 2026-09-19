@@ -3,6 +3,8 @@
 Bring terminal text effects into a native Swift gallery, a command-line tool, and a side-by-side comparison app.
 This **work-in-progress port of Rust ttfx** carries forward the animations of Python [TerminalTextEffects](https://github.com/ChrisBuilds/terminaltexteffects), with Rust as its local reference.
 
+> **Sister project:** Check out [ttfx4android](https://github.com/julianbruno/ttfx4android/), an Android sister project derived from this codebase. Both are active works in progress (WIP), currently verifying and validating what has been built.
+
 ## Executive brief
 
 - **37 native Swift effects** to explore with your own text, seed, and canvas.
